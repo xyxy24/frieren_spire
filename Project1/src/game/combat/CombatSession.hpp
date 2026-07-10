@@ -4,6 +4,7 @@
 #include "game/combat/AttackState.hpp"
 #include "game/combat/CombatContracts.hpp"
 #include "game/combat/Health.hpp"
+#include "game/combat/DamageResolver.hpp"
 #include "game/contracts/PlayerIntent.hpp"
 #include "game/player/PlayerController.hpp"
 #include "game/spells/SpellSystem.hpp"
@@ -48,8 +49,8 @@ private:
     Health enemyHealth_;
     AttackState attack_;
     spells::SpellSystem spells_;
-    std::uint64_t lastHitAttackSequence_ {0};
-    std::uint64_t lastHitEnemyAttackSequence_ {0};
+    DamageResolver playerDamageResolver_;
+    DamageResolver enemyDamageResolver_;
     std::optional<CombatResult> result_;
 };
 }

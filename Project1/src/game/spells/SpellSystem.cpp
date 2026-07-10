@@ -51,13 +51,14 @@ SpellCastResult SpellSystem::tryCast(const std::size_t slot, const Vec2 casterPo
     if (!state.definition || state.cooldownRemaining > 0.0F) return {};
     const auto& spell = *state.definition;
     state.cooldownRemaining = spell.cooldownSeconds;
+    ++state.castSequence;
     const float left = facingDirection >= 0.0F
         ? casterPosition.x + PlayerController::Width
         : casterPosition.x - spell.range;
     const Aabb effectBounds {left, casterPosition.y + (PlayerController::Height - spell.height) * 0.5F,
         spell.range, spell.height};
     const bool hit = intersects(effectBounds, targetBounds);
-    return {true, hit, hit ? spell.damage : 0};
+    return {true, hit, hit ? spell.damage : 0, state.castSequence};
 }
 
 std::array<SpellSlotView, 3> SpellSystem::view() const noexcept

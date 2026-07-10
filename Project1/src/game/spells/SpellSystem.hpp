@@ -31,6 +31,7 @@ struct SpellCastResult
     bool cast {};
     bool hit {};
     int damage {};
+    std::uint64_t sequence {};
 };
 
 [[nodiscard]] const SpellDefinition* findDefinition(std::uint32_t id) noexcept;
@@ -49,6 +50,7 @@ private:
     {
         const SpellDefinition* definition {};
         float cooldownRemaining {};
+        std::uint64_t castSequence {};
     };
     std::array<SlotState, 3> slots_;
 };

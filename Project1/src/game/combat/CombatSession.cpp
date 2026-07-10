@@ -5,6 +5,15 @@
 
 namespace arcane::game
 {
+namespace
+{
+constexpr std::array SpellDamageSources {
+    DamageSource::PlayerSpell0,
+    DamageSource::PlayerSpell1,
+    DamageSource::PlayerSpell2
+};
+}
+
 CombatSession::CombatSession(CombatRequest request)
     : request_(std::move(request)),
       player_(request_.playerSpawn),
@@ -50,15 +59,16 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     {
         if (!intent.spellPressed[slot] || player_.isStunned()) continue;
         const auto cast = spells_.tryCast(slot, player_.position(), player_.facingDirection(), enemyBounds());
-        if (cast.hit) enemyHealth_.damage(cast.damage);
+        if (cast.hit)
+            static_cast<void>(enemyDamageResolver_.resolve(enemyHealth_,
+                {SpellDamageSources[slot], cast.sequence, cast.damage}));
     }
 
     if (attack_.isActive()
-        && lastHitAttackSequence_ != attack_.sequence()
         && intersects(attackBounds(), enemyBounds()))
     {
-        enemyHealth_.damage(AttackDamage);
-        lastHitAttackSequence_ = attack_.sequence();
+        static_cast<void>(enemyDamageResolver_.resolve(enemyHealth_,
+            {DamageSource::PlayerBasicAttack, attack_.sequence(), AttackDamage}));
     }
 
     if (!enemyHealth_.isAlive())
@@ -69,13 +79,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     }
 
     if (enemy_.action() == ai::EnemyAction::Active
-        && lastHitEnemyAttackSequence_ != enemy_.attackSequence()
         && intersects(playerBounds(), enemy_.attackBounds()))
     {
-        const int appliedDamage = playerHealth_.damage(request_.enemyContactDamage);
-        if (appliedDamage > 0)
+        const auto damage = playerDamageResolver_.resolve(playerHealth_,
+            {DamageSource::EnemyAttack, enemy_.attackSequence(), request_.enemyContactDamage});
+        if (damage.appliedDamage > 0)
             player_.applyHitReaction(enemy_.facingDirection() * KnockbackSpeed, HitStunSeconds);
-        lastHitEnemyAttackSequence_ = enemy_.attackSequence();
     }
 
     if (!playerHealth_.isAlive())

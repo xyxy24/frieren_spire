@@ -2,6 +2,7 @@
 #include "game/combat/Health.hpp"
 #include "game/spells/SpellSystem.hpp"
 #include "game/ai/EnemyController.hpp"
+#include "game/combat/DamageResolver.hpp"
 
 #include <iostream>
 #include <array>
@@ -132,6 +133,53 @@ bool zeroHealthProducesDefeatResult()
         && expect(combat.result()->playerHealthRemaining == 0, "defeat should report zero remaining health");
 }
 
+bool damageResolverReportsAppliedAndLethalDamage()
+{
+    arcane::game::Health target(100, 30);
+    arcane::game::DamageResolver resolver;
+    const auto result = resolver.resolve(target,
+        {arcane::game::DamageSource::PlayerBasicAttack, 1U, 50});
+    return expect(result.resolvedDamage == 50, "resolver must report resolved damage")
+        && expect(result.appliedDamage == 30, "applied damage must match actual HP loss")
+        && expect(result.healthBefore == 30 && result.healthAfter == 0, "resolver must snapshot HP change")
+        && expect(result.killed, "lethal damage must be reported");
+}
+
+bool damageResolverDeduplicatesPerSource()
+{
+    arcane::game::Health target(100, 100);
+    arcane::game::DamageResolver resolver;
+    const auto first = resolver.resolve(target,
+        {arcane::game::DamageSource::PlayerBasicAttack, 7U, 20});
+    const auto duplicate = resolver.resolve(target,
+        {arcane::game::DamageSource::PlayerBasicAttack, 7U, 20});
+    const auto independent = resolver.resolve(target,
+        {arcane::game::DamageSource::PlayerSpell0, 7U, 30});
+    return expect(first.appliedDamage == 20, "first sequence must apply")
+        && expect(duplicate.duplicate && duplicate.appliedDamage == 0, "same source sequence must not apply twice")
+        && expect(independent.appliedDamage == 30, "same sequence from another source must remain independent")
+        && expect(target.current() == 50, "only unique damage requests must change HP");
+}
+
+bool damageResolverCentralizesModifiersAndBlocking()
+{
+    arcane::game::Health target(100, 100);
+    arcane::game::DamageResolver resolver;
+    arcane::game::DamageRequest modified {arcane::game::DamageSource::PlayerSpell1, 1U, 10};
+    modified.sourceMultiplier = 1.5F;
+    modified.targetMultiplier = 0.5F;
+    modified.flatReduction = 2;
+    const auto result = resolver.resolve(target, modified);
+    arcane::game::DamageRequest blocked {arcane::game::DamageSource::EnemyAttack, 1U, 99};
+    blocked.blocked = true;
+    const auto blockedResult = resolver.resolve(target, blocked);
+    return expect(result.resolvedDamage == 6 && result.appliedDamage == 6,
+            "modifiers, reduction and rounding must be centralized")
+        && expect(blockedResult.blocked && blockedResult.appliedDamage == 0,
+            "blocked damage must not change health")
+        && expect(target.current() == 94, "blocked request must preserve target HP");
+}
+
 bool enemyChaseIsDeltaTimeStableAndStopsWhenDead()
 {
     const arcane::game::Aabb player {160.0F, 576.0F, 42.0F, 64.0F};
@@ -219,6 +267,9 @@ bool combatSessionAppliesEquippedSpellDamage()
 int main()
 {
     const bool passed = healthClampsDamageAndHealing()
+        && damageResolverReportsAppliedAndLethalDamage()
+        && damageResolverDeduplicatesPerSource()
+        && damageResolverCentralizesModifiersAndBlocking()
         && oneAttackHitsOnlyOnce()
         && fourAttacksProduceVictoryResult()
         && enemyAttackHasWindupAndHitsOnce()

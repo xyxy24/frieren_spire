@@ -26,6 +26,7 @@ add_library(arcane_core STATIC
     Project1/src/app/run/TowerSession.cpp
     Project1/src/game/combat/AttackState.cpp
     Project1/src/game/combat/CombatSession.cpp
+    Project1/src/game/combat/DamageResolver.cpp
     Project1/src/game/combat/Health.cpp
     Project1/src/game/player/PlayerController.cpp
     Project1/src/game/run/DeterministicRng.cpp
