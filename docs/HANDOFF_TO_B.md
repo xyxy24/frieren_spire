@@ -117,18 +117,20 @@ docs/ARCHITECTURE.md 和 docs/DEVELOPMENT_PLAN.md。
 
 ## 6. B 的首个分支
 
-B 完成环境验收后：
+B 的首个流程分支已于 2026-07-10 提交并通过 A 的隔离构建检查。原始工作分支为 `B`，集成时保留原作者提交历史。
+
+首次环境设置时可使用：
 
 ```powershell
 git switch -c b/bootstrap-flow
 ```
 
-首批任务：
+首批任务验收状态：
 
-1. 在 `docs/TEAM_WORK_SPLIT.md` 填写 B 的姓名和实际开发环境。
-2. 定义最小 `RunContext`、`FloorDescriptor`，并引用 `game/combat/CombatContracts.hpp` 中的真实 `CombatResult`。
-3. 在流程测试中直接构造脚本化 `CombatResult`，建立不依赖实时战斗的测试入口；不要复制或另建同名战斗契约。
-4. 提交一个小而可验收的分支，交给 A 构建和评审。
+1. `RunContext`、`FloorDescriptor`、确定性 RNG 和流程测试入口已完成。
+2. 集成层已改为引用 `game/combat/CombatContracts.hpp` 中的真实 `CombatResult`。
+3. 流程测试可直接构造脚本化结果，同时覆盖过期结果拒绝、剩余 HP、奖励、楼梯和三 Boss 胜利。
+4. 下一步是在集成 PR 合并后拉取 `main`，从新的 `b/...` 分支继续楼层表现和流程 UI；不要继续在旧 `B` 分支追加无关功能。
 
 ## 7. 日常同步流程
 

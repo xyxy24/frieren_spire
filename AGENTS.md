@@ -23,8 +23,8 @@ When implementation and documentation disagree, determine whether the code or de
 - Framework: statically linked SFML 3.1.0 fetched by CMake; Graphics/Window/System are enabled, Audio is intentionally deferred.
 - Application target: `Project1`.
 - Pure C++ library target: `arcane_core`.
-- Test targets: `arcane_core_tests` and `combat_session_tests`, registered with CTest.
-- Implemented probe: SFML window/input adapter, player movement and facing, basic attack timing and AABB hit detection, HP, contact damage, a static training enemy, health bars, and `CombatRequest`/`CombatResult` handoff contracts.
+- Test targets: `arcane_core_tests`, `combat_session_tests`, and `run_flow_tests`, registered with CTest.
+- Implemented probe: SFML window/input adapter; player movement and facing; basic attack timing, AABB hit detection, HP, contact damage, a static training enemy and health bars; deterministic floor/reward streams; run, reward, loadout, staircase, merchant, event, and three-boss flow; and a real `CombatResult` handoff between combat and run domains.
 - `Project1.slnx` and `Project1/Project1.vcxproj` are legacy empty-project files retained temporarily. Do not add new source or dependencies to them; CMake is the source of truth.
 
 ## Build & Verification

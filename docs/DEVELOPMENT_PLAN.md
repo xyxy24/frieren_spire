@@ -27,8 +27,9 @@
 
 - M0 进行中：已确定 SFML 3.1.0、C++20、CMake 和 Visual Studio 2026 x64，并已建立远端仓库基线。
 - M1 已开始：完成占位玩家移动/朝向、基础近战攻击、攻击冷却、HP、静态训练敌人、接触伤害和战斗胜负结果。
-- 已建立 `CombatRequest`、`CombatResult`、`PlayerStateView` 与 `EnemyStateView`，供 A/B 独立开发和后续集成。
-- Debug/Release 均已构建，`player_controller` 与 `combat_session` 在两种配置下均通过。
+- A/B 首次集成已完成：`RunController` 直接消费真实 `CombatResult`，接收剩余 HP、金币和遭遇 ID，并拒绝过期或重复结果。
+- 已实现确定性楼层/奖励流、五层流程测试、三 Boss 胜利、跨层回血、奖励装备、商店事务、事件事务，以及事件/商人层的非战斗完成路径。
+- `player_controller`、`combat_session` 与 `run_flow` 已在 Debug/Release 下全部通过。
 - M0 尚缺：另一位成员电脑复现、音频/资源探针、正式接口走查和素材目录约定。
 - M1 尚缺：可移动/主动攻击的普通敌人、击退与硬直、一个带独立 CD 的魔法，以及三槽 HUD。
 
