@@ -24,6 +24,7 @@ public:
         std::span<const game::run::ContentId> rewardPool);
     [[nodiscard]] bool completeNonCombatFloor();
     [[nodiscard]] const game::rewards::RewardOffer& rewardOffer() const;
+    [[nodiscard]] bool openReward();
     [[nodiscard]] bool chooseReward(game::run::ContentId choice);
     [[nodiscard]] bool claimFallbackReward();
     [[nodiscard]] game::economy::PurchaseResult purchaseMerchantItem(

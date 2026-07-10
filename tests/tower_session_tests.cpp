@@ -45,12 +45,24 @@ void interact(arcane::app::TowerSession& tower)
     tower.update(intent, 0.01F);
 }
 
+void collectNearbyLoot(arcane::app::TowerSession& tower)
+{
+    arcane::game::PlayerIntent moveRight;
+    moveRight.moveAxis = 1.0F;
+    tower.update(moveRight, 0.10F);
+    interact(tower);
+}
+
 bool combatRewardLoadoutAndStairsFormOneFlow()
 {
     arcane::app::TowerSession tower(0xC0FFEEU, fastFlowConfig());
     attackOnce(tower);
+    if (!expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
+            "enemy defeat must create a loot drop")
+        || !expect(tower.lootDropBounds().has_value(), "loot drop must exist at enemy death")) return false;
+    collectNearbyLoot(tower);
     if (!expect(tower.run().phase() == arcane::game::run::RunPhase::Reward,
-            "enemy defeat must enter the reward phase")
+            "loot interaction must enter the reward phase")
         || !expect(tower.rewardCandidates().has_value(), "reward phase must expose three candidates")) return false;
 
     const auto selectedReward = (*tower.rewardCandidates())[0];
@@ -99,8 +111,11 @@ bool thirdBossEndsInVictory()
     for (int boss = 0; boss < 3; ++boss)
     {
         attackOnce(tower);
+        if (!expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
+                "each boss defeat must create loot")) return false;
+        collectNearbyLoot(tower);
         if (!expect(tower.run().phase() == arcane::game::run::RunPhase::Reward,
-                "each boss defeat must enter reward")) return false;
+                "each boss loot interaction must enter reward")) return false;
         chooseLeftReward(tower);
         interact(tower);
     }
@@ -185,7 +200,7 @@ bool pauseCanContinueOrRestartFloorSnapshot()
     arcane::game::PlayerIntent attack;
     attack.attackPressed = true;
     app.update(attack, 0.01F);
-    if (!expect(app.tower()->run().phase() == arcane::game::run::RunPhase::Reward,
+    if (!expect(app.tower()->run().phase() == arcane::game::run::RunPhase::LootPending,
         "test must mutate the current floor before restart")) return false;
     arcane::game::PlayerIntent pause;
     pause.pausePressed = true;
@@ -227,6 +242,28 @@ bool defeatResultCanStartANewRun()
             && app.tower()->run().player().currentHp == app.tower()->run().player().maxHp,
         "result confirmation must create a fresh run");
 }
+
+bool heldSpellCannotBypassLootInteraction()
+{
+    auto config = fastFlowConfig();
+    config.initialPlayer.learnedSpells = {1001U};
+    config.initialPlayer.equippedSpells[0] = 1001U;
+    arcane::app::TowerSession tower(777U, config);
+
+    arcane::game::PlayerIntent heldSpell;
+    heldSpell.spellPressed[0] = true;
+    tower.update(heldSpell, 0.01F);
+    if (!expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
+            "lethal spell must create loot instead of opening reward")
+        || !expect(tower.run().player().learnedSpells.size() == 1U,
+            "lethal spell input must not grant another spell")) return false;
+
+    tower.update(heldSpell, 0.01F);
+    return expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
+            "continued spell input must not bypass loot interaction")
+        && expect(tower.run().player().learnedSpells.size() == 1U,
+            "continued spell input must not select a reward");
+}
 }
 
 int main()
@@ -236,7 +273,8 @@ int main()
         && thirdBossEndsInVictory()
         && specialFloorsAdvanceWithoutCombat()
         && pauseCanContinueOrRestartFloorSnapshot()
-        && defeatResultCanStartANewRun();
+        && defeatResultCanStartANewRun()
+        && heldSpellCannotBypassLootInteraction();
     if (!passed) return 1;
     std::cout << "All tower session tests passed.\n";
     return 0;

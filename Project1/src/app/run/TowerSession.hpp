@@ -43,6 +43,7 @@ public:
     [[nodiscard]] const game::CombatSession* combat() const noexcept;
     [[nodiscard]] game::run::FloorType currentFloorType() const noexcept;
     [[nodiscard]] std::optional<std::array<game::run::ContentId, 3>> rewardCandidates() const;
+    [[nodiscard]] std::optional<game::Aabb> lootDropBounds() const noexcept;
     [[nodiscard]] bool loadoutOpen() const noexcept;
     [[nodiscard]] std::optional<game::run::ContentId> selectedLearnedSpell() const noexcept;
     [[nodiscard]] game::Aabb staircaseBounds() const noexcept;
@@ -65,6 +66,7 @@ private:
     TowerSessionConfig config_;
     game::floors::FloorScheduler scheduler_;
     std::optional<game::CombatSession> combat_;
+    std::optional<game::Aabb> lootDropBounds_;
     std::optional<game::PlayerController> explorationPlayer_;
     game::run::FloorType currentFloorType_ {game::run::FloorType::Combat};
     std::size_t selectedLearnedSpellIndex_ {0};

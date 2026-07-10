@@ -92,7 +92,8 @@ stateDiagram-v2
     MainMenu --> RunSetup
     RunSetup --> FloorLoading
     FloorLoading --> InEncounter
-    InEncounter --> Reward: 普通战或 Boss 胜利
+    InEncounter --> LootPending: 普通战或 Boss 胜利并生成掉落物
+    LootPending --> Reward: 玩家靠近掉落物并交互
     InEncounter --> FloorComplete: 事件或商店结束
     InEncounter --> Defeat: HP = 0
     Reward --> FloorComplete: 奖励加入已学魔法
@@ -104,7 +105,7 @@ stateDiagram-v2
     Result --> MainMenu
 ```
 
-奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是顶层流程状态，而是可从 `InEncounter`、`Reward` 或 `FloorComplete` 打开的暂停覆盖层；关闭后恢复原状态。
+`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是顶层流程状态，而是可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的暂停覆盖层；关闭后恢复原状态。
 
 ## 7. 战斗与时间
 

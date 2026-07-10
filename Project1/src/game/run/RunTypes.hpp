@@ -22,6 +22,7 @@ enum class RunPhase : std::uint8_t
 {
     FloorLoading,
     InEncounter,
+    LootPending,
     Reward,
     FloorComplete,
     Defeat,

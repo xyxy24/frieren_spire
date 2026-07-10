@@ -60,8 +60,12 @@ bool completesFiveFloorLoops()
         if (!expect(descriptor.seed == expectedSeed, "floor seed must match its index")
             || !expect(run.resolveEncounter(victoryResult(descriptor.encounterIds[0], 5), spells),
                 "combat victory must resolve once")) return false;
-        const auto choice = run.rewardOffer().candidates[0];
         const auto beforeReward = run.floorResult();
+        if (!expect(run.phase() == arcane::game::run::RunPhase::LootPending,
+                "combat victory must wait for loot interaction")
+            || !expect(run.openReward(), "loot interaction must open the reward")
+            || !expect(!run.openReward(), "reward cannot be opened twice")) return false;
+        const auto choice = run.rewardOffer().candidates[0];
         if (!expect(run.chooseReward(choice), "reward choice must apply")
             || !expect(!run.chooseReward(choice), "reward cannot apply twice")
             || !expect(beforeReward.floorComplete && !beforeReward.rewardComplete
@@ -84,7 +88,7 @@ bool healsHalfMissingRoundedUp()
     arcane::app::RunController run(7U);
     const auto& descriptor = run.loadFloor(arcane::game::run::FloorType::Combat, encounters);
     if (!run.resolveEncounter(victoryResult(descriptor.encounterIds[0], 0, 1), spells)) return false;
-    if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.useStairs()) return false;
+    if (!run.openReward() || !run.chooseReward(run.rewardOffer().candidates[0]) || !run.useStairs()) return false;
     return expect(run.player().currentHp == 51, "99 missing HP heals 50 with ceiling rounding");
 }
 
@@ -167,7 +171,7 @@ bool thirdBossVictorySettlesOnce()
     {
         static_cast<void>(run.loadFloor(arcane::game::run::FloorType::Boss, boss));
         if (!run.resolveEncounter(victoryResult(99U, 0), rewards)) return false;
-        if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.useStairs()) return false;
+        if (!run.openReward() || !run.chooseReward(run.rewardOffer().candidates[0]) || !run.useStairs()) return false;
     }
     return expect(run.context().bossesDefeated == 3U, "boss progress must advance once per boss floor")
         && expect(run.phase() == arcane::game::run::RunPhase::Victory, "third boss must end the run in victory")
@@ -184,6 +188,7 @@ bool depletedRewardUsesGoldFallback()
     arcane::app::RunController run(42U, player);
     const auto& floor = run.loadFloor(run::FloorType::Combat, encounters);
     if (!run.resolveEncounter(victoryResult(floor.encounterIds[0], 5), spells)) return false;
+    if (!run.openReward()) return false;
     return expect(run.rewardOffer().kind == rewards::RewardKind::GoldFallback,
             "depleted reward pool must use fallback")
         && expect(run.claimFallbackReward(), "fallback must be claimable")
@@ -244,8 +249,26 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
     arcane::game::PlayerIntent attack;
     attack.attackPressed = true;
     tower.update(attack, 0.01F);
+    if (!expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
+            "combat victory should create a pending loot drop")
+        || !expect(tower.lootDropBounds().has_value(), "enemy defeat should expose a loot drop")) return false;
+
+    arcane::game::PlayerIntent prematureRewardInput;
+    prematureRewardInput.spellPressed[0] = true;
+    tower.update(prematureRewardInput, 0.01F);
+    if (!expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
+            "spell input must not choose a reward before loot interaction")
+        || !expect(tower.run().player().learnedSpells.empty(),
+            "premature reward input must not teach a spell")) return false;
+
+    arcane::game::PlayerIntent moveToLoot;
+    moveToLoot.moveAxis = 1.0F;
+    tower.update(moveToLoot, 0.10F);
+    arcane::game::PlayerIntent interact;
+    interact.interactPressed = true;
+    tower.update(interact, 0.01F);
     if (!expect(tower.run().phase() == arcane::game::run::RunPhase::Reward,
-        "combat victory should enter the visible reward phase")) return false;
+        "interacting with the loot drop should open the reward phase")) return false;
 
     const auto candidates = tower.rewardCandidates();
     if (!expect(candidates.has_value(), "reward phase should expose three candidates")) return false;
@@ -276,8 +299,6 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
     tower.update(toggleLoadout, 0.01F);
     if (!expect(!tower.loadoutOpen(), "closing loadout should preserve the equipped spell")) return false;
 
-    arcane::game::PlayerIntent interact;
-    interact.interactPressed = true;
     tower.update(interact, 0.01F);
     if (!expect(tower.run().phase() == arcane::game::run::RunPhase::FloorComplete,
         "interacting away from the staircase must not change floors")) return false;

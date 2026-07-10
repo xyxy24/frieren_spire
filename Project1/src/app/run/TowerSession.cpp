@@ -74,6 +74,17 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
             if (combat_->result())
             {
                 const game::CombatResult result = *combat_->result();
+                if (result.outcome == game::CombatOutcome::Victory)
+                {
+                    constexpr float DropSize = 32.0F;
+                    const game::EnemyStateView enemy = combat_->enemyState();
+                    lootDropBounds_ = game::Aabb {
+                        enemy.position.x + (game::CombatSession::EnemyWidth - DropSize) * 0.5F,
+                        enemy.position.y + game::CombatSession::EnemyHeight - DropSize,
+                        DropSize,
+                        DropSize
+                    };
+                }
                 const bool resolved = currentFloorType_ == game::run::FloorType::Boss
                     ? run_.resolveEncounter(result, BossRewardPool)
                     : run_.resolveEncounter(result, NormalRewardPool);
@@ -82,6 +93,20 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
         }
         else
             updateSpecialFloor(intent, deltaSeconds);
+        break;
+
+    case game::run::RunPhase::LootPending:
+        if (!combat_ || !lootDropBounds_)
+            throw std::logic_error("loot phase requires a completed combat map and drop");
+        combat_->update(intent, deltaSeconds);
+        if (intent.interactPressed)
+        {
+            const game::PlayerStateView player = combat_->playerState();
+            const game::Aabb playerBounds {player.position.x, player.position.y,
+                game::PlayerController::Width, game::PlayerController::Height};
+            if (game::intersects(playerBounds, *lootDropBounds_))
+                static_cast<void>(run_.openReward());
+        }
         break;
 
     case game::run::RunPhase::Reward:
@@ -152,6 +177,12 @@ std::optional<std::array<game::run::ContentId, 3>> TowerSession::rewardCandidate
 {
     if (run_.phase() != game::run::RunPhase::Reward) return std::nullopt;
     return run_.rewardOffer().candidates;
+}
+
+std::optional<game::Aabb> TowerSession::lootDropBounds() const noexcept
+{
+    if (run_.phase() != game::run::RunPhase::LootPending) return std::nullopt;
+    return lootDropBounds_;
 }
 
 bool TowerSession::loadoutOpen() const noexcept
@@ -227,6 +258,7 @@ void TowerSession::startNextFloor()
     merchantStock_.clear();
     eventTransaction_.reset();
     combat_.reset();
+    lootDropBounds_.reset();
     explorationPlayer_.reset();
     specialPanelOpen_ = false;
     eventFloorState_ = EventFloorState::Untriggered;

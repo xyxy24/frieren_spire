@@ -71,7 +71,7 @@ bool RunController::resolveEncounter(const game::CombatResult& result,
     reward_ = offer;
     activeEncounterId_.reset();
     rewardApplied_ = false;
-    phase_ = game::run::RunPhase::Reward;
+    phase_ = game::run::RunPhase::LootPending;
     return true;
 }
 
@@ -90,6 +90,13 @@ const game::rewards::RewardOffer& RunController::rewardOffer() const
 {
     if (!reward_) throw std::logic_error("no reward is pending");
     return *reward_;
+}
+
+bool RunController::openReward()
+{
+    if (phase_ != game::run::RunPhase::LootPending || !reward_ || rewardApplied_) return false;
+    phase_ = game::run::RunPhase::Reward;
+    return true;
 }
 
 bool RunController::chooseReward(const game::run::ContentId choice)

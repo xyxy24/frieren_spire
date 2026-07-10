@@ -218,6 +218,22 @@ void drawStaircase(
     }
 }
 
+void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
+{
+    sf::CircleShape glow(bounds.width * 0.65F, 32U);
+    glow.setOrigin({glow.getRadius(), glow.getRadius()});
+    glow.setPosition({bounds.left + bounds.width * 0.5F, bounds.top + bounds.height * 0.5F});
+    glow.setFillColor(sf::Color {116, 188, 255, 70});
+    target.draw(glow);
+
+    sf::CircleShape drop(bounds.width * 0.5F, 4U);
+    drop.setPosition({bounds.left, bounds.top});
+    drop.setFillColor(sf::Color {116, 188, 255});
+    drop.setOutlineColor(sf::Color {232, 246, 255});
+    drop.setOutlineThickness(3.0F);
+    target.draw(drop);
+}
+
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
 {
     const arcane::game::CombatSession* combat = tower.combat();
@@ -321,6 +337,8 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
             return title + "EVENT - U Gain 10 Gold, I Trade 20 HP For Relic, E Close";
         }
         return title + "A/D Move, Space Jump, J Attack, Tab Loadout";
+    case arcane::game::run::RunPhase::LootPending:
+        return title + "ENEMY DROP - Move To Drop, E Inspect Reward | Tab Loadout";
     case arcane::game::run::RunPhase::Reward:
     {
         const auto candidates = tower.rewardCandidates();
@@ -428,12 +446,14 @@ int main()
         {
             const auto phase = tower->run().phase();
             if (phase == arcane::game::run::RunPhase::InEncounter
+                || phase == arcane::game::run::RunPhase::LootPending
                 || phase == arcane::game::run::RunPhase::FloorComplete)
             {
                 if (tower->combat())
                 {
                     drawCombat(window, *tower);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
+                    if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }
             }
             if (phase == arcane::game::run::RunPhase::Reward) drawRewardScreen(window, *tower);
