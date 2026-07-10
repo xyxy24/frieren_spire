@@ -1,4 +1,4 @@
-#include "app/run/TowerSession.hpp"
+#include "app/run/AppFlowController.hpp"
 
 #include <iostream>
 #include <optional>
@@ -171,6 +171,62 @@ bool specialFloorsAdvanceWithoutCombat()
     interact(merchantTower);
     return expect(merchantTower.run().context().floorIndex == 1U, "completed merchant must advance");
 }
+
+bool pauseCanContinueOrRestartFloorSnapshot()
+{
+    auto config = fastFlowConfig();
+    arcane::app::AppFlowController app(123U, config);
+    arcane::game::PlayerIntent confirm;
+    confirm.menuConfirmPressed = true;
+    app.update(confirm, 0.01F);
+    if (!expect(app.screen() == arcane::app::AppScreen::Playing && app.tower(),
+        "start confirmation must create a playable run")) return false;
+
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    app.update(attack, 0.01F);
+    if (!expect(app.tower()->run().phase() == arcane::game::run::RunPhase::Reward,
+        "test must mutate the current floor before restart")) return false;
+    arcane::game::PlayerIntent pause;
+    pause.pausePressed = true;
+    app.update(pause, 0.01F);
+    arcane::game::PlayerIntent restart;
+    restart.menuSecondaryPressed = true;
+    app.update(restart, 0.01F);
+    if (!expect(app.screen() == arcane::app::AppScreen::Playing
+            && app.tower()->run().phase() == arcane::game::run::RunPhase::InEncounter,
+        "restart must restore the floor-start phase")
+        || !expect(app.tower()->run().player().gold == 0 && app.tower()->run().player().learnedSpells.empty(),
+            "restart must roll back rewards earned on the current floor")) return false;
+
+    app.update(pause, 0.01F);
+    app.update(confirm, 0.01F);
+    if (!expect(app.screen() == arcane::app::AppScreen::Start && app.canContinue(),
+        "temporary exit must return to a continue-capable start screen")) return false;
+    app.update(confirm, 0.01F);
+    return expect(app.screen() == arcane::app::AppScreen::Playing
+            && app.tower()->run().context().floorIndex == 0U,
+        "continue must resume the retained run instead of creating another one");
+}
+
+bool defeatResultCanStartANewRun()
+{
+    auto config = fastFlowConfig();
+    config.enemySpawn = config.playerSpawn;
+    config.normalEnemyHealth = 1000;
+    arcane::app::AppFlowController app(321U, config);
+    arcane::game::PlayerIntent confirm;
+    confirm.menuConfirmPressed = true;
+    app.update(confirm, 0.01F);
+    for (int hit = 0; hit < 10 && app.screen() == arcane::app::AppScreen::Playing; ++hit)
+        app.update(arcane::game::PlayerIntent {}, 1.01F);
+    if (!expect(app.screen() == arcane::app::AppScreen::Result && !app.victory(),
+        "player death must enter the defeat result screen")) return false;
+    app.update(confirm, 0.01F);
+    return expect(app.screen() == arcane::app::AppScreen::Playing
+            && app.tower()->run().player().currentHp == app.tower()->run().player().maxHp,
+        "result confirmation must create a fresh run");
+}
 }
 
 int main()
@@ -178,7 +234,9 @@ int main()
     const bool passed = combatRewardLoadoutAndStairsFormOneFlow()
         && contactDefeatEndsTheTowerFlow()
         && thirdBossEndsInVictory()
-        && specialFloorsAdvanceWithoutCombat();
+        && specialFloorsAdvanceWithoutCombat()
+        && pauseCanContinueOrRestartFloorSnapshot()
+        && defeatResultCanStartANewRun();
     if (!passed) return 1;
     std::cout << "All tower session tests passed.\n";
     return 0;

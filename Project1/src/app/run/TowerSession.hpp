@@ -54,6 +54,7 @@ public:
     [[nodiscard]] bool specialPanelOpen() const noexcept;
     [[nodiscard]] EventFloorState eventFloorState() const noexcept;
     [[nodiscard]] std::optional<game::run::ContentId> eventResultChoice() const noexcept;
+    void restartCurrentFloor();
 
 private:
     void startNextFloor();
@@ -73,5 +74,7 @@ private:
     EventFloorState eventFloorState_ {EventFloorState::Untriggered};
     std::optional<game::run::ContentId> eventResultChoice_;
     bool specialPanelOpen_ {};
+    std::optional<RunController> floorStartRun_;
+    std::optional<game::floors::FloorScheduler> floorStartScheduler_;
 };
 }

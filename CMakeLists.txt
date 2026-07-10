@@ -21,6 +21,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SFML)
 
 add_library(arcane_core STATIC
+    Project1/src/app/run/AppFlowController.cpp
     Project1/src/app/run/TowerSession.cpp
     Project1/src/game/combat/AttackState.cpp
     Project1/src/game/combat/CombatSession.cpp

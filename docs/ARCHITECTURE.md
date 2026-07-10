@@ -82,6 +82,8 @@ GameApp
 
 ## 6. 顶层状态机
 
+`AppFlowController` 持有可选的 `TowerSession` 并管理 `Start/Playing/Pause/Result` 页面。暂退到 Start 时保留同一个 `TowerSession` 供 Continue 使用；结果页确认则创建新实例。`TowerSession` 在每层调度前保存 `RunController` 与 `FloorScheduler` 快照，本层重开时恢复快照后重新生成同一种子楼层，不保存或复用旧层实体。
+
 ```mermaid
 stateDiagram-v2
     [*] --> Boot

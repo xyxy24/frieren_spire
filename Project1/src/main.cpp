@@ -1,4 +1,4 @@
-#include "app/run/TowerSession.hpp"
+#include "app/run/AppFlowController.hpp"
 #include "platform/SfmlInputMapper.hpp"
 
 #include <SFML/Graphics.hpp>
@@ -328,6 +328,48 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
 
     return title;
 }
+
+void drawMenuPanels(sf::RenderTarget& target, const std::size_t count, const sf::Color color)
+{
+    for (std::size_t index = 0U; index < count; ++index)
+    {
+        sf::RectangleShape panel({420.0F, 82.0F});
+        panel.setPosition({430.0F, 270.0F + static_cast<float>(index) * 110.0F});
+        panel.setFillColor(color);
+        panel.setOutlineColor(sf::Color {225, 220, 240});
+        panel.setOutlineThickness(3.0F);
+        target.draw(panel);
+    }
+}
+
+void drawDigit(sf::RenderTarget& target, const int digit, const sf::Vector2f origin)
+{
+    constexpr std::array<std::uint8_t, 10> masks {0x3FU, 0x06U, 0x5BU, 0x4FU, 0x66U,
+        0x6DU, 0x7DU, 0x07U, 0x7FU, 0x6FU};
+    constexpr std::array<sf::Vector2f, 7> positions {{{4.0F, 0.0F}, {20.0F, 4.0F},
+        {20.0F, 24.0F}, {4.0F, 40.0F}, {0.0F, 24.0F}, {0.0F, 4.0F}, {4.0F, 20.0F}}};
+    constexpr std::array<sf::Vector2f, 7> sizes {{{16.0F, 4.0F}, {4.0F, 16.0F},
+        {4.0F, 16.0F}, {16.0F, 4.0F}, {4.0F, 16.0F}, {4.0F, 16.0F}, {16.0F, 4.0F}}};
+    for (std::size_t segment = 0U; segment < positions.size(); ++segment)
+    {
+        if ((masks[static_cast<std::size_t>(digit)] & (1U << segment)) == 0U) continue;
+        sf::RectangleShape bar(sizes[segment]);
+        bar.setPosition(origin + positions[segment]);
+        bar.setFillColor(sf::Color {246, 201, 82});
+        target.draw(bar);
+    }
+}
+
+void drawGold(sf::RenderTarget& target, const int gold)
+{
+    sf::CircleShape coin(10.0F);
+    coin.setPosition({32.0F, 68.0F});
+    coin.setFillColor(sf::Color {246, 201, 82});
+    target.draw(coin);
+    const std::string digits = std::to_string(std::max(0, gold));
+    for (std::size_t index = 0U; index < digits.size(); ++index)
+        drawDigit(target, digits[index] - '0', {62.0F + static_cast<float>(index) * 30.0F, 58.0F});
+}
 }
 
 int main()
@@ -338,7 +380,7 @@ int main()
     arcane::platform::SfmlInputMapper inputMapper;
     arcane::app::TowerSessionConfig config;
     config.worldBounds = {0.0F, static_cast<float>(WindowWidth), GroundTop};
-    arcane::app::TowerSession tower(0xC0FFEEU, config);
+    arcane::app::AppFlowController app(0xC0FFEEU, config);
     sf::Clock frameClock;
 
     while (window.isOpen())
@@ -349,63 +391,56 @@ int main()
         }
 
         const float deltaSeconds = std::min(frameClock.restart().asSeconds(), MaximumFrameTime);
-        tower.update(inputMapper.sample(), deltaSeconds);
-        window.setTitle(makeWindowTitle(tower));
+        app.update(inputMapper.sample(), deltaSeconds);
+        if (app.screen() == arcane::app::AppScreen::Start)
+            window.setTitle(app.canContinue() ? "Arcane Spire | CONTINUE - Enter" : "Arcane Spire | START - Enter");
+        else if (app.screen() == arcane::app::AppScreen::Pause)
+            window.setTitle("Arcane Spire | PAUSE - Esc Resume | Enter Exit To Start | R Restart Floor");
+        else if (app.screen() == arcane::app::AppScreen::Result)
+            window.setTitle(app.victory() ? "Arcane Spire | WIN - Enter Start" : "Arcane Spire | DEFEAT - Enter Start");
+        else if (app.tower()) window.setTitle(makeWindowTitle(*app.tower()) + " | Esc Pause");
 
-        const auto phase = tower.run().phase();
         sf::Color background {18, 20, 28};
-        if (phase == arcane::game::run::RunPhase::Reward) background = sf::Color {27, 30, 58};
-        if (phase == arcane::game::run::RunPhase::InEncounter
-            && tower.currentFloorType() == arcane::game::run::FloorType::Merchant)
-            background = sf::Color {48, 40, 27};
-        if (phase == arcane::game::run::RunPhase::InEncounter
-            && tower.currentFloorType() == arcane::game::run::FloorType::Event)
-            background = sf::Color {38, 27, 52};
-        if (phase == arcane::game::run::RunPhase::FloorComplete) background = sf::Color {27, 38, 52};
-        if (phase == arcane::game::run::RunPhase::Victory) background = sf::Color {20, 67, 49};
-        if (phase == arcane::game::run::RunPhase::Defeat) background = sf::Color {68, 24, 31};
+        if (app.screen() == arcane::app::AppScreen::Result)
+            background = app.victory() ? sf::Color {20, 67, 49} : sf::Color {68, 24, 31};
         window.clear(background);
 
-        if (phase == arcane::game::run::RunPhase::InEncounter
-            || phase == arcane::game::run::RunPhase::FloorComplete)
+        if (app.screen() == arcane::app::AppScreen::Start)
+            drawMenuPanels(window, 1U, app.canContinue() ? sf::Color {55, 105, 130} : sf::Color {63, 116, 82});
+        else if (app.screen() == arcane::app::AppScreen::Pause)
+            drawMenuPanels(window, 2U, sf::Color {74, 66, 105});
+        else if (app.screen() == arcane::app::AppScreen::Result)
+            drawMenuPanels(window, 1U, app.victory() ? sf::Color {63, 116, 82} : sf::Color {116, 63, 72});
+        else if (const auto* tower = app.tower())
         {
-            if (tower.combat())
+            const auto phase = tower->run().phase();
+            if (phase == arcane::game::run::RunPhase::InEncounter
+                || phase == arcane::game::run::RunPhase::FloorComplete)
             {
-                drawCombat(window, tower);
-                drawStaircase(window, tower.staircaseBounds(), tower.staircaseUnlocked());
+                if (tower->combat())
+                {
+                    drawCombat(window, *tower);
+                    drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
+                }
             }
-        }
-        if (phase == arcane::game::run::RunPhase::Reward) drawRewardScreen(window, tower);
-        if (phase == arcane::game::run::RunPhase::InEncounter
-            && tower.currentFloorType() == arcane::game::run::FloorType::Merchant)
-        {
-            drawSpecialFloor(window, tower);
-            if (tower.specialPanelOpen()) drawMerchantScreen(window, tower);
-        }
-        if (phase == arcane::game::run::RunPhase::InEncounter
-            && tower.currentFloorType() == arcane::game::run::FloorType::Event)
-        {
-            drawSpecialFloor(window, tower);
-            if (tower.specialPanelOpen()) drawEventScreen(window, tower);
-        }
-
-        int displayedHealth = tower.run().player().currentHp;
-        if (tower.combat()) displayedHealth = tower.combat()->playerState().currentHealth;
-        drawHealthBar(
-            window,
-            {32.0F, 28.0F},
-            {300.0F, 22.0F},
-            displayedHealth,
-            tower.run().player().maxHp,
-            sf::Color {108, 206, 126});
-
-        if (!tower.loadoutOpen())
-        {
-            drawEquippedSlots(window, tower.run().player());
-        }
-        else
-        {
-            drawLoadoutOverlay(window, tower);
+            if (phase == arcane::game::run::RunPhase::Reward) drawRewardScreen(window, *tower);
+            if (phase == arcane::game::run::RunPhase::InEncounter
+                && (tower->currentFloorType() == arcane::game::run::FloorType::Merchant
+                    || tower->currentFloorType() == arcane::game::run::FloorType::Event))
+            {
+                drawSpecialFloor(window, *tower);
+                if (tower->specialPanelOpen() && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
+                    drawMerchantScreen(window, *tower);
+                if (tower->specialPanelOpen() && tower->currentFloorType() == arcane::game::run::FloorType::Event)
+                    drawEventScreen(window, *tower);
+            }
+            int displayedHealth = tower->run().player().currentHp;
+            if (tower->combat()) displayedHealth = tower->combat()->playerState().currentHealth;
+            drawHealthBar(window, {32.0F, 28.0F}, {300.0F, 22.0F}, displayedHealth,
+                tower->run().player().maxHp, sf::Color {108, 206, 126});
+            drawGold(window, tower->run().player().gold);
+            if (!tower->loadoutOpen()) drawEquippedSlots(window, tower->run().player());
+            else drawLoadoutOverlay(window, *tower);
         }
 
         window.display();

@@ -203,6 +203,15 @@ std::optional<game::run::ContentId> TowerSession::eventResultChoice() const noex
     return eventResultChoice_;
 }
 
+void TowerSession::restartCurrentFloor()
+{
+    if (!floorStartRun_ || !floorStartScheduler_)
+        throw std::logic_error("current floor has no restart snapshot");
+    run_ = *floorStartRun_;
+    scheduler_ = *floorStartScheduler_;
+    startNextFloor();
+}
+
 void TowerSession::startNextFloor()
 {
     if (run_.phase() != game::run::RunPhase::FloorLoading)
@@ -210,6 +219,8 @@ void TowerSession::startNextFloor()
         throw std::logic_error("a floor can only start from FloorLoading");
     }
 
+    floorStartRun_ = run_;
+    floorStartScheduler_ = scheduler_;
     currentFloorType_ = config_.enableSpecialFloors
         ? scheduler_.next(run_.context())
         : ((run_.context().floorIndex + 1U) % config_.floorsPerBoss == 0U
