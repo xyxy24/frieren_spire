@@ -126,8 +126,8 @@ git switch -c b/bootstrap-flow
 首批任务：
 
 1. 在 `docs/TEAM_WORK_SPLIT.md` 填写 B 的姓名和实际开发环境。
-2. 定义最小 `RunContext`、`FloorDescriptor` 和假 `CombatResult`。
-3. 建立不依赖真实战斗的流程测试入口。
+2. 定义最小 `RunContext`、`FloorDescriptor`，并引用 `game/combat/CombatContracts.hpp` 中的真实 `CombatResult`。
+3. 在流程测试中直接构造脚本化 `CombatResult`，建立不依赖实时战斗的测试入口；不要复制或另建同名战斗契约。
 4. 提交一个小而可验收的分支，交给 A 构建和评审。
 
 ## 7. 日常同步流程
@@ -177,4 +177,3 @@ git push -u origin <自己的分支>
 ### 两台电脑生成文件不同
 
 只比较源码、CMake、脚本、文档和资源。`build/`、`.vs/` 和编译产物是本地生成内容，不应比较或提交。
-

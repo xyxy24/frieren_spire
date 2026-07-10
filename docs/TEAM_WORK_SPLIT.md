@@ -517,5 +517,6 @@ test(reward): prevent duplicate boss choice
 - 2026-07-10：成员 A 已认领战斗域工作，姓名待补。
 - 2026-07-10：接受 SFML 3.1.0、C++20、CMake 与 Visual Studio 2026 x64 技术基线。
 - 2026-07-10：A 已完成 Git 初始化、构建脚本、SFML 窗口/输入探针、占位玩家移动跳跃和首个纯 C++ 测试。
-- 下一交接点：B 在自己的电脑运行 `configure`、`build-debug`、`test-debug`，并开始假战斗流程入口。
+- 2026-07-10：A 已完成最小 `CombatSession`、HP、基础攻击/冷却、AABB 命中、训练敌人、接触伤害、胜负结果和第二组纯 C++ 测试。
+- 下一交接点：B 在自己的电脑运行 `configure`、`build-debug`、`test-debug`，引用真实 `CombatResult` 开始脚本化战斗流程入口。
 - B 的完整克隆、环境、Codex 与 Git 入组流程见 `HANDOFF_TO_B.md`。

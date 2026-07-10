@@ -23,8 +23,8 @@ When implementation and documentation disagree, determine whether the code or de
 - Framework: statically linked SFML 3.1.0 fetched by CMake; Graphics/Window/System are enabled, Audio is intentionally deferred.
 - Application target: `Project1`.
 - Pure C++ library target: `arcane_core`.
-- Test target: `arcane_core_tests`, registered with CTest.
-- Implemented probe: SFML window, input adapter, placeholder player movement/jump/gravity/ground and horizontal bounds.
+- Test targets: `arcane_core_tests` and `combat_session_tests`, registered with CTest.
+- Implemented probe: SFML window/input adapter, player movement and facing, basic attack timing and AABB hit detection, HP, contact damage, a static training enemy, health bars, and `CombatRequest`/`CombatResult` handoff contracts.
 - `Project1.slnx` and `Project1/Project1.vcxproj` are legacy empty-project files retained temporarily. Do not add new source or dependencies to them; CMake is the source of truth.
 
 ## Build & Verification
@@ -44,7 +44,7 @@ Run commands from the repository root in PowerShell. Initial configuration downl
 - Run Release x64 when changing performance-sensitive code, compiler settings, packaging, or third-party integration.
 - Project-owned targets must compile with zero errors and zero warnings. Warnings emitted only while building pinned third-party source must be recorded separately and must not be hidden by lowering project warning levels.
 - Do not claim tests passed unless the matching `test-*` command was run and CTest reported success.
-- When adding deterministic, non-rendering behavior, add or update `arcane_core_tests` in the same change.
+- When adding deterministic, non-rendering behavior, add or update an `arcane_core` CTest target in the same change.
 
 ## Development Workflow
 

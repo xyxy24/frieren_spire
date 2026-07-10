@@ -25,6 +25,7 @@ public:
     [[nodiscard]] Vec2 position() const noexcept;
     [[nodiscard]] Vec2 velocity() const noexcept;
     [[nodiscard]] bool isGrounded() const noexcept;
+    [[nodiscard]] float facingDirection() const noexcept;
 
 private:
     static constexpr float MoveSpeed = 260.0F;
@@ -35,6 +36,6 @@ private:
     Vec2 position_;
     Vec2 velocity_;
     bool grounded_ {false};
+    float facingDirection_ {1.0F};
 };
 }
-
