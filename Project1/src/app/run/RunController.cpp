@@ -101,6 +101,33 @@ bool RunController::chooseReward(const game::run::ContentId choice)
     return true;
 }
 
+bool RunController::claimFallbackReward()
+{
+    if (phase_ != game::run::RunPhase::Reward || rewardApplied_ || !reward_
+        || reward_->kind != game::rewards::RewardKind::GoldFallback
+        || reward_->fallbackGold > std::numeric_limits<int>::max() - player_.gold) return false;
+    player_.gold += reward_->fallbackGold;
+    rewardApplied_ = true;
+    phase_ = game::run::RunPhase::FloorComplete;
+    return true;
+}
+
+game::economy::PurchaseResult RunController::purchaseMerchantItem(
+    std::vector<game::economy::StockItem>& stock, const game::run::ContentId itemId)
+{
+    if (phase_ != game::run::RunPhase::InEncounter || currentFloorType_ != game::run::FloorType::Merchant)
+        return game::economy::PurchaseResult::NotFound;
+    return game::economy::purchase(player_, stock, itemId);
+}
+
+game::events::EventResult RunController::chooseEvent(game::events::EventTransaction& transaction,
+    const std::span<const game::events::EventChoice> choices, const game::run::ContentId choiceId)
+{
+    if (phase_ != game::run::RunPhase::InEncounter || currentFloorType_ != game::run::FloorType::Event)
+        return game::events::EventResult::ChoiceNotFound;
+    return transaction.choose(player_, choices, choiceId);
+}
+
 bool RunController::equip(const std::size_t slot, const game::run::ContentId spell)
 {
     if (slot >= player_.equippedSpells.size()
@@ -138,5 +165,12 @@ int RunController::recoverHalfMissingHp(const int currentHp, const int maxHp) no
 {
     const int missing = maxHp - currentHp;
     return std::min(maxHp, currentHp + ((missing + 1) / 2));
+}
+
+game::run::FloorResult RunController::floorResult() const noexcept
+{
+    const bool rewardComplete = phase_ == game::run::RunPhase::FloorComplete
+        || phase_ == game::run::RunPhase::Victory;
+    return floor_.result(rewardComplete);
 }
 }

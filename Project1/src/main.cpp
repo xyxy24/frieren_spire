@@ -99,6 +99,55 @@ void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession&
     }
 }
 
+void drawMerchantScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+{
+    constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
+    const auto& stock = tower.merchantStock();
+    for (std::size_t index = 0U; index < stock.size() && index < CardX.size(); ++index)
+        drawCard(target, stock[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, stock[index].sold);
+}
+
+void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+{
+    if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
+    {
+        if (tower.eventResultChoice())
+            drawCard(target, *tower.eventResultChoice(), {535.0F, 205.0F}, {210.0F, 280.0F}, true);
+        return;
+    }
+    constexpr std::array<float, 2> CardX {400.0F, 670.0F};
+    const auto choices = tower.eventChoices();
+    for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
+        drawCard(target, choices[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
+}
+
+void drawStaircase(sf::RenderTarget& target, arcane::game::Aabb bounds, bool unlocked);
+
+void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+{
+    sf::RectangleShape ground({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight) - GroundTop});
+    ground.setPosition({0.0F, GroundTop});
+    ground.setFillColor(sf::Color {64, 72, 88});
+    target.draw(ground);
+    if (const auto* player = tower.explorationPlayer())
+    {
+        sf::RectangleShape shape({arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
+        const auto position = player->position();
+        shape.setPosition({position.x, position.y});
+        shape.setFillColor(sf::Color {232, 232, 242});
+        target.draw(shape);
+    }
+    const auto npc = tower.npcBounds();
+    sf::RectangleShape npcShape({npc.width, npc.height});
+    npcShape.setPosition({npc.left, npc.top});
+    npcShape.setFillColor(tower.currentFloorType() == arcane::game::run::FloorType::Merchant
+        ? sf::Color {205, 159, 75} : sf::Color {116, 83, 170});
+    npcShape.setOutlineColor(sf::Color {235, 225, 190});
+    npcShape.setOutlineThickness(3.0F);
+    target.draw(npcShape);
+    drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked());
+}
+
 void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
 {
     sf::RectangleShape overlay({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});
@@ -234,6 +283,30 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
     switch (run.phase())
     {
     case arcane::game::run::RunPhase::InEncounter:
+        if (tower.currentFloorType() == arcane::game::run::FloorType::Merchant)
+        {
+            if (!tower.specialPanelOpen()) return title + "MERCHANT ROOM - Meet NPC, E Trade | Rear Staircase Exits";
+            const auto& stock = tower.merchantStock();
+            std::string items;
+            constexpr std::array<char, 3> keys {'U', 'I', 'O'};
+            for (std::size_t index = 0U; index < stock.size() && index < keys.size(); ++index)
+            {
+                if (!items.empty()) items += " | ";
+                items += keys[index] + std::string {"="} + std::to_string(stock[index].id)
+                    + (stock[index].sold ? " SOLD" : " " + std::to_string(stock[index].price) + "g");
+            }
+            return title + "MERCHANT - " + items + " | E Close";
+        }
+        if (tower.currentFloorType() == arcane::game::run::FloorType::Event)
+        {
+            if (!tower.specialPanelOpen())
+                return title + (tower.eventFloorState() == arcane::app::EventFloorState::Result
+                    ? "EVENT RESOLVED - E Review NPC Result | Rear Staircase Exits"
+                    : "EVENT ROOM - Meet NPC, E Interact");
+            if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
+                return title + "EVENT RESULT - E Close";
+            return title + "EVENT - U Gain 10 Gold, I Trade 20 HP For Relic, E Close";
+        }
         return title + "A/D Move, Space Jump, J Attack, Tab Loadout";
     case arcane::game::run::RunPhase::Reward:
     {
@@ -282,6 +355,12 @@ int main()
         const auto phase = tower.run().phase();
         sf::Color background {18, 20, 28};
         if (phase == arcane::game::run::RunPhase::Reward) background = sf::Color {27, 30, 58};
+        if (phase == arcane::game::run::RunPhase::InEncounter
+            && tower.currentFloorType() == arcane::game::run::FloorType::Merchant)
+            background = sf::Color {48, 40, 27};
+        if (phase == arcane::game::run::RunPhase::InEncounter
+            && tower.currentFloorType() == arcane::game::run::FloorType::Event)
+            background = sf::Color {38, 27, 52};
         if (phase == arcane::game::run::RunPhase::FloorComplete) background = sf::Color {27, 38, 52};
         if (phase == arcane::game::run::RunPhase::Victory) background = sf::Color {20, 67, 49};
         if (phase == arcane::game::run::RunPhase::Defeat) background = sf::Color {68, 24, 31};
@@ -290,10 +369,25 @@ int main()
         if (phase == arcane::game::run::RunPhase::InEncounter
             || phase == arcane::game::run::RunPhase::FloorComplete)
         {
-            drawCombat(window, tower);
-            drawStaircase(window, tower.staircaseBounds(), tower.staircaseUnlocked());
+            if (tower.combat())
+            {
+                drawCombat(window, tower);
+                drawStaircase(window, tower.staircaseBounds(), tower.staircaseUnlocked());
+            }
         }
         if (phase == arcane::game::run::RunPhase::Reward) drawRewardScreen(window, tower);
+        if (phase == arcane::game::run::RunPhase::InEncounter
+            && tower.currentFloorType() == arcane::game::run::FloorType::Merchant)
+        {
+            drawSpecialFloor(window, tower);
+            if (tower.specialPanelOpen()) drawMerchantScreen(window, tower);
+        }
+        if (phase == arcane::game::run::RunPhase::InEncounter
+            && tower.currentFloorType() == arcane::game::run::FloorType::Event)
+        {
+            drawSpecialFloor(window, tower);
+            if (tower.specialPanelOpen()) drawEventScreen(window, tower);
+        }
 
         int displayedHealth = tower.run().player().currentHp;
         if (tower.combat()) displayedHealth = tower.combat()->playerState().currentHealth;

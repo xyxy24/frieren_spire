@@ -1,6 +1,8 @@
 #pragma once
 
 #include "game/combat/CombatContracts.hpp"
+#include "game/economy/MerchantSystem.hpp"
+#include "game/events/EventSystem.hpp"
 #include "game/floors/FloorController.hpp"
 #include "game/rewards/RewardSystem.hpp"
 
@@ -23,8 +25,14 @@ public:
     [[nodiscard]] bool completeNonCombatFloor();
     [[nodiscard]] const game::rewards::RewardOffer& rewardOffer() const;
     [[nodiscard]] bool chooseReward(game::run::ContentId choice);
+    [[nodiscard]] bool claimFallbackReward();
+    [[nodiscard]] game::economy::PurchaseResult purchaseMerchantItem(
+        std::vector<game::economy::StockItem>& stock, game::run::ContentId itemId);
+    [[nodiscard]] game::events::EventResult chooseEvent(game::events::EventTransaction& transaction,
+        std::span<const game::events::EventChoice> choices, game::run::ContentId choiceId);
     [[nodiscard]] bool equip(std::size_t slot, game::run::ContentId spell);
     [[nodiscard]] bool useStairs();
+    [[nodiscard]] game::run::FloorResult floorResult() const noexcept;
 
 private:
     static int recoverHalfMissingHp(int currentHp, int maxHp) noexcept;

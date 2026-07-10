@@ -54,4 +54,11 @@ struct FloorDescriptor
     ContentId arenaId {};
     std::vector<ContentId> encounterIds;
 };
+
+struct FloorResult
+{
+    bool floorComplete {};
+    bool rewardComplete {};
+    bool stairsAvailable {};
+};
 }

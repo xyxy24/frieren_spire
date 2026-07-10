@@ -2,6 +2,7 @@
 #include "app/run/TowerSession.hpp"
 #include "game/economy/MerchantSystem.hpp"
 #include "game/events/EventSystem.hpp"
+#include "game/floors/FloorScheduler.hpp"
 #include "game/run/DeterministicRng.hpp"
 
 #include <array>
@@ -60,8 +61,12 @@ bool completesFiveFloorLoops()
             || !expect(run.resolveEncounter(victoryResult(descriptor.encounterIds[0], 5), spells),
                 "combat victory must resolve once")) return false;
         const auto choice = run.rewardOffer().candidates[0];
+        const auto beforeReward = run.floorResult();
         if (!expect(run.chooseReward(choice), "reward choice must apply")
             || !expect(!run.chooseReward(choice), "reward cannot apply twice")
+            || !expect(beforeReward.floorComplete && !beforeReward.rewardComplete
+                && !beforeReward.stairsAvailable, "floor result must withhold stairs before reward")
+            || !expect(run.floorResult().stairsAvailable, "completed reward must expose stairs")
             || !expect(run.useStairs(), "stairs complete the floor")
             || !expect(!run.useStairs(), "stairs transaction cannot repeat")) return false;
     }
@@ -169,12 +174,61 @@ bool thirdBossVictorySettlesOnce()
         && expect(!run.useStairs(), "victory cannot be settled twice");
 }
 
+bool depletedRewardUsesGoldFallback()
+{
+    using namespace arcane::game;
+    constexpr std::array<run::ContentId, 1> encounters {10U};
+    constexpr std::array<run::ContentId, 3> spells {1U, 2U, 3U};
+    run::PlayerProgress player;
+    player.learnedSpells = {1U};
+    arcane::app::RunController run(42U, player);
+    const auto& floor = run.loadFloor(run::FloorType::Combat, encounters);
+    if (!run.resolveEncounter(victoryResult(floor.encounterIds[0], 5), spells)) return false;
+    return expect(run.rewardOffer().kind == rewards::RewardKind::GoldFallback,
+            "depleted reward pool must use fallback")
+        && expect(run.claimFallbackReward(), "fallback must be claimable")
+        && expect(!run.claimFallbackReward(), "fallback cannot be claimed twice")
+        && expect(run.player().gold == 20, "fallback must add configured gold once");
+}
+
+bool merchantStockAndFloorScheduleReproduce()
+{
+    using namespace arcane::game;
+    const std::array catalog {economy::CatalogItem {1U, economy::ItemKind::Spell, 10},
+        economy::CatalogItem {2U, economy::ItemKind::Spell, 15},
+        economy::CatalogItem {3U, economy::ItemKind::Relic, 20},
+        economy::CatalogItem {4U, economy::ItemKind::Relic, 25}};
+    run::PlayerProgress player;
+    player.learnedSpells = {1U};
+    const auto leftStock = economy::generateStock(catalog, player, 99U);
+    const auto rightStock = economy::generateStock(catalog, player, 99U);
+    if (!expect(leftStock.size() == 3U && leftStock[0].id == rightStock[0].id
+            && leftStock[1].id == rightStock[1].id && leftStock[2].id == rightStock[2].id,
+        "merchant stock must reproduce and exclude owned content")) return false;
+
+    floors::FloorScheduler left({3U, 4U, 3U});
+    floors::FloorScheduler right({3U, 4U, 3U});
+    run::RunContext context {77U, 0U, 0U, 1U, 0U};
+    for (std::uint32_t floor = 0U; floor < 18U; ++floor)
+    {
+        context.floorIndex = floor;
+        context.floorSeed = run::deriveFloorSeed(context.runSeed, floor);
+        const auto leftType = left.next(context);
+        const auto rightType = right.next(context);
+        if (!expect(leftType == rightType, "floor schedule must reproduce")) return false;
+        if ((floor + 1U) % 3U == 0U && !expect(leftType == run::FloorType::Boss,
+            "configured boss floors must take priority")) return false;
+    }
+    return true;
+}
+
 bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 {
     arcane::app::TowerSessionConfig config;
     config.enemySpawn = {210.0F, 576.0F};
     config.normalEnemyHealth = 25;
     config.bossEnemyHealth = 25;
+    config.enableSpecialFloors = false;
     config.staircaseBounds = {300.0F, 560.0F, 90.0F, 80.0F};
     arcane::app::TowerSession tower(123U, config);
 
@@ -245,6 +299,7 @@ int main()
         && healsHalfMissingRoundedUp() && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
         && merchantPurchaseIsAtomic()
         && eventChoiceIsAtomic() && thirdBossVictorySettlesOnce()
+        && depletedRewardUsesGoldFallback() && merchantStockAndFloorScheduleReproduce()
         && towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction();
     if (!passed) return 1;
     std::cout << "All run flow tests passed.\n";
