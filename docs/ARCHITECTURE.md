@@ -44,6 +44,7 @@ flowchart TB
 | `FloorController` | 生成、加载、激活、结算和卸载一层 | 直接决定魔法伤害 |
 | `EncounterDirector` | 按楼层类型启动普通战、事件、商店或 Boss | 保存渲染对象 |
 | `CombatWorld` | 战斗实体、命中、伤害、死亡和战斗结束条件 | 奖励界面 |
+| `EnemyController` | 敌人追击、前摇、攻击有效帧、后摇和攻击序列 | 直接修改玩家 HP |
 | `PlayerState` | HP、金币、已学魔法、三槽装备、遗物集合 | 输入设备读取 |
 | `SpellSystem` | 施法条件、效果触发、槽位与冷却状态 | UI 图标布局 |
 | `RelicSystem` | 注册修正与触发器，处理叠加和防重入 | 直接修改表现动画 |
@@ -117,6 +118,8 @@ stateDiagram-v2
 ### 7.2 伤害与修正
 
 使用集中式 `DamageResolver`：输入攻击上下文、来源快照、目标快照和遗物修正，输出一次不可变的 `DamageResult`。表现层根据结果播放数字、音效和硬直，不自行重新计算。
+
+当前原型由 `EnemyController` 产出带递增序列号的攻击有效帧，`CombatSession` 负责去重、扣除 HP 并调用玩家受击反应。`PlayerController` 只持有击退速度和硬直剩余时间；硬直期间忽略移动、跳跃、攻击与施法输入，计时结束后恢复控制。
 
 建议把遗物修正分为明确阶段：
 

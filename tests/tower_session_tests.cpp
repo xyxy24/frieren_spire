@@ -84,8 +84,8 @@ bool contactDefeatEndsTheTowerFlow()
     config.enemySpawn = config.playerSpawn;
     config.normalEnemyHealth = 1000;
     arcane::app::TowerSession tower(7U, config);
-    for (int hit = 0; hit < 10 && tower.run().phase() == arcane::game::run::RunPhase::InEncounter; ++hit)
-        tower.update(arcane::game::PlayerIntent {}, 1.01F);
+    for (int step = 0; step < 1000 && tower.run().phase() == arcane::game::run::RunPhase::InEncounter; ++step)
+        tower.update(arcane::game::PlayerIntent {}, 0.10F);
     return expect(tower.run().phase() == arcane::game::run::RunPhase::Defeat,
             "lethal contact damage must enter defeat")
         && expect(tower.run().player().currentHp == 0, "defeat must commit zero run HP");
@@ -218,8 +218,8 @@ bool defeatResultCanStartANewRun()
     arcane::game::PlayerIntent confirm;
     confirm.menuConfirmPressed = true;
     app.update(confirm, 0.01F);
-    for (int hit = 0; hit < 10 && app.screen() == arcane::app::AppScreen::Playing; ++hit)
-        app.update(arcane::game::PlayerIntent {}, 1.01F);
+    for (int step = 0; step < 1000 && app.screen() == arcane::app::AppScreen::Playing; ++step)
+        app.update(arcane::game::PlayerIntent {}, 0.10F);
     if (!expect(app.screen() == arcane::app::AppScreen::Result && !app.victory(),
         "player death must enter the defeat result screen")) return false;
     app.update(confirm, 0.01F);

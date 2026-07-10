@@ -7,6 +7,7 @@
 #include "game/contracts/PlayerIntent.hpp"
 #include "game/player/PlayerController.hpp"
 #include "game/spells/SpellSystem.hpp"
+#include "game/ai/EnemyController.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -16,8 +17,8 @@ namespace arcane::game
 class CombatSession
 {
 public:
-    static constexpr float EnemyWidth = 48.0F;
-    static constexpr float EnemyHeight = 64.0F;
+    static constexpr float EnemyWidth = ai::EnemyController::Width;
+    static constexpr float EnemyHeight = ai::EnemyController::Height;
 
     explicit CombatSession(CombatRequest request);
 
@@ -33,7 +34,8 @@ private:
     static constexpr float AttackHeight = 36.0F;
     static constexpr float AttackVerticalOffset = 14.0F;
     static constexpr int AttackDamage = 25;
-    static constexpr float ContactDamageCooldown = 1.0F;
+    static constexpr float HitStunSeconds = 0.28F;
+    static constexpr float KnockbackSpeed = 360.0F;
 
     [[nodiscard]] Aabb playerBounds() const noexcept;
     [[nodiscard]] Aabb enemyBounds() const noexcept;
@@ -42,12 +44,12 @@ private:
     CombatRequest request_;
     PlayerController player_;
     Health playerHealth_;
-    Vec2 enemyPosition_;
+    ai::EnemyController enemy_;
     Health enemyHealth_;
     AttackState attack_;
     spells::SpellSystem spells_;
     std::uint64_t lastHitAttackSequence_ {0};
-    float contactDamageCooldownRemaining_ {0.0F};
+    std::uint64_t lastHitEnemyAttackSequence_ {0};
     std::optional<CombatResult> result_;
 };
 }

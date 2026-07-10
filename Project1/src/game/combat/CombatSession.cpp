@@ -9,7 +9,7 @@ CombatSession::CombatSession(CombatRequest request)
     : request_(std::move(request)),
       player_(request_.playerSpawn),
       playerHealth_(request_.playerMaximumHealth, request_.playerCurrentHealth),
-      enemyPosition_(request_.enemySpawn),
+      enemy_(request_.enemySpawn),
       enemyHealth_(request_.enemyMaximumHealth, request_.enemyMaximumHealth),
       spells_(request_.equippedSpellIds)
 {
@@ -38,17 +38,17 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
 
     attack_.update(deltaSeconds);
     spells_.update(deltaSeconds);
-    contactDamageCooldownRemaining_ = std::max(0.0F, contactDamageCooldownRemaining_ - deltaSeconds);
     player_.update(intent, deltaSeconds, request_.worldBounds);
+    enemy_.update(playerBounds(), deltaSeconds, request_.worldBounds);
 
-    if (intent.attackPressed)
+    if (intent.attackPressed && !player_.isStunned())
     {
         attack_.tryStart();
     }
 
     for (std::size_t slot = 0U; slot < intent.spellPressed.size(); ++slot)
     {
-        if (!intent.spellPressed[slot]) continue;
+        if (!intent.spellPressed[slot] || player_.isStunned()) continue;
         const auto cast = spells_.tryCast(slot, player_.position(), player_.facingDirection(), enemyBounds());
         if (cast.hit) enemyHealth_.damage(cast.damage);
     }
@@ -63,14 +63,19 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
 
     if (!enemyHealth_.isAlive())
     {
+        enemy_.markDead();
         finish(CombatOutcome::Victory);
         return;
     }
 
-    if (contactDamageCooldownRemaining_ <= 0.0F && intersects(playerBounds(), enemyBounds()))
+    if (enemy_.action() == ai::EnemyAction::Active
+        && lastHitEnemyAttackSequence_ != enemy_.attackSequence()
+        && intersects(playerBounds(), enemy_.attackBounds()))
     {
-        playerHealth_.damage(request_.enemyContactDamage);
-        contactDamageCooldownRemaining_ = ContactDamageCooldown;
+        const int appliedDamage = playerHealth_.damage(request_.enemyContactDamage);
+        if (appliedDamage > 0)
+            player_.applyHitReaction(enemy_.facingDirection() * KnockbackSpeed, HitStunSeconds);
+        lastHitEnemyAttackSequence_ = enemy_.attackSequence();
     }
 
     if (!playerHealth_.isAlive())
@@ -89,17 +94,21 @@ PlayerStateView CombatSession::playerState() const noexcept
         player_.facingDirection(),
         attack_.isActive(),
         attack_.cooldownRemaining(),
-        spells_.view()
+        spells_.view(),
+        player_.isStunned(),
+        player_.stunRemaining()
     };
 }
 
 EnemyStateView CombatSession::enemyState() const noexcept
 {
     return {
-        enemyPosition_,
+        enemy_.position(),
         enemyHealth_.current(),
         enemyHealth_.maximum(),
-        enemyHealth_.isAlive()
+        enemyHealth_.isAlive(),
+        enemy_.action() == ai::EnemyAction::Windup,
+        enemy_.action() == ai::EnemyAction::Active
     };
 }
 
@@ -126,7 +135,8 @@ Aabb CombatSession::playerBounds() const noexcept
 
 Aabb CombatSession::enemyBounds() const noexcept
 {
-    return {enemyPosition_.x, enemyPosition_.y, EnemyWidth, EnemyHeight};
+    const auto position = enemy_.position();
+    return {position.x, position.y, EnemyWidth, EnemyHeight};
 }
 
 void CombatSession::finish(const CombatOutcome outcome) noexcept

@@ -51,6 +51,8 @@ struct PlayerStateView
     bool attackActive {false};
     float attackCooldownRemaining {0.0F};
     std::array<spells::SpellSlotView, 3> spellSlots;
+    bool stunned {false};
+    float stunRemaining {0.0F};
 };
 
 struct EnemyStateView
@@ -59,5 +61,7 @@ struct EnemyStateView
     int currentHealth {0};
     int maximumHealth {0};
     bool alive {false};
+    bool windingUp {false};
+    bool attackActive {false};
 };
 }

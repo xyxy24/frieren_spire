@@ -1,11 +1,13 @@
 #include "game/combat/CombatSession.hpp"
 #include "game/combat/Health.hpp"
 #include "game/spells/SpellSystem.hpp"
+#include "game/ai/EnemyController.hpp"
 
 #include <iostream>
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <cmath>
 #include <string_view>
 
 namespace
@@ -66,6 +68,7 @@ bool fourAttacksProduceVictoryResult()
     arcane::game::CombatRequest request = adjacentEnemyRequest();
     request.encounterId = 42;
     request.goldReward = 17;
+    request.enemyContactDamage = 0;
     arcane::game::CombatSession combat(request);
 
     for (int attackNumber = 0; attackNumber < 4; ++attackNumber)
@@ -88,7 +91,7 @@ bool fourAttacksProduceVictoryResult()
         && expect(combat.result()->playerHealthRemaining == 100, "victory should preserve remaining player health");
 }
 
-bool contactDamageHasCooldown()
+bool enemyAttackHasWindupAndHitsOnce()
 {
     arcane::game::CombatRequest request;
     request.playerSpawn = {160.0F, 576.0F};
@@ -96,11 +99,16 @@ bool contactDamageHasCooldown()
     arcane::game::CombatSession combat(request);
 
     combat.update(arcane::game::PlayerIntent {}, 0.01F);
-    const int afterContact = combat.playerState().currentHealth;
-    combat.update(arcane::game::PlayerIntent {}, 0.20F);
+    combat.update(arcane::game::PlayerIntent {}, 0.40F);
+    if (!expect(combat.playerState().currentHealth == 100,
+        "enemy windup must not deal early damage")) return false;
+    combat.update(arcane::game::PlayerIntent {}, 0.06F);
+    const auto afterHit = combat.playerState();
+    combat.update(arcane::game::PlayerIntent {}, 0.05F);
 
-    return expect(afterContact == 90, "enemy contact should deal the configured damage")
-        && expect(combat.playerState().currentHealth == 90, "contact damage should respect its cooldown");
+    return expect(afterHit.currentHealth == 90, "active enemy attack should deal configured damage")
+        && expect(afterHit.stunned, "enemy hit should apply player hit stun")
+        && expect(combat.playerState().currentHealth == 90, "one enemy attack must hit only once");
 }
 
 bool zeroHealthProducesDefeatResult()
@@ -114,6 +122,7 @@ bool zeroHealthProducesDefeatResult()
     arcane::game::CombatSession combat(request);
 
     combat.update(arcane::game::PlayerIntent {}, 0.01F);
+    combat.update(arcane::game::PlayerIntent {}, 0.46F);
 
     return expect(combat.result().has_value(), "zero player health should complete combat")
         && expect(combat.result()->outcome == arcane::game::CombatOutcome::Defeat, "player death should be defeat")
@@ -121,6 +130,40 @@ bool zeroHealthProducesDefeatResult()
         && expect(combat.result()->defeatedEnemies == 0, "defeat should not report an enemy kill")
         && expect(combat.result()->goldAwarded == 0, "defeat should not award gold")
         && expect(combat.result()->playerHealthRemaining == 0, "defeat should report zero remaining health");
+}
+
+bool enemyChaseIsDeltaTimeStableAndStopsWhenDead()
+{
+    const arcane::game::Aabb player {160.0F, 576.0F, 42.0F, 64.0F};
+    const arcane::game::WorldBounds bounds {0.0F, 1280.0F, 640.0F};
+    arcane::game::ai::EnemyController oneStep({800.0F, 576.0F});
+    arcane::game::ai::EnemyController manySteps({800.0F, 576.0F});
+    oneStep.update(player, 1.0F, bounds);
+    for (int frame = 0; frame < 10; ++frame) manySteps.update(player, 0.1F, bounds);
+    const float oneStepX = oneStep.position().x;
+    const float manyStepsX = manySteps.position().x;
+    manySteps.markDead();
+    manySteps.update(player, 1.0F, bounds);
+    return expect(oneStepX < 800.0F, "enemy must chase the player")
+        && expect(std::abs(oneStepX - manyStepsX) <= 0.001F, "enemy chase must use delta time")
+        && expect(manySteps.position().x == manyStepsX, "dead enemy must stop updating");
+}
+
+bool hitStunSuppressesInputAndAppliesKnockback()
+{
+    arcane::game::PlayerController player({300.0F, 576.0F});
+    const arcane::game::WorldBounds bounds {0.0F, 1280.0F, 640.0F};
+    player.applyHitReaction(-360.0F, 0.28F);
+    arcane::game::PlayerIntent moveAgainstKnockback;
+    moveAgainstKnockback.moveAxis = 1.0F;
+    moveAgainstKnockback.jumpPressed = true;
+    player.update(moveAgainstKnockback, 0.10F, bounds);
+    const float duringStunX = player.position().x;
+    if (!expect(duringStunX < 300.0F && player.isStunned(),
+        "stunned player must be knocked back instead of following input")) return false;
+    player.update(arcane::game::PlayerIntent {}, 0.20F, bounds);
+    player.update(moveAgainstKnockback, 0.10F, bounds);
+    return expect(player.position().x > duringStunX, "player input must resume after hit stun");
 }
 
 bool spellSlotsHaveIndependentCooldowns()
@@ -178,8 +221,10 @@ int main()
     const bool passed = healthClampsDamageAndHealing()
         && oneAttackHitsOnlyOnce()
         && fourAttacksProduceVictoryResult()
-        && contactDamageHasCooldown()
+        && enemyAttackHasWindupAndHitsOnce()
         && zeroHealthProducesDefeatResult()
+        && enemyChaseIsDeltaTimeStableAndStopsWhenDead()
+        && hitStunSuppressesInputAndAppliesKnockback()
         && spellSlotsHaveIndependentCooldowns()
         && spellCooldownIsDeltaTimeStable()
         && combatSessionAppliesEquippedSpellDamage();

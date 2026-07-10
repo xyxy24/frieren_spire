@@ -231,7 +231,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const arcane::game::PlayerStateView player = combat->playerState();
     sf::RectangleShape playerShape({arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
     playerShape.setPosition({player.position.x, player.position.y});
-    playerShape.setFillColor(player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242});
+    playerShape.setFillColor(player.stunned ? sf::Color {112, 180, 235}
+        : (player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242}));
     playerShape.setOutlineColor(sf::Color {142, 115, 200});
     playerShape.setOutlineThickness(3.0F);
     target.draw(playerShape);
@@ -244,9 +245,11 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             arcane::game::CombatSession::EnemyHeight
         });
         enemyShape.setPosition({enemy.position.x, enemy.position.y});
-        enemyShape.setFillColor(tower.currentFloorType() == arcane::game::run::FloorType::Boss
-            ? sf::Color {129, 68, 172}
-            : sf::Color {176, 70, 78});
+        sf::Color enemyColor = tower.currentFloorType() == arcane::game::run::FloorType::Boss
+            ? sf::Color {129, 68, 172} : sf::Color {176, 70, 78};
+        if (enemy.windingUp) enemyColor = sf::Color {242, 154, 69};
+        if (enemy.attackActive) enemyColor = sf::Color {248, 222, 105};
+        enemyShape.setFillColor(enemyColor);
         enemyShape.setOutlineColor(sf::Color {245, 176, 129});
         enemyShape.setOutlineThickness(tower.currentFloorType() == arcane::game::run::FloorType::Boss ? 6.0F : 3.0F);
         target.draw(enemyShape);

@@ -30,8 +30,9 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
         grounded_ = false;
     }
 
-    const float moveAxis = std::clamp(intent.moveAxis, -1.0F, 1.0F);
-    velocity_.x = moveAxis * MoveSpeed;
+    stunRemaining_ = std::max(0.0F, stunRemaining_ - deltaSeconds);
+    const float moveAxis = stunRemaining_ > 0.0F ? 0.0F : std::clamp(intent.moveAxis, -1.0F, 1.0F);
+    if (stunRemaining_ <= 0.0F) velocity_.x = moveAxis * MoveSpeed;
 
     if (moveAxis > 0.0F)
     {
@@ -42,7 +43,7 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
         facingDirection_ = -1.0F;
     }
 
-    if (intent.jumpPressed && grounded_)
+    if (intent.jumpPressed && grounded_ && stunRemaining_ <= 0.0F)
     {
         velocity_.y = -JumpSpeed;
         grounded_ = false;
@@ -85,4 +86,13 @@ float PlayerController::facingDirection() const noexcept
 {
     return facingDirection_;
 }
+
+void PlayerController::applyHitReaction(const float horizontalVelocity, const float stunSeconds) noexcept
+{
+    velocity_.x = horizontalVelocity;
+    stunRemaining_ = std::max(stunRemaining_, std::max(0.0F, stunSeconds));
+}
+
+bool PlayerController::isStunned() const noexcept { return stunRemaining_ > 0.0F; }
+float PlayerController::stunRemaining() const noexcept { return stunRemaining_; }
 }
