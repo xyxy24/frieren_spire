@@ -1,0 +1,42 @@
+# Visual Studio local state
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# CMake and build output
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CTestTestfile.cmake
+Testing/
+cmake_install.cmake
+compile_commands.json
+
+# Visual Studio / MSBuild output
+x64/
+Win32/
+Debug/
+Release/
+out/
+*.tlog/
+*.lastbuildstate
+
+# Compiled artifacts
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.exp
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+

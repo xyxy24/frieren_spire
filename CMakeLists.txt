@@ -1,0 +1,71 @@
+cmake_minimum_required(VERSION 3.28)
+
+project(ArcaneSpire VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+include(FetchContent)
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build dependencies as static libraries" FORCE)
+set(SFML_BUILD_AUDIO OFF CACHE BOOL "Audio will be enabled after the graphics probe" FORCE)
+set(SFML_BUILD_NETWORK OFF CACHE BOOL "Networking is outside the course scope" FORCE)
+
+FetchContent_Declare(
+    SFML
+    GIT_REPOSITORY https://github.com/SFML/SFML.git
+    GIT_TAG 3.1.0
+    GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(SFML)
+
+add_library(arcane_core STATIC
+    Project1/src/game/player/PlayerController.cpp
+)
+
+target_include_directories(arcane_core
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/Project1/src
+)
+
+add_executable(Project1
+    Project1/src/main.cpp
+    Project1/src/platform/SfmlInputMapper.cpp
+)
+
+target_link_libraries(Project1
+    PRIVATE
+        arcane_core
+        SFML::Graphics
+        SFML::Window
+        SFML::System
+)
+
+if(MSVC)
+    target_compile_options(arcane_core PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+    target_compile_options(Project1 PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+else()
+    target_compile_options(arcane_core PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(Project1 PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Project1)
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(arcane_core_tests
+        tests/player_controller_tests.cpp
+    )
+    target_link_libraries(arcane_core_tests PRIVATE arcane_core)
+
+    if(MSVC)
+        target_compile_options(arcane_core_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+    else()
+        target_compile_options(arcane_core_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
+    add_test(NAME player_controller COMMAND arcane_core_tests)
+endif()
+
