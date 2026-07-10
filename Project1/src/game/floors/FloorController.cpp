@@ -3,6 +3,7 @@
 #include "game/run/DeterministicRng.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 namespace arcane::game::floors
 {
@@ -13,7 +14,8 @@ const run::FloorDescriptor& FloorController::load(const run::RunContext& context
     {
         throw std::logic_error("an active floor must be unloaded before loading another");
     }
-    if ((type == run::FloorType::Combat || type == run::FloorType::Boss) && encounterPool.empty())
+    const bool requiresEncounter = type == run::FloorType::Combat || type == run::FloorType::Boss;
+    if (requiresEncounter && encounterPool.empty())
     {
         throw std::invalid_argument("combat floors require an encounter pool");
     }
@@ -21,7 +23,7 @@ const run::FloorDescriptor& FloorController::load(const run::RunContext& context
     run::DeterministicRng layout(run::deriveStreamSeed(context.floorSeed, run::RandomStream::Layout));
     run::DeterministicRng encounters(run::deriveStreamSeed(context.floorSeed, run::RandomStream::Encounter));
     run::FloorDescriptor descriptor {type, context.floorSeed, 100U + layout.index(4U), {}};
-    if (!encounterPool.empty())
+    if (requiresEncounter)
     {
         descriptor.encounterIds.push_back(encounterPool[encounters.index(
             static_cast<std::uint32_t>(encounterPool.size()))]);

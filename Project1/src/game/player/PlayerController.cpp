@@ -33,6 +33,15 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     const float moveAxis = std::clamp(intent.moveAxis, -1.0F, 1.0F);
     velocity_.x = moveAxis * MoveSpeed;
 
+    if (moveAxis > 0.0F)
+    {
+        facingDirection_ = 1.0F;
+    }
+    else if (moveAxis < 0.0F)
+    {
+        facingDirection_ = -1.0F;
+    }
+
     if (intent.jumpPressed && grounded_)
     {
         velocity_.y = -JumpSpeed;
@@ -71,5 +80,9 @@ bool PlayerController::isGrounded() const noexcept
 {
     return grounded_;
 }
-}
 
+float PlayerController::facingDirection() const noexcept
+{
+    return facingDirection_;
+}
+}

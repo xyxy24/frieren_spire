@@ -180,7 +180,7 @@ docs/
 | `PlayerIntent` | A | A/B 的输入与 UI | 移动、跳跃、攻击、槽位 0–2、交互 |
 | `PlayerStateView` | A | B | HP、金币显示值、槽位、冷却、死亡状态 |
 | `CombatRequest` | A+B | A | 敌人列表、场地 ID、难度和种子 |
-| `CombatResult` | A+B | B | 胜负、金币基础值、击杀信息 |
+| `CombatResult` | A+B | B | 胜负、遭遇 ID、金币基础值、击杀信息和剩余 HP |
 | `CombatEvents` | A | B | 受击、击杀、玩家死亡、战斗完成 |
 | `RunContext` | B | A | 楼层、幕、Boss 进度和种子 |
 | `FloorDescriptor` | B | A/表现层 | 场地、出生点、敌人和出口描述 |
@@ -517,5 +517,8 @@ test(reward): prevent duplicate boss choice
 - 2026-07-10：成员 A 已认领战斗域工作，姓名待补。
 - 2026-07-10：接受 SFML 3.1.0、C++20、CMake 与 Visual Studio 2026 x64 技术基线。
 - 2026-07-10：A 已完成 Git 初始化、构建脚本、SFML 窗口/输入探针、占位玩家移动跳跃和首个纯 C++ 测试。
-- 下一交接点：B 在自己的电脑运行 `configure`、`build-debug`、`test-debug`，并开始假战斗流程入口。
+- 2026-07-10：A 已完成最小 `CombatSession`、HP、基础攻击/冷却、AABB 命中、训练敌人、接触伤害、胜负结果和第二组纯 C++ 测试。
+- 2026-07-10：B 已提交确定性 RNG、楼层、奖励、装备、商店、事件、楼梯和三 Boss 流程，并提供 `run_flow` 测试。
+- 2026-07-10：A/B 首次接口集成完成；`RunController` 已消费真实 `CombatResult`，测试脚本覆盖三组测试，事件/商人层具备独立完成路径。
+- 下一交接点：集成 PR 合并后，A/B 都从最新 `main` 新建各自下一阶段分支；B 在自己的电脑复验三组 Debug 测试。
 - B 的完整克隆、环境、Codex 与 Git 入组流程见 `HANDOFF_TO_B.md`。

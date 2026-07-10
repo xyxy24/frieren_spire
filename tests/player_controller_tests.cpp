@@ -47,6 +47,17 @@ bool clampsToWorldBounds()
         "player should remain inside the right world boundary");
 }
 
+bool remembersLastMovementDirection()
+{
+    arcane::game::PlayerController player;
+    arcane::game::PlayerIntent moveLeft;
+    moveLeft.moveAxis = -1.0F;
+    player.update(moveLeft, 0.01F, TestBounds);
+    player.update(arcane::game::PlayerIntent {}, 0.01F, TestBounds);
+
+    return expect(nearlyEqual(player.facingDirection(), -1.0F), "player should keep facing the last movement direction");
+}
+
 bool jumpsFromGround()
 {
     arcane::game::PlayerController player;
@@ -79,6 +90,7 @@ int main()
 {
     const bool passed = movesHorizontally()
         && clampsToWorldBounds()
+        && remembersLastMovementDirection()
         && jumpsFromGround()
         && landsOnGround();
 
@@ -90,4 +102,3 @@ int main()
     std::cout << "All player controller tests passed.\n";
     return 0;
 }
-

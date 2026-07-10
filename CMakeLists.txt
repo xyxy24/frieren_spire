@@ -21,6 +21,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SFML)
 
 add_library(arcane_core STATIC
+    Project1/src/game/combat/AttackState.cpp
+    Project1/src/game/combat/CombatSession.cpp
+    Project1/src/game/combat/Health.cpp
     Project1/src/game/player/PlayerController.cpp
     Project1/src/game/run/DeterministicRng.cpp
     Project1/src/game/floors/FloorController.cpp
@@ -66,6 +69,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(arcane_core_tests PRIVATE arcane_core)
 
+    add_executable(combat_session_tests
+        tests/combat_session_tests.cpp
+    )
+    target_link_libraries(combat_session_tests PRIVATE arcane_core)
+
     add_executable(run_flow_tests
         tests/run_flow_tests.cpp
     )
@@ -73,13 +81,15 @@ if(BUILD_TESTING)
 
     if(MSVC)
         target_compile_options(arcane_core_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+        target_compile_options(combat_session_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
         target_compile_options(run_flow_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
     else()
         target_compile_options(arcane_core_tests PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(combat_session_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(run_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     add_test(NAME player_controller COMMAND arcane_core_tests)
+    add_test(NAME combat_session COMMAND combat_session_tests)
     add_test(NAME run_flow COMMAND run_flow_tests)
 endif()
-

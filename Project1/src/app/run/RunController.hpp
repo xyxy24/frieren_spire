@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/combat/CombatContracts.hpp"
 #include "game/floors/FloorController.hpp"
 #include "game/rewards/RewardSystem.hpp"
 
@@ -17,14 +18,14 @@ public:
     [[nodiscard]] game::run::RunPhase phase() const noexcept;
     [[nodiscard]] const game::run::FloorDescriptor& loadFloor(game::run::FloorType type,
         std::span<const game::run::ContentId> encounterPool);
-    [[nodiscard]] bool resolveEncounter(bool victory, int goldAward,
+    [[nodiscard]] bool resolveEncounter(const game::CombatResult& result,
         std::span<const game::run::ContentId> rewardPool);
+    [[nodiscard]] bool completeNonCombatFloor();
     [[nodiscard]] const game::rewards::RewardOffer& rewardOffer() const;
     [[nodiscard]] bool chooseReward(game::run::ContentId choice);
     [[nodiscard]] bool equip(std::size_t slot, game::run::ContentId spell);
     [[nodiscard]] bool finishLoadout();
     [[nodiscard]] bool useStairs();
-    void setCurrentHpForFlow(int hp);
 
 private:
     static int recoverHalfMissingHp(int currentHp, int maxHp) noexcept;
@@ -33,7 +34,8 @@ private:
     game::run::RunPhase phase_ {game::run::RunPhase::FloorLoading};
     game::floors::FloorController floor_;
     std::optional<game::rewards::RewardOffer> reward_;
+    std::optional<game::run::FloorType> currentFloorType_;
+    std::optional<game::run::ContentId> activeEncounterId_;
     bool rewardApplied_ {};
-    bool currentFloorWasBoss_ {};
 };
 }

@@ -16,6 +16,25 @@ bool expect(const bool condition, const std::string_view message)
     return condition;
 }
 
+arcane::game::CombatResult victoryResult(
+    const arcane::game::run::ContentId encounterId,
+    const int goldAwarded,
+    const int playerHealthRemaining = 100)
+{
+    return {
+        arcane::game::CombatOutcome::Victory,
+        encounterId,
+        1,
+        goldAwarded,
+        playerHealthRemaining
+    };
+}
+
+arcane::game::CombatResult defeatResult(const arcane::game::run::ContentId encounterId)
+{
+    return {arcane::game::CombatOutcome::Defeat, encounterId, 0, 0, 0};
+}
+
 bool deterministicStreamsAreIsolated()
 {
     using namespace arcane::game::run;
@@ -37,7 +56,8 @@ bool completesFiveFloorLoops()
         const auto expectedSeed = arcane::game::run::deriveFloorSeed(12345U, floor);
         const auto& descriptor = run.loadFloor(arcane::game::run::FloorType::Combat, encounters);
         if (!expect(descriptor.seed == expectedSeed, "floor seed must match its index")
-            || !expect(run.resolveEncounter(true, 5, spells), "combat victory must resolve once")) return false;
+            || !expect(run.resolveEncounter(victoryResult(descriptor.encounterIds[0], 5), spells),
+                "combat victory must resolve once")) return false;
         const auto choice = run.rewardOffer().candidates[0];
         if (!expect(run.chooseReward(choice), "reward choice must apply")
             || !expect(!run.chooseReward(choice), "reward cannot apply twice")
@@ -55,9 +75,8 @@ bool healsHalfMissingRoundedUp()
     constexpr std::array<arcane::game::run::ContentId, 1> encounters {10U};
     constexpr std::array<arcane::game::run::ContentId, 3> spells {1U, 2U, 3U};
     arcane::app::RunController run(7U);
-    run.setCurrentHpForFlow(1);
-    static_cast<void>(run.loadFloor(arcane::game::run::FloorType::Combat, encounters));
-    if (!run.resolveEncounter(true, 0, spells)) return false;
+    const auto& descriptor = run.loadFloor(arcane::game::run::FloorType::Combat, encounters);
+    if (!run.resolveEncounter(victoryResult(descriptor.encounterIds[0], 0, 1), spells)) return false;
     if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.finishLoadout() || !run.useStairs()) return false;
     return expect(run.player().currentHp == 51, "99 missing HP heals 50 with ceiling rounding");
 }
@@ -66,10 +85,34 @@ bool failureIsTerminal()
 {
     constexpr std::array<arcane::game::run::ContentId, 1> encounters {10U};
     arcane::app::RunController run(9U);
-    static_cast<void>(run.loadFloor(arcane::game::run::FloorType::Combat, encounters));
-    return expect(run.resolveEncounter(false, 0, {}), "defeat result must be accepted")
+    const auto& descriptor = run.loadFloor(arcane::game::run::FloorType::Combat, encounters);
+    if (!expect(!run.resolveEncounter(victoryResult(999U, 0), {}),
+        "a stale encounter result must be rejected")) return false;
+    return expect(run.resolveEncounter(defeatResult(descriptor.encounterIds[0]), {}),
+            "defeat result must be accepted")
         && expect(run.phase() == arcane::game::run::RunPhase::Defeat, "defeat must enter terminal state")
-        && expect(!run.resolveEncounter(false, 0, {}), "encounter result must settle once");
+        && expect(!run.resolveEncounter(defeatResult(descriptor.encounterIds[0]), {}),
+            "encounter result must settle once");
+}
+
+bool nonCombatFloorsSkipCombatRewards()
+{
+    using namespace arcane::game::run;
+    arcane::app::RunController run(55U);
+
+    const auto& eventFloor = run.loadFloor(FloorType::Event, {});
+    if (!expect(eventFloor.encounterIds.empty(), "event floors should not create combat encounters")
+        || !expect(!run.resolveEncounter(victoryResult(1U, 0), {}),
+            "event floors must reject combat results")
+        || !expect(run.completeNonCombatFloor(), "event floors should complete without combat rewards")
+        || !expect(!run.completeNonCombatFloor(), "non-combat completion cannot repeat")
+        || !expect(run.useStairs(), "completed event floors should enable stairs")) return false;
+
+    const auto& merchantFloor = run.loadFloor(FloorType::Merchant, {});
+    return expect(merchantFloor.encounterIds.empty(), "merchant floors should not create combat encounters")
+        && expect(run.completeNonCombatFloor(), "merchant floors should complete without combat rewards")
+        && expect(run.useStairs(), "completed merchant floors should enable stairs")
+        && expect(run.context().floorIndex == 2U, "both non-combat floors should advance the run");
 }
 
 bool merchantPurchaseIsAtomic()
@@ -116,7 +159,7 @@ bool thirdBossVictorySettlesOnce()
     for (int defeated = 0; defeated < 3; ++defeated)
     {
         static_cast<void>(run.loadFloor(arcane::game::run::FloorType::Boss, boss));
-        if (!run.resolveEncounter(true, 0, rewards)) return false;
+        if (!run.resolveEncounter(victoryResult(99U, 0), rewards)) return false;
         if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.finishLoadout() || !run.useStairs()) return false;
     }
     return expect(run.context().bossesDefeated == 3U, "boss progress must advance once per boss floor")
@@ -128,7 +171,8 @@ bool thirdBossVictorySettlesOnce()
 int main()
 {
     const bool passed = deterministicStreamsAreIsolated() && completesFiveFloorLoops()
-        && healsHalfMissingRoundedUp() && failureIsTerminal() && merchantPurchaseIsAtomic()
+        && healsHalfMissingRoundedUp() && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
+        && merchantPurchaseIsAtomic()
         && eventChoiceIsAtomic() && thirdBossVictorySettlesOnce();
     if (!passed) return 1;
     std::cout << "All run flow tests passed.\n";
