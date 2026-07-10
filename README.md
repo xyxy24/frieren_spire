@@ -53,3 +53,5 @@ build/windows-vs2022/Debug/Project1.exe
 - `docs/TEAM_WORK_SPLIT.md`：双 C++ 开发者分工。
 - `docs/HANDOFF_TO_B.md`：成员 B 克隆、构建、Codex 约束与日常 Git 流程。
 - `docs/decisions/0001-sfml3-cmake.md`：技术选型记录。
+
+This is a test sentence.
