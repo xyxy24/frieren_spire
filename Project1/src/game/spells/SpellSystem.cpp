@@ -10,15 +10,15 @@ namespace arcane::game::spells
 namespace
 {
 constexpr std::array Definitions {
-    SpellDefinition {1001U, 25, 1.20F, 190.0F, 42.0F},
-    SpellDefinition {1002U, 35, 2.00F, 270.0F, 34.0F},
-    SpellDefinition {1003U, 50, 3.50F, 110.0F, 72.0F},
-    SpellDefinition {1004U, 20, 0.80F, 150.0F, 48.0F},
-    SpellDefinition {1005U, 45, 2.80F, 220.0F, 54.0F},
-    SpellDefinition {1006U, 60, 4.50F, 130.0F, 80.0F},
-    SpellDefinition {2001U, 70, 5.00F, 260.0F, 80.0F},
-    SpellDefinition {2002U, 80, 6.00F, 180.0F, 110.0F},
-    SpellDefinition {2003U, 100, 8.00F, 320.0F, 96.0F}
+    SpellDefinition {1001U, "Blooming Field", "Large field: enemies -50% speed; heal 5 HP/s for 4s.", SpellEffect::FlowerField, 0, 7.0F, 360.0F, 180.0F},
+    SpellDefinition {1002U, "Goddess Blessing", "8s control immunity and +20% damage.", SpellEffect::GoddessBlessing, 0, 10.0F, 0.0F, 0.0F},
+    SpellDefinition {1003U, "Blood Magic", "Lose 10% current HP; deal 50% current HP ahead.", SpellEffect::BloodMagic, 0, 4.0F, 210.0F, 72.0F},
+    SpellDefinition {1004U, "Arc Bolt", "Fast medium-range direct damage.", SpellEffect::DirectDamage, 20, 0.8F, 150.0F, 48.0F},
+    SpellDefinition {1005U, "Frost Lance", "Long-range direct damage.", SpellEffect::DirectDamage, 45, 2.8F, 220.0F, 54.0F},
+    SpellDefinition {1006U, "Flame Burst", "Heavy short-range direct damage.", SpellEffect::DirectDamage, 60, 4.5F, 130.0F, 80.0F},
+    SpellDefinition {2001U, "Starfall", "Boss-tier direct damage.", SpellEffect::DirectDamage, 70, 5.0F, 260.0F, 80.0F},
+    SpellDefinition {2002U, "Sanctuary", "Boss-tier blessing.", SpellEffect::GoddessBlessing, 0, 10.0F, 0.0F, 0.0F},
+    SpellDefinition {2003U, "Crimson Verdict", "Boss-tier blood magic.", SpellEffect::BloodMagic, 0, 8.0F, 320.0F, 96.0F}
 };
 }
 
@@ -58,7 +58,7 @@ SpellCastResult SpellSystem::tryCast(const std::size_t slot, const Vec2 casterPo
     const Aabb effectBounds {left, casterPosition.y + (PlayerController::Height - spell.height) * 0.5F,
         spell.range, spell.height};
     const bool hit = intersects(effectBounds, targetBounds);
-    return {true, hit, hit ? spell.damage : 0, state.castSequence};
+    return {true, hit, hit ? spell.damage : 0, state.castSequence, spell.effect};
 }
 
 std::array<SpellSlotView, 3> SpellSystem::view() const noexcept

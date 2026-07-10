@@ -16,23 +16,21 @@ constexpr std::array<game::run::ContentId, 3> BossRewardPool {
     2001U, 2002U, 2003U
 };
 constexpr std::array MerchantCatalog {
-    game::economy::CatalogItem {3001U, game::economy::ItemKind::Spell, 10},
-    game::economy::CatalogItem {3002U, game::economy::ItemKind::Spell, 15},
-    game::economy::CatalogItem {3003U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1001U, game::economy::ItemKind::Spell, 10},
+    game::economy::CatalogItem {1002U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1003U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1004U, game::economy::ItemKind::Spell, 10},
+    game::economy::CatalogItem {1005U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1006U, game::economy::ItemKind::Spell, 20},
     game::economy::CatalogItem {4001U, game::economy::ItemKind::Relic, 15},
-    game::economy::CatalogItem {4002U, game::economy::ItemKind::Relic, 20},
-    game::economy::CatalogItem {4003U, game::economy::ItemKind::Relic, 25}
-};
-constexpr std::array EventChoices {
-    game::events::EventChoice {5001U, 0, 10, 0U},
-    game::events::EventChoice {5002U, -20, 0, 4101U}
+    game::economy::CatalogItem {4002U, game::economy::ItemKind::Relic, 20}
 };
 }
 
 TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config)
     : run_(seed, config.initialPlayer), config_(std::move(config)), scheduler_({config_.floorsPerBoss, 4U, 3U})
 {
-    if (config_.normalEnemyHealth <= 0 || config_.bossEnemyHealth <= 0
+    if (config_.normalEnemyHealth < 0 || config_.bossEnemyHealth <= 0
         || config_.normalGoldReward < 0 || config_.bossGoldReward < 0
         || config_.floorsPerBoss == 0U || config_.staircaseBounds.width <= 0.0F
         || config_.staircaseBounds.height <= 0.0F || config_.npcBounds.width <= 0.0F
@@ -217,7 +215,7 @@ const std::vector<game::economy::StockItem>& TowerSession::merchantStock() const
 
 std::span<const game::events::EventChoice> TowerSession::eventChoices() const noexcept
 {
-    return EventChoices;
+    return eventChoices_;
 }
 
 const game::PlayerController* TowerSession::explorationPlayer() const noexcept
@@ -275,6 +273,16 @@ void TowerSession::startNextFloor()
     {
         static_cast<void>(run_.loadFloor(currentFloorType_, {}));
         eventTransaction_.emplace();
+        const auto spellOffer = game::rewards::generateOffer(NormalRewardPool,
+            run_.player().learnedSpells,
+            game::run::deriveStreamSeed(run_.context().floorSeed, game::run::RandomStream::Event));
+        const auto randomSpell = spellOffer.kind == game::rewards::RewardKind::SpellChoice
+            ? spellOffer.candidates[0] : 0U;
+        eventChoices_ = {{
+            game::events::EventChoice {5001U, 0, 0, 0U, 30, 0U},
+            game::events::EventChoice {5002U, 0, randomSpell == 0U ? 15 : 0, 0U, 0, randomSpell},
+            game::events::EventChoice {5003U, 0, 50, 0U, 0, 0U}
+        }};
         explorationPlayer_.emplace(config_.playerSpawn);
         return;
     }
@@ -294,12 +302,20 @@ void TowerSession::startNextFloor()
     request.playerCurrentHealth = run_.player().currentHp;
     request.enemyMaximumHealth = currentFloorType_ == game::run::FloorType::Boss
         ? config_.bossEnemyHealth
-        : config_.normalEnemyHealth;
-    request.enemyContactDamage = currentFloorType_ == game::run::FloorType::Boss ? 20 : 10;
+        : (config_.normalEnemyHealth > 0 ? config_.normalEnemyHealth
+            : (run_.context().floorIndex % 2U == 0U ? 60 : 45));
+    request.enemyArchetype = currentFloorType_ == game::run::FloorType::Boss
+        ? game::EnemyArchetype::Boss
+        : (run_.context().floorIndex % 2U == 0U
+            ? game::EnemyArchetype::ChestMimic : game::EnemyArchetype::HeadlessKnight);
+    request.enemyContactDamage = currentFloorType_ == game::run::FloorType::Boss ? 20 : 15;
+    request.enemyAttackDamage = request.enemyArchetype == game::EnemyArchetype::HeadlessKnight ? 20 : 15;
+    request.enemyControlSeconds = request.enemyArchetype == game::EnemyArchetype::ChestMimic ? 1.0F : 0.28F;
     request.goldReward = currentFloorType_ == game::run::FloorType::Boss
         ? config_.bossGoldReward
         : config_.normalGoldReward;
     request.equippedSpellIds = run_.player().equippedSpells;
+    request.relicIds = run_.player().relics;
 
     combat_.emplace(request);
 }
@@ -348,14 +364,14 @@ void TowerSession::updateSpecialFloor(const game::PlayerIntent& intent, const fl
         }
         else if (eventFloorState_ == EventFloorState::Choosing && eventTransaction_)
         {
-            for (std::size_t index = 0U; index < 2U; ++index)
+            for (std::size_t index = 0U; index < eventChoices_.size(); ++index)
             {
                 if (intent.spellPressed[index]
-                    && run_.chooseEvent(*eventTransaction_, EventChoices, EventChoices[index].id)
+                    && run_.chooseEvent(*eventTransaction_, eventChoices_, eventChoices_[index].id)
                         == game::events::EventResult::Success)
                 {
                     eventFloorState_ = EventFloorState::Result;
-                    eventResultChoice_ = EventChoices[index].id;
+                    eventResultChoice_ = eventChoices_[index].id;
                     break;
                 }
             }

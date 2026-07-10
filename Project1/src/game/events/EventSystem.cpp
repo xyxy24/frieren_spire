@@ -10,12 +10,18 @@ EventResult EventTransaction::choose(run::PlayerProgress& player, const std::spa
     if (choice == choices.end()) return EventResult::ChoiceNotFound;
     const int newHp = player.currentHp + choice->hpDelta;
     const int newGold = player.gold + choice->goldDelta;
-    if (newHp <= 0 || newHp > player.maxHp || newGold < 0) return EventResult::InvalidOutcome;
+    const int newMaxHp = player.maxHp + choice->maxHpDelta;
+    if (newMaxHp <= 0 || newHp <= 0 || newHp > newMaxHp || newGold < 0) return EventResult::InvalidOutcome;
     if (choice->relicId != 0U && std::find(player.relics.begin(), player.relics.end(), choice->relicId) != player.relics.end())
         return EventResult::AlreadyOwned;
+    if (choice->spellId != 0U
+        && std::find(player.learnedSpells.begin(), player.learnedSpells.end(), choice->spellId)
+            != player.learnedSpells.end()) return EventResult::AlreadyOwned;
+    player.maxHp = newMaxHp;
     player.currentHp = newHp;
     player.gold = newGold;
     if (choice->relicId != 0U) player.relics.push_back(choice->relicId);
+    if (choice->spellId != 0U) player.learnedSpells.push_back(choice->spellId);
     resolved_ = true;
     return EventResult::Success;
 }

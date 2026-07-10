@@ -22,7 +22,7 @@ struct TowerSessionConfig
     game::Vec2 enemySpawn {800.0F, 576.0F};
     game::Aabb staircaseBounds {1150.0F, 520.0F, 90.0F, 120.0F};
     game::Aabb npcBounds {600.0F, 560.0F, 56.0F, 80.0F};
-    int normalEnemyHealth {100};
+    int normalEnemyHealth {0};
     int bossEnemyHealth {200};
     int normalGoldReward {10};
     int bossGoldReward {30};
@@ -73,6 +73,7 @@ private:
     bool loadoutOpen_ {false};
     std::vector<game::economy::StockItem> merchantStock_;
     std::optional<game::events::EventTransaction> eventTransaction_;
+    std::array<game::events::EventChoice, 3> eventChoices_;
     EventFloorState eventFloorState_ {EventFloorState::Untriggered};
     std::optional<game::run::ContentId> eventResultChoice_;
     bool specialPanelOpen_ {};

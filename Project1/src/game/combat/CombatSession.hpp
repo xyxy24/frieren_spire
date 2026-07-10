@@ -9,6 +9,7 @@
 #include "game/player/PlayerController.hpp"
 #include "game/spells/SpellSystem.hpp"
 #include "game/ai/EnemyController.hpp"
+#include "game/relics/RelicSystem.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -34,7 +35,7 @@ private:
     static constexpr float AttackRange = 58.0F;
     static constexpr float AttackHeight = 36.0F;
     static constexpr float AttackVerticalOffset = 14.0F;
-    static constexpr int AttackDamage = 25;
+    static constexpr int AttackDamage = 15;
     static constexpr float HitStunSeconds = 0.28F;
     static constexpr float KnockbackSpeed = 360.0F;
 
@@ -49,8 +50,17 @@ private:
     Health enemyHealth_;
     AttackState attack_;
     spells::SpellSystem spells_;
+    relics::RelicRuntime relics_;
     DamageResolver playerDamageResolver_;
     DamageResolver enemyDamageResolver_;
+    float blessingRemaining_ {};
+    float flowerFieldRemaining_ {};
+    float flowerFieldCenterX_ {};
+    float flowerHealingAccumulator_ {};
+    std::uint64_t selfDamageSequence_ {};
+    bool enemySlowed_ {};
+    float contactDamageCooldownRemaining_ {};
+    std::uint64_t contactDamageSequence_ {};
     std::optional<CombatResult> result_;
 };
 }

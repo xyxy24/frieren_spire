@@ -60,25 +60,26 @@ bool oneAttackHitsOnlyOnce()
         combat.update(idle, 0.01F);
     }
 
-    return expect(healthAfterFirstHit == 75, "a basic attack should deal 25 damage")
-        && expect(combat.enemyState().currentHealth == 75, "an active attack must hit an enemy only once");
+    return expect(healthAfterFirstHit == 85, "a basic attack should deal the configured 15 damage")
+        && expect(combat.enemyState().currentHealth == 85, "an active attack must hit an enemy only once");
 }
 
-bool fourAttacksProduceVictoryResult()
+bool repeatedAttacksProduceVictoryResult()
 {
     arcane::game::CombatRequest request = adjacentEnemyRequest();
     request.encounterId = 42;
     request.goldReward = 17;
     request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
     arcane::game::CombatSession combat(request);
 
-    for (int attackNumber = 0; attackNumber < 4; ++attackNumber)
+    for (int attackNumber = 0; attackNumber < 7; ++attackNumber)
     {
         arcane::game::PlayerIntent attack;
         attack.attackPressed = true;
         combat.update(attack, 0.01F);
 
-        if (attackNumber < 3)
+        if (attackNumber < 6)
         {
             combat.update(arcane::game::PlayerIntent {}, 0.36F);
         }
@@ -97,10 +98,11 @@ bool enemyAttackHasWindupAndHitsOnce()
     arcane::game::CombatRequest request;
     request.playerSpawn = {160.0F, 576.0F};
     request.enemySpawn = {180.0F, 576.0F};
+    request.enemyContactDamage = 0;
     arcane::game::CombatSession combat(request);
 
     combat.update(arcane::game::PlayerIntent {}, 0.01F);
-    combat.update(arcane::game::PlayerIntent {}, 0.40F);
+    combat.update(arcane::game::PlayerIntent {}, 0.30F);
     if (!expect(combat.playerState().currentHealth == 100,
         "enemy windup must not deal early damage")) return false;
     combat.update(arcane::game::PlayerIntent {}, 0.06F);
@@ -131,6 +133,72 @@ bool zeroHealthProducesDefeatResult()
         && expect(combat.result()->defeatedEnemies == 0, "defeat should not report an enemy kill")
         && expect(combat.result()->goldAwarded == 0, "defeat should not award gold")
         && expect(combat.result()->playerHealthRemaining == 0, "defeat should report zero remaining health");
+}
+
+bool bloodMagicUsesCurrentHealth()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemySpawn = {300.0F, 576.0F};
+    request.enemyMaximumHealth = 100;
+    request.equippedSpellIds[0] = 1003U;
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent cast;
+    cast.spellPressed[0] = true;
+    combat.update(cast, 0.01F);
+    return expect(combat.playerState().currentHealth == 90, "blood magic must cost 10% current HP")
+        && expect(combat.enemyState().currentHealth == 55,
+            "blood magic damage must equal 50% of HP remaining after its cost");
+}
+
+bool flowerFieldHealsAndMoonFlowerAutoCasts()
+{
+    auto request = adjacentEnemyRequest();
+    request.playerCurrentHealth = 50;
+    request.enemySpawn = {500.0F, 576.0F};
+    request.relicIds = {arcane::game::relics::MoonGrassFlowerId};
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    if (!expect(combat.playerState().flowerFieldRemaining == 4.0F,
+        "moon grass flower must cast the field at combat start")) return false;
+    combat.update(arcane::game::PlayerIntent {}, 1.0F);
+    return expect(combat.playerState().currentHealth == 55, "flower field must heal 5 HP each second")
+        && expect(combat.enemyState().slowed, "enemy inside flower field must be slowed");
+}
+
+bool goddessBlessingBoostsDamageAndPreventsControl()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemySpawn = {210.0F, 576.0F};
+    request.equippedSpellIds[0] = 1002U;
+    request.equippedSpellIds[1] = 1004U;
+    request.enemyContactDamage = 15;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent bless;
+    bless.spellPressed[0] = true;
+    combat.update(bless, 0.01F);
+    arcane::game::PlayerIntent damage;
+    damage.spellPressed[1] = true;
+    combat.update(damage, 0.01F);
+    return expect(combat.playerState().blessingRemaining > 7.0F, "blessing must last eight seconds")
+        && expect(!combat.playerState().stunned, "blessing must prevent control effects")
+        && expect(combat.enemyState().currentHealth == 76, "blessing must increase outgoing damage by 20%");
+}
+
+bool darkDragonHornAppliesRiskAndReward()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemySpawn = {195.0F, 576.0F};
+    request.relicIds = {arcane::game::relics::DarkDragonHornId};
+    request.enemyContactDamage = 15;
+    request.enemyAttackDamage = 0;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    combat.update(attack, 0.01F);
+    return expect(combat.enemyState().currentHealth == 82, "dragon horn must increase outgoing damage by 20%")
+        && expect(combat.playerState().currentHealth == 82, "opening vulnerability must increase incoming damage by 20%")
+        && expect(combat.playerState().vulnerableRemaining > 14.0F, "opening vulnerability must start at 15 seconds");
 }
 
 bool damageResolverReportsAppliedAndLethalDamage()
@@ -216,16 +284,16 @@ bool hitStunSuppressesInputAndAppliesKnockback()
 
 bool spellSlotsHaveIndependentCooldowns()
 {
-    std::array<std::optional<std::uint32_t>, 3> equipped {1001U, 1002U, std::nullopt};
+    std::array<std::optional<std::uint32_t>, 3> equipped {1004U, 1005U, std::nullopt};
     arcane::game::spells::SpellSystem spells(equipped);
     const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
     const auto first = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
     const auto blocked = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
     const auto otherSlot = spells.tryCast(1U, {160.0F, 576.0F}, 1.0F, target);
     const auto emptySlot = spells.tryCast(2U, {160.0F, 576.0F}, 1.0F, target);
-    spells.update(1.20F);
+    spells.update(0.80F);
     const auto readyAgain = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
-    return expect(first.cast && first.hit && first.damage == 25, "equipped spell must cast and hit")
+    return expect(first.cast && first.hit && first.damage == 20, "equipped spell must cast and hit")
         && expect(!blocked.cast, "spell must be blocked during its own cooldown")
         && expect(otherSlot.cast, "one slot cooldown must not block another slot")
         && expect(!emptySlot.cast, "empty spell slot must not cast")
@@ -234,14 +302,14 @@ bool spellSlotsHaveIndependentCooldowns()
 
 bool spellCooldownIsDeltaTimeStable()
 {
-    std::array<std::optional<std::uint32_t>, 3> equipped {1001U, std::nullopt, std::nullopt};
+    std::array<std::optional<std::uint32_t>, 3> equipped {1004U, std::nullopt, std::nullopt};
     arcane::game::spells::SpellSystem oneStep(equipped);
     arcane::game::spells::SpellSystem manySteps(equipped);
     const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
     static_cast<void>(oneStep.tryCast(0U, {160.0F, 576.0F}, 1.0F, target));
     static_cast<void>(manySteps.tryCast(0U, {160.0F, 576.0F}, 1.0F, target));
-    oneStep.update(1.20F);
-    for (int frame = 0; frame < 12; ++frame) manySteps.update(0.10F);
+    oneStep.update(0.80F);
+    for (int frame = 0; frame < 8; ++frame) manySteps.update(0.10F);
     return expect(oneStep.tryCast(0U, {160.0F, 576.0F}, 1.0F, target).cast,
             "single-step cooldown must finish")
         && expect(manySteps.tryCast(0U, {160.0F, 576.0F}, 1.0F, target).cast,
@@ -253,7 +321,7 @@ bool combatSessionAppliesEquippedSpellDamage()
     auto request = adjacentEnemyRequest();
     request.enemySpawn = {300.0F, 576.0F};
     request.enemyMaximumHealth = 25;
-    request.equippedSpellIds[0] = 1001U;
+    request.equippedSpellIds[0] = 1006U;
     arcane::game::CombatSession combat(request);
     arcane::game::PlayerIntent cast;
     cast.spellPressed[0] = true;
@@ -271,14 +339,18 @@ int main()
         && damageResolverDeduplicatesPerSource()
         && damageResolverCentralizesModifiersAndBlocking()
         && oneAttackHitsOnlyOnce()
-        && fourAttacksProduceVictoryResult()
+        && repeatedAttacksProduceVictoryResult()
         && enemyAttackHasWindupAndHitsOnce()
         && zeroHealthProducesDefeatResult()
         && enemyChaseIsDeltaTimeStableAndStopsWhenDead()
         && hitStunSuppressesInputAndAppliesKnockback()
         && spellSlotsHaveIndependentCooldowns()
         && spellCooldownIsDeltaTimeStable()
-        && combatSessionAppliesEquippedSpellDamage();
+        && combatSessionAppliesEquippedSpellDamage()
+        && bloodMagicUsesCurrentHealth()
+        && flowerFieldHealsAndMoonFlowerAutoCasts()
+        && goddessBlessingBoostsDamageAndPreventsControl()
+        && darkDragonHornAppliesRiskAndReward();
 
     if (!passed)
     {

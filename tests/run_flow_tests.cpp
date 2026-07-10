@@ -231,8 +231,8 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 {
     arcane::app::TowerSessionConfig config;
     config.enemySpawn = {210.0F, 576.0F};
-    config.normalEnemyHealth = 25;
-    config.bossEnemyHealth = 25;
+    config.normalEnemyHealth = 15;
+    config.bossEnemyHealth = 15;
     config.enableSpecialFloors = false;
     config.staircaseBounds = {300.0F, 560.0F, 90.0F, 80.0F};
     arcane::app::TowerSession tower(123U, config);

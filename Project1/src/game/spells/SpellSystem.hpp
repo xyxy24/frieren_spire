@@ -10,9 +10,14 @@
 
 namespace arcane::game::spells
 {
+enum class SpellEffect : std::uint8_t { DirectDamage, FlowerField, GoddessBlessing, BloodMagic };
+
 struct SpellDefinition
 {
     std::uint32_t id {};
+    const char* name {};
+    const char* description {};
+    SpellEffect effect {SpellEffect::DirectDamage};
     int damage {};
     float cooldownSeconds {};
     float range {};
@@ -32,6 +37,7 @@ struct SpellCastResult
     bool hit {};
     int damage {};
     std::uint64_t sequence {};
+    SpellEffect effect {SpellEffect::DirectDamage};
 };
 
 [[nodiscard]] const SpellDefinition* findDefinition(std::uint32_t id) noexcept;

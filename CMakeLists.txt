@@ -30,6 +30,7 @@ add_library(arcane_core STATIC
     Project1/src/game/combat/Health.cpp
     Project1/src/game/player/PlayerController.cpp
     Project1/src/game/run/DeterministicRng.cpp
+    Project1/src/game/relics/RelicSystem.cpp
     Project1/src/game/spells/SpellSystem.cpp
     Project1/src/game/floors/FloorController.cpp
     Project1/src/game/floors/FloorScheduler.cpp

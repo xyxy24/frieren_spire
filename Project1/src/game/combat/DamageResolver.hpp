@@ -14,6 +14,7 @@ enum class DamageSource : std::uint8_t
     PlayerSpell1,
     PlayerSpell2,
     EnemyAttack,
+    EnemyContact,
     Event,
     Count
 };

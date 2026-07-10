@@ -7,6 +7,8 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <cctype>
 
 namespace
 {
@@ -45,6 +47,56 @@ sf::Color colorForContent(const arcane::game::run::ContentId id)
     const auto green = static_cast<std::uint8_t>(80U + (id * 71U) % 140U);
     const auto blue = static_cast<std::uint8_t>(110U + (id * 29U) % 120U);
     return {red, green, blue};
+}
+
+std::array<std::uint8_t, 7> glyphRows(const char value)
+{
+    switch (static_cast<char>(std::toupper(static_cast<unsigned char>(value))))
+    {
+    case 'A': return {14, 17, 17, 31, 17, 17, 17}; case 'B': return {30, 17, 17, 30, 17, 17, 30};
+    case 'C': return {14, 17, 16, 16, 16, 17, 14}; case 'D': return {30, 17, 17, 17, 17, 17, 30};
+    case 'E': return {31, 16, 16, 30, 16, 16, 31}; case 'F': return {31, 16, 16, 30, 16, 16, 16};
+    case 'G': return {14, 17, 16, 23, 17, 17, 15}; case 'H': return {17, 17, 17, 31, 17, 17, 17};
+    case 'I': return {31, 4, 4, 4, 4, 4, 31}; case 'J': return {7, 2, 2, 2, 18, 18, 12};
+    case 'K': return {17, 18, 20, 24, 20, 18, 17}; case 'L': return {16, 16, 16, 16, 16, 16, 31};
+    case 'M': return {17, 27, 21, 21, 17, 17, 17}; case 'N': return {17, 25, 21, 19, 17, 17, 17};
+    case 'O': return {14, 17, 17, 17, 17, 17, 14}; case 'P': return {30, 17, 17, 30, 16, 16, 16};
+    case 'Q': return {14, 17, 17, 17, 21, 18, 13}; case 'R': return {30, 17, 17, 30, 20, 18, 17};
+    case 'S': return {15, 16, 16, 14, 1, 1, 30}; case 'T': return {31, 4, 4, 4, 4, 4, 4};
+    case 'U': return {17, 17, 17, 17, 17, 17, 14}; case 'V': return {17, 17, 17, 17, 17, 10, 4};
+    case 'W': return {17, 17, 17, 21, 21, 21, 10}; case 'X': return {17, 17, 10, 4, 10, 17, 17};
+    case 'Y': return {17, 17, 10, 4, 4, 4, 4}; case 'Z': return {31, 1, 2, 4, 8, 16, 31};
+    case '0': return {14, 17, 19, 21, 25, 17, 14}; case '1': return {4, 12, 4, 4, 4, 4, 14};
+    case '2': return {14, 17, 1, 2, 4, 8, 31}; case '3': return {30, 1, 1, 14, 1, 1, 30};
+    case '4': return {2, 6, 10, 18, 31, 2, 2}; case '5': return {31, 16, 16, 30, 1, 1, 30};
+    case '6': return {14, 16, 16, 30, 17, 17, 14}; case '7': return {31, 1, 2, 4, 8, 8, 8};
+    case '8': return {14, 17, 17, 14, 17, 17, 14}; case '9': return {14, 17, 17, 15, 1, 1, 14};
+    case '+': return {0, 4, 4, 31, 4, 4, 0}; case '-': return {0, 0, 0, 31, 0, 0, 0};
+    case '%': return {17, 2, 4, 8, 17, 0, 0}; case ':': return {0, 4, 4, 0, 4, 4, 0};
+    default: return {};
+    }
+}
+
+void drawPixelText(sf::RenderTarget& target, const std::string_view text, const sf::Vector2f origin,
+    const float scale = 2.0F, const sf::Color color = sf::Color {235, 235, 245})
+{
+    sf::Vector2f cursor = origin;
+    for (const char character : text)
+    {
+        if (character == '\n') { cursor.x = origin.x; cursor.y += 9.0F * scale; continue; }
+        const auto rows = glyphRows(character);
+        for (std::size_t row = 0U; row < rows.size(); ++row)
+            for (std::size_t column = 0U; column < 5U; ++column)
+                if ((rows[row] & (1U << (4U - column))) != 0U)
+                {
+                    sf::RectangleShape pixel({scale, scale});
+                    pixel.setPosition({cursor.x + static_cast<float>(column) * scale,
+                        cursor.y + static_cast<float>(row) * scale});
+                    pixel.setFillColor(color);
+                    target.draw(pixel);
+                }
+        cursor.x += 6.0F * scale;
+    }
 }
 
 void drawCard(
@@ -106,6 +158,8 @@ void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession&
     for (std::size_t index = 0; index < candidates->size(); ++index)
     {
         drawCard(target, (*candidates)[index], {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
+        if (const auto* definition = arcane::game::spells::findDefinition((*candidates)[index]))
+            drawPixelText(target, definition->name, {CardX[index], 505.0F}, 1.5F);
     }
 }
 
@@ -114,7 +168,13 @@ void drawMerchantScreen(sf::RenderTarget& target, const arcane::app::TowerSessio
     constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
     const auto& stock = tower.merchantStock();
     for (std::size_t index = 0U; index < stock.size() && index < CardX.size(); ++index)
+    {
         drawCard(target, stock[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, stock[index].sold);
+        if (const auto* spell = arcane::game::spells::findDefinition(stock[index].id))
+            drawPixelText(target, spell->name, {CardX[index], 505.0F}, 1.5F);
+        else if (const auto* relic = arcane::game::relics::findDefinition(stock[index].id))
+            drawPixelText(target, relic->name, {CardX[index], 505.0F}, 1.5F);
+    }
 }
 
 void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
@@ -125,10 +185,13 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
             drawCard(target, *tower.eventResultChoice(), {535.0F, 205.0F}, {210.0F, 280.0F}, true);
         return;
     }
-    constexpr std::array<float, 2> CardX {400.0F, 670.0F};
+    constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
     const auto choices = tower.eventChoices();
     for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
         drawCard(target, choices[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
+    constexpr std::array<std::string_view, 3> Names {"DESSERT +30 MAX HP", "GRIMOIRE RANDOM SPELL", "COMMISSION +50 GOLD"};
+    for (std::size_t index = 0U; index < choices.size() && index < Names.size(); ++index)
+        drawPixelText(target, Names[index], {CardX[index], 505.0F}, 1.25F);
 }
 
 void drawStaircase(sf::RenderTarget& target, arcane::game::Aabb bounds, bool unlocked);
@@ -190,6 +253,12 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
     }
 
     drawEquippedSlots(target, tower.run().player());
+    if (tower.selectedLearnedSpell())
+        if (const auto* definition = arcane::game::spells::findDefinition(*tower.selectedLearnedSpell()))
+        {
+            drawPixelText(target, definition->name, {190.0F, 520.0F}, 1.8F, sf::Color {255, 231, 145});
+            drawPixelText(target, definition->description, {190.0F, 548.0F}, 1.15F);
+        }
 }
 
 void drawStaircase(
@@ -303,7 +372,9 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
     if (tower.loadoutOpen())
     {
         const std::string selected = tower.selectedLearnedSpell()
-            ? std::to_string(*tower.selectedLearnedSpell())
+            ? (arcane::game::spells::findDefinition(*tower.selectedLearnedSpell())
+                ? arcane::game::spells::findDefinition(*tower.selectedLearnedSpell())->name
+                : std::to_string(*tower.selectedLearnedSpell()))
             : std::string {"None"};
         return title + "SPELL LOADOUT - Selected " + selected
             + " | A/D Select, U/I/O Equip Slot, Tab Close";
@@ -334,7 +405,7 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
                     : "EVENT ROOM - Meet NPC, E Interact");
             if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
                 return title + "EVENT RESULT - E Close";
-            return title + "EVENT - U Gain 10 Gold, I Trade 20 HP For Relic, E Close";
+            return title + "ALDEN BALL - U Dessert(+30 MaxHP), I Grimoire(Random Spell), O Commission(+50 Gold), E Close";
         }
         return title + "A/D Move, Space Jump, J Attack, Tab Loadout";
     case arcane::game::run::RunPhase::LootPending:
@@ -343,9 +414,13 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
     {
         const auto candidates = tower.rewardCandidates();
         if (!candidates) return title + "Reward";
-        return title + "Choose U=" + std::to_string((*candidates)[0])
-            + " I=" + std::to_string((*candidates)[1])
-            + " O=" + std::to_string((*candidates)[2]) + " | Tab Loadout";
+        const auto name = [](const arcane::game::run::ContentId id) {
+            const auto* definition = arcane::game::spells::findDefinition(id);
+            return definition ? std::string {definition->name} : std::to_string(id);
+        };
+        return title + "Choose U=" + name((*candidates)[0])
+            + " I=" + name((*candidates)[1])
+            + " O=" + name((*candidates)[2]) + " | Tab Loadout";
     }
     case arcane::game::run::RunPhase::FloorComplete:
         return title + "Move Into Staircase, E Climb (+50% Missing HP), Tab Loadout";

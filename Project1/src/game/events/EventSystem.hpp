@@ -3,7 +3,15 @@
 #include <span>
 namespace arcane::game::events
 {
-struct EventChoice { run::ContentId id {}; int hpDelta {}; int goldDelta {}; run::ContentId relicId {}; };
+struct EventChoice
+{
+    run::ContentId id {};
+    int hpDelta {};
+    int goldDelta {};
+    run::ContentId relicId {};
+    int maxHpDelta {};
+    run::ContentId spellId {};
+};
 enum class EventResult : std::uint8_t { Success, ChoiceNotFound, AlreadyResolved, InvalidOutcome, AlreadyOwned };
 class EventTransaction
 {

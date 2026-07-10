@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <array>
 #include <optional>
+#include <vector>
 
 #include "game/spells/SpellSystem.hpp"
 
@@ -16,6 +17,7 @@ enum class CombatOutcome
     Victory,
     Defeat
 };
+enum class EnemyArchetype : std::uint8_t { ChestMimic, HeadlessKnight, Boss };
 
 struct CombatRequest
 {
@@ -28,8 +30,12 @@ struct CombatRequest
     int playerCurrentHealth {100};
     int enemyMaximumHealth {100};
     int enemyContactDamage {10};
+    int enemyAttackDamage {10};
+    float enemyControlSeconds {0.28F};
+    EnemyArchetype enemyArchetype {EnemyArchetype::HeadlessKnight};
     int goldReward {10};
     std::array<std::optional<std::uint32_t>, 3> equippedSpellIds;
+    std::vector<std::uint32_t> relicIds;
 };
 
 struct CombatResult
@@ -53,6 +59,9 @@ struct PlayerStateView
     std::array<spells::SpellSlotView, 3> spellSlots;
     bool stunned {false};
     float stunRemaining {0.0F};
+    float blessingRemaining {0.0F};
+    float vulnerableRemaining {0.0F};
+    float flowerFieldRemaining {0.0F};
 };
 
 struct EnemyStateView
@@ -63,5 +72,6 @@ struct EnemyStateView
     bool alive {false};
     bool windingUp {false};
     bool attackActive {false};
+    bool slowed {false};
 };
 }

@@ -18,8 +18,8 @@ arcane::app::TowerSessionConfig fastFlowConfig()
     config.playerSpawn = {160.0F, 576.0F};
     config.enemySpawn = {210.0F, 576.0F};
     config.staircaseBounds = {150.0F, 550.0F, 100.0F, 90.0F};
-    config.normalEnemyHealth = 25;
-    config.bossEnemyHealth = 25;
+    config.normalEnemyHealth = 15;
+    config.bossEnemyHealth = 15;
     config.enableSpecialFloors = false;
     return config;
 }
@@ -154,12 +154,13 @@ bool specialFloorsAdvanceWithoutCombat()
     chooseLeftReward(eventTower);
     if (!expect(eventTower.eventFloorState() == arcane::app::EventFloorState::Result,
             "event choice must persist a result state")
-        || !expect(eventTower.run().player().gold == 40, "first event choice must grant ten gold")) return false;
+        || !expect(eventTower.run().player().maxHp == 130 && eventTower.run().player().gold == 30,
+            "dessert choice must increase maximum HP by thirty without changing gold")) return false;
     interact(eventTower);
     interact(eventTower);
     if (!expect(eventTower.specialPanelOpen()
             && eventTower.eventFloorState() == arcane::app::EventFloorState::Result
-            && eventTower.run().player().gold == 40,
+            && eventTower.run().player().maxHp == 130 && eventTower.run().player().gold == 30,
         "reopening an event NPC must show its result without applying it twice")) return false;
     interact(eventTower);
     arcane::game::PlayerIntent moveRight;
@@ -246,8 +247,8 @@ bool defeatResultCanStartANewRun()
 bool heldSpellCannotBypassLootInteraction()
 {
     auto config = fastFlowConfig();
-    config.initialPlayer.learnedSpells = {1001U};
-    config.initialPlayer.equippedSpells[0] = 1001U;
+    config.initialPlayer.learnedSpells = {1006U};
+    config.initialPlayer.equippedSpells[0] = 1006U;
     arcane::app::TowerSession tower(777U, config);
 
     arcane::game::PlayerIntent heldSpell;

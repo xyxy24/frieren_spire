@@ -18,6 +18,7 @@ struct EnemyConfig
     float windupSeconds {0.45F};
     float activeSeconds {0.12F};
     float recoverySeconds {0.55F};
+    float activeDashDistance {};
 };
 
 class EnemyController
@@ -27,7 +28,8 @@ public:
     static constexpr float Height = 64.0F;
 
     explicit EnemyController(Vec2 spawnPosition, EnemyConfig config = {});
-    void update(const Aabb& playerBounds, float deltaSeconds, const WorldBounds& worldBounds) noexcept;
+    void update(const Aabb& playerBounds, float deltaSeconds, const WorldBounds& worldBounds,
+        float speedMultiplier = 1.0F) noexcept;
     void markDead() noexcept;
     [[nodiscard]] Vec2 position() const noexcept;
     [[nodiscard]] EnemyAction action() const noexcept;

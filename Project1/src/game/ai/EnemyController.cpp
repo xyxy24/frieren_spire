@@ -9,7 +9,7 @@ EnemyController::EnemyController(const Vec2 spawnPosition, const EnemyConfig con
     : config_(config), position_(spawnPosition) {}
 
 void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
-    const WorldBounds& worldBounds) noexcept
+    const WorldBounds& worldBounds, const float speedMultiplier) noexcept
 {
     if (deltaSeconds <= 0.0F || action_ == EnemyAction::Dead) return;
     const float playerCenter = playerBounds.left + playerBounds.width * 0.5F;
@@ -27,7 +27,8 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
         else
         {
             const float maximumTravel = std::max(0.0F, std::abs(horizontalDelta) - config_.attackDistance);
-            const float travel = std::min(config_.moveSpeed * deltaSeconds, maximumTravel);
+            const float travel = std::min(config_.moveSpeed * std::max(0.0F, speedMultiplier)
+                * deltaSeconds, maximumTravel);
             position_.x += facingDirection_ * travel;
             position_.x = std::clamp(position_.x, worldBounds.left, worldBounds.right - Width);
         }
@@ -38,6 +39,8 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
         {
             action_ = EnemyAction::Active;
             stateRemaining_ = config_.activeSeconds;
+            position_.x = std::clamp(position_.x + facingDirection_ * config_.activeDashDistance,
+                worldBounds.left, worldBounds.right - Width);
             ++attackSequence_;
         }
         break;
