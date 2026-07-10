@@ -10,7 +10,8 @@ CombatSession::CombatSession(CombatRequest request)
       player_(request_.playerSpawn),
       playerHealth_(request_.playerMaximumHealth, request_.playerCurrentHealth),
       enemyPosition_(request_.enemySpawn),
-      enemyHealth_(request_.enemyMaximumHealth, request_.enemyMaximumHealth)
+      enemyHealth_(request_.enemyMaximumHealth, request_.enemyMaximumHealth),
+      spells_(request_.equippedSpellIds)
 {
     if (!playerHealth_.isAlive())
     {
@@ -36,12 +37,20 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     }
 
     attack_.update(deltaSeconds);
+    spells_.update(deltaSeconds);
     contactDamageCooldownRemaining_ = std::max(0.0F, contactDamageCooldownRemaining_ - deltaSeconds);
     player_.update(intent, deltaSeconds, request_.worldBounds);
 
     if (intent.attackPressed)
     {
         attack_.tryStart();
+    }
+
+    for (std::size_t slot = 0U; slot < intent.spellPressed.size(); ++slot)
+    {
+        if (!intent.spellPressed[slot]) continue;
+        const auto cast = spells_.tryCast(slot, player_.position(), player_.facingDirection(), enemyBounds());
+        if (cast.hit) enemyHealth_.damage(cast.damage);
     }
 
     if (attack_.isActive()
@@ -79,7 +88,8 @@ PlayerStateView CombatSession::playerState() const noexcept
         player_.isGrounded(),
         player_.facingDirection(),
         attack_.isActive(),
-        attack_.cooldownRemaining()
+        attack_.cooldownRemaining(),
+        spells_.view()
     };
 }
 

@@ -1,7 +1,11 @@
 #include "game/combat/CombatSession.hpp"
 #include "game/combat/Health.hpp"
+#include "game/spells/SpellSystem.hpp"
 
 #include <iostream>
+#include <array>
+#include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace
@@ -118,6 +122,55 @@ bool zeroHealthProducesDefeatResult()
         && expect(combat.result()->goldAwarded == 0, "defeat should not award gold")
         && expect(combat.result()->playerHealthRemaining == 0, "defeat should report zero remaining health");
 }
+
+bool spellSlotsHaveIndependentCooldowns()
+{
+    std::array<std::optional<std::uint32_t>, 3> equipped {1001U, 1002U, std::nullopt};
+    arcane::game::spells::SpellSystem spells(equipped);
+    const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
+    const auto first = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
+    const auto blocked = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
+    const auto otherSlot = spells.tryCast(1U, {160.0F, 576.0F}, 1.0F, target);
+    const auto emptySlot = spells.tryCast(2U, {160.0F, 576.0F}, 1.0F, target);
+    spells.update(1.20F);
+    const auto readyAgain = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
+    return expect(first.cast && first.hit && first.damage == 25, "equipped spell must cast and hit")
+        && expect(!blocked.cast, "spell must be blocked during its own cooldown")
+        && expect(otherSlot.cast, "one slot cooldown must not block another slot")
+        && expect(!emptySlot.cast, "empty spell slot must not cast")
+        && expect(readyAgain.cast, "spell must become available after its cooldown");
+}
+
+bool spellCooldownIsDeltaTimeStable()
+{
+    std::array<std::optional<std::uint32_t>, 3> equipped {1001U, std::nullopt, std::nullopt};
+    arcane::game::spells::SpellSystem oneStep(equipped);
+    arcane::game::spells::SpellSystem manySteps(equipped);
+    const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
+    static_cast<void>(oneStep.tryCast(0U, {160.0F, 576.0F}, 1.0F, target));
+    static_cast<void>(manySteps.tryCast(0U, {160.0F, 576.0F}, 1.0F, target));
+    oneStep.update(1.20F);
+    for (int frame = 0; frame < 12; ++frame) manySteps.update(0.10F);
+    return expect(oneStep.tryCast(0U, {160.0F, 576.0F}, 1.0F, target).cast,
+            "single-step cooldown must finish")
+        && expect(manySteps.tryCast(0U, {160.0F, 576.0F}, 1.0F, target).cast,
+            "partitioned delta time must finish the same cooldown");
+}
+
+bool combatSessionAppliesEquippedSpellDamage()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemySpawn = {300.0F, 576.0F};
+    request.enemyMaximumHealth = 25;
+    request.equippedSpellIds[0] = 1001U;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent cast;
+    cast.spellPressed[0] = true;
+    combat.update(cast, 0.01F);
+    return expect(combat.result().has_value()
+            && combat.result()->outcome == arcane::game::CombatOutcome::Victory,
+        "spell damage must use combat health and produce victory");
+}
 }
 
 int main()
@@ -126,7 +179,10 @@ int main()
         && oneAttackHitsOnlyOnce()
         && fourAttacksProduceVictoryResult()
         && contactDamageHasCooldown()
-        && zeroHealthProducesDefeatResult();
+        && zeroHealthProducesDefeatResult()
+        && spellSlotsHaveIndependentCooldowns()
+        && spellCooldownIsDeltaTimeStable()
+        && combatSessionAppliesEquippedSpellDamage();
 
     if (!passed)
     {

@@ -4,6 +4,10 @@
 #include "game/player/PlayerController.hpp"
 
 #include <cstdint>
+#include <array>
+#include <optional>
+
+#include "game/spells/SpellSystem.hpp"
 
 namespace arcane::game
 {
@@ -25,6 +29,7 @@ struct CombatRequest
     int enemyMaximumHealth {100};
     int enemyContactDamage {10};
     int goldReward {10};
+    std::array<std::optional<std::uint32_t>, 3> equippedSpellIds;
 };
 
 struct CombatResult
@@ -45,6 +50,7 @@ struct PlayerStateView
     float facingDirection {1.0F};
     bool attackActive {false};
     float attackCooldownRemaining {0.0F};
+    std::array<spells::SpellSlotView, 3> spellSlots;
 };
 
 struct EnemyStateView

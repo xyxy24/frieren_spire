@@ -68,7 +68,8 @@ void drawCard(
     target.draw(sigil);
 }
 
-void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::PlayerProgress& player)
+void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::PlayerProgress& player,
+    const arcane::game::PlayerStateView* combatView = nullptr)
 {
     constexpr float SlotSize = 66.0F;
     constexpr float Gap = 18.0F;
@@ -84,6 +85,15 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
         slot.setOutlineColor(sf::Color {175, 164, 214});
         slot.setOutlineThickness(3.0F);
         target.draw(slot);
+        if (combatView && combatView->spellSlots[index].cooldownDuration > 0.0F)
+        {
+            const float ratio = std::clamp(combatView->spellSlots[index].cooldownRemaining
+                / combatView->spellSlots[index].cooldownDuration, 0.0F, 1.0F);
+            sf::RectangleShape cooldown({SlotSize, SlotSize * ratio});
+            cooldown.setPosition({startX + static_cast<float>(index) * (SlotSize + Gap), 630.0F});
+            cooldown.setFillColor(sf::Color {8, 10, 18, 190});
+            target.draw(cooldown);
+        }
     }
 }
 
@@ -435,11 +445,17 @@ int main()
                     drawEventScreen(window, *tower);
             }
             int displayedHealth = tower->run().player().currentHp;
-            if (tower->combat()) displayedHealth = tower->combat()->playerState().currentHealth;
+            std::optional<arcane::game::PlayerStateView> combatView;
+            if (tower->combat())
+            {
+                combatView = tower->combat()->playerState();
+                displayedHealth = combatView->currentHealth;
+            }
             drawHealthBar(window, {32.0F, 28.0F}, {300.0F, 22.0F}, displayedHealth,
                 tower->run().player().maxHp, sf::Color {108, 206, 126});
             drawGold(window, tower->run().player().gold);
-            if (!tower->loadoutOpen()) drawEquippedSlots(window, tower->run().player());
+            if (!tower->loadoutOpen()) drawEquippedSlots(window, tower->run().player(),
+                combatView ? &*combatView : nullptr);
             else drawLoadoutOverlay(window, *tower);
         }
 

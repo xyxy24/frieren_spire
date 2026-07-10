@@ -6,6 +6,7 @@
 #include "game/combat/Health.hpp"
 #include "game/contracts/PlayerIntent.hpp"
 #include "game/player/PlayerController.hpp"
+#include "game/spells/SpellSystem.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -44,6 +45,7 @@ private:
     Vec2 enemyPosition_;
     Health enemyHealth_;
     AttackState attack_;
+    spells::SpellSystem spells_;
     std::uint64_t lastHitAttackSequence_ {0};
     float contactDamageCooldownRemaining_ {0.0F};
     std::optional<CombatResult> result_;

@@ -9,12 +9,11 @@ namespace arcane::app
 {
 namespace
 {
-constexpr std::array<game::run::ContentId, 16> NormalRewardPool {
-    1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1007U, 1008U,
-    1009U, 1010U, 1011U, 1012U, 1013U, 1014U, 1015U, 1016U
+constexpr std::array<game::run::ContentId, 6> NormalRewardPool {
+    1001U, 1002U, 1003U, 1004U, 1005U, 1006U
 };
-constexpr std::array<game::run::ContentId, 9> BossRewardPool {
-    2001U, 2002U, 2003U, 2004U, 2005U, 2006U, 2007U, 2008U, 2009U
+constexpr std::array<game::run::ContentId, 3> BossRewardPool {
+    2001U, 2002U, 2003U
 };
 constexpr std::array MerchantCatalog {
     game::economy::CatalogItem {3001U, game::economy::ItemKind::Spell, 10},
@@ -268,6 +267,7 @@ void TowerSession::startNextFloor()
     request.goldReward = currentFloorType_ == game::run::FloorType::Boss
         ? config_.bossGoldReward
         : config_.normalGoldReward;
+    request.equippedSpellIds = run_.player().equippedSpells;
 
     combat_.emplace(request);
 }
