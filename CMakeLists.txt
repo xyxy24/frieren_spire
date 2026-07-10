@@ -24,10 +24,12 @@ add_library(arcane_core STATIC
     Project1/src/game/player/PlayerController.cpp
     Project1/src/game/run/DeterministicRng.cpp
     Project1/src/game/floors/FloorController.cpp
+    Project1/src/game/floors/FloorScheduler.cpp
     Project1/src/game/rewards/RewardSystem.cpp
     Project1/src/game/economy/MerchantSystem.cpp
     Project1/src/game/events/EventSystem.cpp
     Project1/src/app/run/RunController.cpp
+    Project1/src/presentation/FlowViewState.cpp
 )
 
 target_include_directories(arcane_core

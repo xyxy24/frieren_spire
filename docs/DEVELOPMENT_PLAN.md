@@ -25,10 +25,19 @@
 
 ### 当前进度（2026-07-10）
 
+<<<<<<< Updated upstream
 - M0 进行中：已确定 SFML 3.1.0、C++20、CMake 和 Visual Studio 2026 x64。
 - 已初始化 Git 与 `.gitignore`，尚未创建首次提交。
 - 已完成 SFML 窗口/输入探针、占位玩家移动跳跃和纯 C++ 测试目标。
 - Debug/Release 均已构建，`player_controller` 在两种配置下均通过。
+=======
+- M0 进行中：已确定 SFML 3.1.0、C++20、CMake 和 Visual Studio 2026 x64，并已建立远端仓库基线。
+- M1 已开始：完成占位玩家移动/朝向、基础近战攻击、攻击冷却、HP、静态训练敌人、接触伤害和战斗胜负结果。
+- A/B 首次集成已完成：`RunController` 直接消费真实 `CombatResult`，接收剩余 HP、金币和遭遇 ID，并拒绝过期或重复结果。
+- 已实现确定性楼层/奖励流、五层流程测试、三 Boss 胜利、跨层回血、奖励装备、商店事务、事件事务，以及事件/商人层的非战斗完成路径。
+- 已补充可配置楼层类型保底、确定性商店库存、奖励池耗尽金币替代、`FloorResult` 和 HUD/暂停/结果页面的纯 C++ 状态控制。
+- `player_controller`、`combat_session` 与 `run_flow` 已在 Debug/Release 下全部通过。
+>>>>>>> Stashed changes
 - M0 尚缺：另一位成员电脑复现、音频/资源探针、正式接口走查和素材目录约定。
 
 ## 3. M0：技术基线

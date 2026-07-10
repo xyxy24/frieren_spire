@@ -16,6 +16,7 @@ public:
     [[nodiscard]] bool canUseStairs() const noexcept;
     [[nodiscard]] bool unload() noexcept;
     [[nodiscard]] bool isLoaded() const noexcept;
+    [[nodiscard]] run::FloorResult result(bool rewardComplete) const noexcept;
 
 private:
     std::optional<run::FloorDescriptor> activeFloor_;

@@ -51,4 +51,9 @@ bool FloorController::unload() noexcept
 }
 
 bool FloorController::isLoaded() const noexcept { return activeFloor_.has_value(); }
+
+run::FloorResult FloorController::result(const bool rewardComplete) const noexcept
+{
+    return {encounterComplete_, rewardComplete, canUseStairs() && rewardComplete};
+}
 }

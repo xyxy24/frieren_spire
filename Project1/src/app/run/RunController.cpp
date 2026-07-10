@@ -64,6 +64,17 @@ bool RunController::chooseReward(const game::run::ContentId choice)
     return true;
 }
 
+bool RunController::claimFallbackReward()
+{
+    if (phase_ != game::run::RunPhase::Reward || rewardApplied_ || !reward_
+        || reward_->kind != game::rewards::RewardKind::GoldFallback
+        || reward_->fallbackGold > std::numeric_limits<int>::max() - player_.gold) return false;
+    player_.gold += reward_->fallbackGold;
+    rewardApplied_ = true;
+    phase_ = game::run::RunPhase::Loadout;
+    return true;
+}
+
 bool RunController::equip(const std::size_t slot, const game::run::ContentId spell)
 {
     if (phase_ != game::run::RunPhase::Loadout || slot >= player_.equippedSpells.size()
@@ -101,10 +112,18 @@ bool RunController::useStairs()
     return true;
 }
 
+<<<<<<< Updated upstream
 void RunController::setCurrentHpForFlow(const int hp)
 {
     if (hp < 0 || hp > player_.maxHp) throw std::out_of_range("HP is outside player bounds");
     player_.currentHp = hp;
+=======
+game::run::FloorResult RunController::floorResult() const noexcept
+{
+    const bool rewardComplete = phase_ == game::run::RunPhase::FloorComplete
+        || phase_ == game::run::RunPhase::Victory;
+    return floor_.result(rewardComplete);
+>>>>>>> Stashed changes
 }
 
 int RunController::recoverHalfMissingHp(const int currentHp, const int maxHp) noexcept

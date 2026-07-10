@@ -21,10 +21,15 @@ public:
         std::span<const game::run::ContentId> rewardPool);
     [[nodiscard]] const game::rewards::RewardOffer& rewardOffer() const;
     [[nodiscard]] bool chooseReward(game::run::ContentId choice);
+    [[nodiscard]] bool claimFallbackReward();
     [[nodiscard]] bool equip(std::size_t slot, game::run::ContentId spell);
     [[nodiscard]] bool finishLoadout();
     [[nodiscard]] bool useStairs();
+<<<<<<< Updated upstream
     void setCurrentHpForFlow(int hp);
+=======
+    [[nodiscard]] game::run::FloorResult floorResult() const noexcept;
+>>>>>>> Stashed changes
 
 private:
     static int recoverHalfMissingHp(int currentHp, int maxHp) noexcept;
