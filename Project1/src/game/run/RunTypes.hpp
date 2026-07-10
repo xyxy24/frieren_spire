@@ -23,7 +23,6 @@ enum class RunPhase : std::uint8_t
     FloorLoading,
     InEncounter,
     Reward,
-    Loadout,
     FloorComplete,
     Defeat,
     Victory

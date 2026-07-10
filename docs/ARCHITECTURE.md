@@ -39,6 +39,7 @@ flowchart TB
 | 系统 | 责任 | 不负责 |
 |---|---|---|
 | `GameApp` | 启动、主循环、顶层状态切换 | 具体战斗规则 |
+| `TowerSession` | 把战斗结果、奖励、装备、楼梯和下一层串成可执行流程 | 绘制 SFML 图形 |
 | `RunController` | 创建/结束本局，持有本局种子、玩家构筑与 Boss 进度 | 绘制 HUD |
 | `FloorController` | 生成、加载、激活、结算和卸载一层 | 直接决定魔法伤害 |
 | `EncounterDirector` | 按楼层类型启动普通战、事件、商店或 Boss | 保存渲染对象 |
@@ -52,6 +53,8 @@ flowchart TB
 | `ContentRegistry` | 加载和查询内容定义，校验 ID 与引用 | 持有本局进度 |
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
+
+当前垂直切片由纯 C++ `TowerSession` 持有 `RunController` 和至多一个 `CombatSession`。SFML `main.cpp` 只提交 `PlayerIntent` 并读取状态快照；奖励按键、独立装备覆盖层、楼梯解锁及玩家与楼梯交互区域的相交校验由 `TowerSession` 与 `RunController` 决定。
 
 ## 5. 状态所有权
 
@@ -89,8 +92,7 @@ stateDiagram-v2
     InEncounter --> Reward: 普通战或 Boss 胜利
     InEncounter --> FloorComplete: 事件或商店结束
     InEncounter --> Defeat: HP = 0
-    Reward --> Loadout
-    Loadout --> FloorComplete
+    Reward --> FloorComplete: 奖励加入已学魔法
     FloorComplete --> FloorTransition: 与楼梯交互
     FloorTransition --> Victory: 已击败第三位 Boss
     FloorTransition --> FloorLoading: 仍需继续攀登
@@ -99,7 +101,7 @@ stateDiagram-v2
     Result --> MainMenu
 ```
 
-奖励、配置和楼梯交互是独立状态，防止战斗仍在运行时修改权威构筑或重复发放奖励。
+奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是顶层流程状态，而是可从 `InEncounter`、`Reward` 或 `FloorComplete` 打开的暂停覆盖层；关闭后恢复原状态。
 
 ## 7. 战斗与时间
 
@@ -206,7 +208,7 @@ runSeed
 
 楼梯交互必须是一次不可重复提交的事务：
 
-1. 校验本层已完成且玩家可交互。
+1. 校验本层已完成、楼梯已解锁，并且玩家碰撞体处于楼梯交互区域内。
 2. 锁定重复输入并进入 `FloorTransition`。
 3. 结算未应用的奖励或拒绝过层。
 4. 计算并应用 `50% × 已损失 HP` 的恢复。
@@ -252,7 +254,8 @@ runSeed
 
 ### 13.2 集成测试优先项
 
-- 普通战结束 → 奖励 → 配置 → 楼梯 → 回血 → 下一层。
+- 普通战结束 → 奖励加入已学列表 → 返回原地图 → 靠近楼梯交互 → 回血 → 下一层。
+- 任意可玩阶段打开装备栏 → 浏览全部已学魔法 → 明确装备到某一槽位 → 关闭后恢复原阶段。
 - 商店购买后金币、库存和构筑一致。
 - Boss 胜利只发放一次奖励。
 - 楼层卸载后没有旧实体继续更新或触发事件。

@@ -1,4 +1,5 @@
 #include "app/run/RunController.hpp"
+#include "app/run/TowerSession.hpp"
 #include "game/economy/MerchantSystem.hpp"
 #include "game/events/EventSystem.hpp"
 #include "game/run/DeterministicRng.hpp"
@@ -61,13 +62,14 @@ bool completesFiveFloorLoops()
         const auto choice = run.rewardOffer().candidates[0];
         if (!expect(run.chooseReward(choice), "reward choice must apply")
             || !expect(!run.chooseReward(choice), "reward cannot apply twice")
-            || !expect(run.equip(floor % 3U, choice), "learned spell can be equipped")
-            || !expect(run.finishLoadout(), "loadout can finish")
             || !expect(run.useStairs(), "stairs complete the floor")
             || !expect(!run.useStairs(), "stairs transaction cannot repeat")) return false;
     }
     return expect(run.context().floorIndex == 5U, "five transitions must advance exactly five floors")
-        && expect(run.player().gold == 25, "gold must be granted once per victory");
+        && expect(run.player().gold == 25, "gold must be granted once per victory")
+        && expect(run.player().learnedSpells.size() == 5U, "each reward should join the learned spell list")
+        && expect(!run.player().equippedSpells[0] && !run.player().equippedSpells[1]
+            && !run.player().equippedSpells[2], "reward choice must not force a loadout replacement");
 }
 
 bool healsHalfMissingRoundedUp()
@@ -77,7 +79,7 @@ bool healsHalfMissingRoundedUp()
     arcane::app::RunController run(7U);
     const auto& descriptor = run.loadFloor(arcane::game::run::FloorType::Combat, encounters);
     if (!run.resolveEncounter(victoryResult(descriptor.encounterIds[0], 0, 1), spells)) return false;
-    if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.finishLoadout() || !run.useStairs()) return false;
+    if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.useStairs()) return false;
     return expect(run.player().currentHp == 51, "99 missing HP heals 50 with ceiling rounding");
 }
 
@@ -160,11 +162,80 @@ bool thirdBossVictorySettlesOnce()
     {
         static_cast<void>(run.loadFloor(arcane::game::run::FloorType::Boss, boss));
         if (!run.resolveEncounter(victoryResult(99U, 0), rewards)) return false;
-        if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.finishLoadout() || !run.useStairs()) return false;
+        if (!run.chooseReward(run.rewardOffer().candidates[0]) || !run.useStairs()) return false;
     }
     return expect(run.context().bossesDefeated == 3U, "boss progress must advance once per boss floor")
         && expect(run.phase() == arcane::game::run::RunPhase::Victory, "third boss must end the run in victory")
         && expect(!run.useStairs(), "victory cannot be settled twice");
+}
+
+bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
+{
+    arcane::app::TowerSessionConfig config;
+    config.enemySpawn = {210.0F, 576.0F};
+    config.normalEnemyHealth = 25;
+    config.bossEnemyHealth = 25;
+    config.staircaseBounds = {300.0F, 560.0F, 90.0F, 80.0F};
+    arcane::app::TowerSession tower(123U, config);
+
+    arcane::game::PlayerIntent toggleLoadout;
+    toggleLoadout.toggleLoadoutPressed = true;
+    tower.update(toggleLoadout, 0.01F);
+    if (!expect(tower.loadoutOpen(), "loadout should be available during combat")) return false;
+    tower.update(toggleLoadout, 0.01F);
+    if (!expect(!tower.loadoutOpen(), "loadout should close without changing the run phase")
+        || !expect(tower.run().phase() == arcane::game::run::RunPhase::InEncounter,
+            "closing loadout should resume the underlying combat phase")) return false;
+
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    tower.update(attack, 0.01F);
+    if (!expect(tower.run().phase() == arcane::game::run::RunPhase::Reward,
+        "combat victory should enter the visible reward phase")) return false;
+
+    const auto candidates = tower.rewardCandidates();
+    if (!expect(candidates.has_value(), "reward phase should expose three candidates")) return false;
+
+    arcane::game::PlayerIntent choose;
+    choose.spellPressed[0] = true;
+    tower.update(choose, 0.01F);
+    if (!expect(tower.run().phase() == arcane::game::run::RunPhase::FloorComplete,
+            "choosing a reward should return to the completed floor")
+        || !expect(tower.run().player().learnedSpells.back() == (*candidates)[0],
+            "chosen reward should join learned spells")
+        || !expect(!tower.run().player().equippedSpells[0]
+            && !tower.run().player().equippedSpells[1]
+            && !tower.run().player().equippedSpells[2],
+            "chosen reward should not automatically replace an equipped spell")) return false;
+
+    tower.update(toggleLoadout, 0.01F);
+    if (!expect(tower.loadoutOpen(), "loadout should open on the completed floor")
+        || !expect(tower.selectedLearnedSpell() == (*candidates)[0],
+            "newly learned reward should be selectable in loadout")) return false;
+
+    arcane::game::PlayerIntent equip;
+    equip.spellPressed[1] = true;
+    tower.update(equip, 0.01F);
+    if (!expect(tower.run().player().equippedSpells[1] == (*candidates)[0],
+        "chosen spell should equip into the requested slot")) return false;
+
+    tower.update(toggleLoadout, 0.01F);
+    if (!expect(!tower.loadoutOpen(), "closing loadout should preserve the equipped spell")) return false;
+
+    arcane::game::PlayerIntent interact;
+    interact.interactPressed = true;
+    tower.update(interact, 0.01F);
+    if (!expect(tower.run().phase() == arcane::game::run::RunPhase::FloorComplete,
+        "interacting away from the staircase must not change floors")) return false;
+
+    arcane::game::PlayerIntent moveToStairs;
+    moveToStairs.moveAxis = 1.0F;
+    tower.update(moveToStairs, 0.5F);
+    tower.update(interact, 0.01F);
+    return expect(tower.run().phase() == arcane::game::run::RunPhase::InEncounter,
+            "interacting inside the staircase should start the next floor")
+        && expect(tower.run().context().floorIndex == 1U, "stairs should advance exactly one floor")
+        && expect(tower.combat() != nullptr, "the next floor should own a fresh combat session");
 }
 }
 
@@ -173,7 +244,8 @@ int main()
     const bool passed = deterministicStreamsAreIsolated() && completesFiveFloorLoops()
         && healsHalfMissingRoundedUp() && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
         && merchantPurchaseIsAtomic()
-        && eventChoiceIsAtomic() && thirdBossVictorySettlesOnce();
+        && eventChoiceIsAtomic() && thirdBossVictorySettlesOnce()
+        && towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction();
     if (!passed) return 1;
     std::cout << "All run flow tests passed.\n";
     return 0;

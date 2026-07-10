@@ -20,8 +20,18 @@ CombatSession::CombatSession(CombatRequest request)
 
 void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
 {
-    if (result_.has_value() || deltaSeconds <= 0.0F)
+    if (deltaSeconds <= 0.0F)
     {
+        return;
+    }
+
+    if (result_.has_value())
+    {
+        if (result_->outcome == CombatOutcome::Victory)
+        {
+            attack_.update(deltaSeconds);
+            player_.update(intent, deltaSeconds, request_.worldBounds);
+        }
         return;
     }
 

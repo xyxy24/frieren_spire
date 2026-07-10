@@ -16,6 +16,8 @@ private:
     bool previousSpell0_ {false};
     bool previousSpell1_ {false};
     bool previousSpell2_ {false};
+    bool previousToggleLoadout_ {false};
+    bool previousMenuLeft_ {false};
+    bool previousMenuRight_ {false};
 };
 }
-

@@ -27,6 +27,7 @@ game::PlayerIntent SfmlInputMapper::sample()
     const bool spell1 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::I);
     const bool spell2 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::O);
     const bool interact = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E);
+    const bool toggleLoadout = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Tab);
 
     game::PlayerIntent intent;
     intent.moveAxis = static_cast<float>(moveRight) - static_cast<float>(moveLeft);
@@ -36,7 +37,9 @@ game::PlayerIntent SfmlInputMapper::sample()
     intent.spellPressed[1] = pressedOnce(spell1, previousSpell1_);
     intent.spellPressed[2] = pressedOnce(spell2, previousSpell2_);
     intent.interactPressed = pressedOnce(interact, previousInteract_);
+    intent.toggleLoadoutPressed = pressedOnce(toggleLoadout, previousToggleLoadout_);
+    intent.menuPreviousPressed = pressedOnce(moveLeft, previousMenuLeft_);
+    intent.menuNextPressed = pressedOnce(moveRight, previousMenuRight_);
     return intent;
 }
 }
-

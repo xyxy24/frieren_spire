@@ -97,24 +97,17 @@ bool RunController::chooseReward(const game::run::ContentId choice)
     if (phase_ != game::run::RunPhase::Reward || rewardApplied_) return false;
     if (!game::rewards::applySpellChoice(player_, *reward_, choice)) return false;
     rewardApplied_ = true;
-    phase_ = game::run::RunPhase::Loadout;
+    phase_ = game::run::RunPhase::FloorComplete;
     return true;
 }
 
 bool RunController::equip(const std::size_t slot, const game::run::ContentId spell)
 {
-    if (phase_ != game::run::RunPhase::Loadout || slot >= player_.equippedSpells.size()
+    if (slot >= player_.equippedSpells.size()
         || std::find(player_.learnedSpells.begin(), player_.learnedSpells.end(), spell)
             == player_.learnedSpells.end()) return false;
     for (auto& equipped : player_.equippedSpells) if (equipped == spell) equipped.reset();
     player_.equippedSpells[slot] = spell;
-    return true;
-}
-
-bool RunController::finishLoadout()
-{
-    if (phase_ != game::run::RunPhase::Loadout) return false;
-    phase_ = game::run::RunPhase::FloorComplete;
     return true;
 }
 

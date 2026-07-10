@@ -24,7 +24,6 @@ public:
     [[nodiscard]] const game::rewards::RewardOffer& rewardOffer() const;
     [[nodiscard]] bool chooseReward(game::run::ContentId choice);
     [[nodiscard]] bool equip(std::size_t slot, game::run::ContentId spell);
-    [[nodiscard]] bool finishLoadout();
     [[nodiscard]] bool useStairs();
 
 private:

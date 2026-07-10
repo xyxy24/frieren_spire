@@ -24,7 +24,7 @@ When implementation and documentation disagree, determine whether the code or de
 - Application target: `Project1`.
 - Pure C++ library target: `arcane_core`.
 - Test targets: `arcane_core_tests`, `combat_session_tests`, and `run_flow_tests`, registered with CTest.
-- Implemented probe: SFML window/input adapter; player movement and facing; basic attack timing, AABB hit detection, HP, contact damage, a static training enemy and health bars; deterministic floor/reward streams; run, reward, loadout, staircase, merchant, event, and three-boss flow; and a real `CombatResult` handoff between combat and run domains.
+- Implemented probe: SFML window/input adapter; player movement and facing; basic attack timing, AABB hit detection, HP, contact damage, a static training enemy and health bars; a visible combat → reward → return-to-map → spatial staircase → next-floor loop; an independently toggled learned-spell loadout overlay; deterministic floor/reward streams; merchant/event backend transactions; three-boss victory; and a real `CombatResult` handoff between combat and run domains.
 - `Project1.slnx` and `Project1/Project1.vcxproj` are legacy empty-project files retained temporarily. Do not add new source or dependencies to them; CMake is the source of truth.
 
 ## Build & Verification

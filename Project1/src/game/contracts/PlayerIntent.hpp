@@ -11,6 +11,8 @@ struct PlayerIntent
     bool attackPressed {false};
     std::array<bool, 3> spellPressed {false, false, false};
     bool interactPressed {false};
+    bool toggleLoadoutPressed {false};
+    bool menuPreviousPressed {false};
+    bool menuNextPressed {false};
 };
 }
-
