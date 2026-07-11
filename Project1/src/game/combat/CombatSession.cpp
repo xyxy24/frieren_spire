@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace arcane::game
@@ -127,26 +128,96 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     relics_.update(deltaSeconds);
     blessingRemaining_ = std::max(0.0F, blessingRemaining_ - deltaSeconds);
     flowerFieldRemaining_ = std::max(0.0F, flowerFieldRemaining_ - deltaSeconds);
+    acidFieldRemaining_ = std::max(0.0F, acidFieldRemaining_ - deltaSeconds);
+    phantomRemaining_ = std::max(0.0F, phantomRemaining_ - deltaSeconds);
+    cleanseProtectionRemaining_ = std::max(0.0F, cleanseProtectionRemaining_ - deltaSeconds);
+    for (auto& effect : activeSpellEffects_)
+        effect.remaining = std::max(0.0F, effect.remaining - deltaSeconds);
+    std::erase_if(activeSpellEffects_, [](const auto& effect) { return effect.remaining <= 0.0F; });
+    for (auto& impact : pendingSpellImpacts_)
+    {
+        impact.delayRemaining -= deltaSeconds;
+        if (impact.delayRemaining > 0.0F) continue;
+        for (auto& enemy : enemies_)
+            if (enemy.health.isAlive() && intersects(impact.bounds, enemy.controller.bounds()))
+                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    {impact.source, impact.sequence, impact.damage, impact.multiplier
+                        * (enemy.exposedRemaining > 0.0F ? 1.25F : 1.0F)
+                        * (enemy.markedRemaining > 0.0F ? 1.15F : 1.0F)}));
+    }
+    std::erase_if(pendingSpellImpacts_, [](const auto& impact) {
+        return impact.delayRemaining <= 0.0F;
+    });
     guardRemaining_ = std::max(0.0F, guardRemaining_ - deltaSeconds);
     guardCooldownRemaining_ = std::max(0.0F, guardCooldownRemaining_ - deltaSeconds);
-    player_.update(intent, deltaSeconds, request_.worldBounds);
+    const bool wasDashing = player_.isDashing();
+    const Vec2 beforePlayerUpdate = player_.position();
+    PlayerIntent playerIntent = intent;
+    if (beamRemaining_ > 0.0F)
+    {
+        playerIntent.moveAxis *= 0.3F;
+        playerIntent.jumpPressed = false;
+        playerIntent.dashPressed = false;
+    }
+    player_.update(playerIntent, deltaSeconds, request_.worldBounds);
+    if (intent.dashPressed && !wasDashing && player_.isDashing())
+    {
+        const float left = player_.facingDirection() > 0.0F
+            ? beforePlayerUpdate.x : beforePlayerUpdate.x - PlayerController::DashDistance;
+        activeSpellEffects_.push_back({1010U,
+            {left, beforePlayerUpdate.y, PlayerController::DashDistance, PlayerController::Height},
+            PlayerController::DashDurationSeconds, PlayerController::DashDurationSeconds});
+    }
+    if (teaChannelRemaining_ > 0.0F)
+    {
+        const float previous = teaChannelRemaining_;
+        teaChannelRemaining_ = std::max(0.0F, teaChannelRemaining_ - deltaSeconds);
+        if (std::abs(player_.position().x - teaStartX_) > 8.0F || player_.isStunned())
+            teaChannelRemaining_ = 0.0F;
+        else if (previous > 0.0F && teaChannelRemaining_ <= 0.0F)
+            static_cast<void>(playerHealth_.heal(18));
+    }
     if (intent.guardPressed && !player_.isStunned() && !player_.isDashing()
         && guardCooldownRemaining_ <= 0.0F)
     {
         guardRemaining_ = GuardDurationSeconds;
         guardCooldownRemaining_ = GuardCooldownSeconds;
+        activeSpellEffects_.push_back({1007U, playerBounds(),
+            GuardDurationSeconds, GuardDurationSeconds});
     }
     const float playerCenter = player_.position().x + PlayerController::Width * 0.5F;
-    const bool canAct = !player_.isStunned() && !player_.isDashing() && guardRemaining_ <= 0.0F;
+    const bool canAct = !player_.isStunned() && !player_.isDashing()
+        && guardRemaining_ <= 0.0F && beamRemaining_ <= 0.0F;
 
     for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
     {
         auto& enemy = enemies_[enemyIndex];
         if (!enemy.health.isAlive()) continue;
+        enemy.frostSlowRemaining = std::max(0.0F, enemy.frostSlowRemaining - deltaSeconds);
+        enemy.controlRemaining = std::max(0.0F, enemy.controlRemaining - deltaSeconds);
+        enemy.exposedRemaining = std::max(0.0F, enemy.exposedRemaining - deltaSeconds);
+        enemy.markedRemaining = std::max(0.0F, enemy.markedRemaining - deltaSeconds);
+        if (acidFieldRemaining_ > 0.0F && intersects(acidFieldBounds_, enemy.controller.bounds()))
+            enemy.exposedRemaining = std::max(enemy.exposedRemaining, 0.1F);
+        if (enemy.burnRemaining > 0.0F)
+        {
+            const float activeDelta = std::min(deltaSeconds, enemy.burnRemaining);
+            enemy.burnRemaining -= activeDelta;
+            enemy.burnTickAccumulator += activeDelta;
+            while (enemy.burnTickAccumulator >= 1.0F && enemy.health.isAlive())
+            {
+                enemy.burnTickAccumulator -= 1.0F;
+                ++enemy.burnTick;
+                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    {enemy.burnSource, enemy.burnSequenceBase + enemy.burnTick, 4}));
+            }
+        }
+        if (!enemy.health.isAlive()) continue;
         enemy.contactCooldown = std::max(0.0F, enemy.contactCooldown - deltaSeconds);
         const auto bounds = enemy.controller.bounds();
-        enemy.slowed = flowerFieldRemaining_ > 0.0F
+        const bool flowerSlowed = flowerFieldRemaining_ > 0.0F
             && std::abs(bounds.left + bounds.width * 0.5F - flowerFieldCenterX_) <= 360.0F;
+        enemy.slowed = flowerSlowed || enemy.frostSlowRemaining > 0.0F;
         if (enemy.archetype == EnemyArchetype::RedMirrorDragon)
         {
             enemy.breathCooldown = std::max(0.0F, enemy.breathCooldown - deltaSeconds);
@@ -179,7 +250,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     if (intersects(playerBounds(), flames))
                         static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
                             {DamageSource::EnemyAttack, sequence, 15, 1.0F,
-                                relics_.incomingDamageMultiplier(), 0,
+                                relics_.incomingDamageMultiplier()
+                                    * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F), 0,
                                 player_.isDashing() || guardRemaining_ > 0.0F}));
                 }
                 if (enemy.breathRemaining <= 0.0F) enemy.breathCooldown = 12.0F;
@@ -192,7 +264,59 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 continue;
             }
         }
-        enemy.controller.update(playerBounds(), deltaSeconds, request_.worldBounds, enemy.slowed ? 0.5F : 1.0F);
+        if (enemy.controlRemaining <= 0.0F)
+        {
+            const Aabb target = phantomRemaining_ > 0.0F ? phantomBounds_ : playerBounds();
+            const float speedMultiplier = flowerSlowed ? 0.5F
+                : (enemy.frostSlowRemaining > 0.0F ? 0.6F : 1.0F);
+            enemy.controller.update(target, deltaSeconds, request_.worldBounds, speedMultiplier);
+        }
+        if (phantomRemaining_ > 0.0F && enemy.controller.action() == ai::EnemyAction::Active
+            && intersects(phantomBounds_, enemy.controller.attackBounds()))
+            phantomRemaining_ = 0.0F;
+    }
+
+    if (hellfireRemaining_ > 0.0F)
+    {
+        const float activeDelta = std::min(deltaSeconds, hellfireRemaining_);
+        hellfireRemaining_ -= activeDelta;
+        hellfireTickAccumulator_ += activeDelta;
+        const float fieldCenter = hellfireBounds_.left + hellfireBounds_.width * 0.5F;
+        for (auto& enemy : enemies_)
+            if (enemy.health.isAlive() && intersects(hellfireBounds_, enemy.controller.bounds()))
+            {
+                const auto bounds = enemy.controller.bounds();
+                const float enemyCenter = bounds.left + bounds.width * 0.5F;
+                enemy.controller.translateHorizontal((fieldCenter > enemyCenter ? 1.0F : -1.0F)
+                    * 24.0F * activeDelta, request_.worldBounds);
+            }
+        while (hellfireTickAccumulator_ >= 0.5F)
+        {
+            hellfireTickAccumulator_ -= 0.5F;
+            ++hellfireTick_;
+            const int tickDamage = hellfireTick_ <= 4U ? 15 : 14;
+            for (auto& enemy : enemies_)
+                if (enemy.health.isAlive() && intersects(hellfireBounds_, enemy.controller.bounds()))
+                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                        {DamageSource::PlayerUltimateSpell, hellfireSequenceBase_ + hellfireTick_,
+                            tickDamage, hellfireMultiplier_}));
+        }
+    }
+    if (beamRemaining_ > 0.0F)
+    {
+        const float activeDelta = std::min(deltaSeconds, beamRemaining_);
+        beamRemaining_ -= activeDelta;
+        beamTickAccumulator_ += activeDelta;
+        while (beamTickAccumulator_ >= 0.25F)
+        {
+            beamTickAccumulator_ -= 0.25F;
+            ++beamTick_;
+            for (auto& enemy : enemies_)
+                if (enemy.health.isAlive() && intersects(beamBounds_, enemy.controller.bounds()))
+                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                        {DamageSource::PlayerUltimateSpell, beamSequenceBase_ + beamTick_,
+                            15, beamMultiplier_}));
+        }
     }
 
     std::vector<Vec2> summonedKnights;
@@ -237,19 +361,35 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         for (auto& enemy : enemies_)
             if (enemy.health.isAlive() && intersects(area, enemy.controller.bounds()))
                 static_cast<void>(enemy.damageResolver.resolve(enemy.health,
-                    {source, sequence, damage, multiplier}));
-    };
-    const auto castArea = [this](const spells::SpellDefinition& definition) {
-        const auto position = player_.position();
-        const float left = player_.facingDirection() > 0.0F
-            ? position.x + PlayerController::Width : position.x - definition.range;
-        return Aabb {left, position.y + (PlayerController::Height - definition.height) * 0.5F,
-            definition.range, definition.height};
+                    {source, sequence, damage, multiplier
+                        * (enemy.exposedRemaining > 0.0F ? 1.25F : 1.0F)
+                        * (enemy.markedRemaining > 0.0F ? 1.15F : 1.0F)}));
     };
     const auto applyCast = [&](const spells::SpellCastResult& cast, const DamageSource source,
         const spells::SpellDefinition* definition)
     {
         if (!cast.cast || !definition) return;
+        const auto visualDuration = [](const spells::SpellEffect effect) {
+            switch (effect)
+            {
+            case spells::SpellEffect::FlowerField: return 4.0F;
+            case spells::SpellEffect::GoddessBlessing: return 6.0F;
+            case spells::SpellEffect::FlameBurst: return 3.0F;
+            case spells::SpellEffect::Phantom: return 3.0F;
+            case spells::SpellEffect::SourGrape: return 5.0F;
+            case spells::SpellEffect::HotTea: return 1.0F;
+            case spells::SpellEffect::ManaTrace: return 6.0F;
+            case spells::SpellEffect::GoddessSpears: return 0.6F;
+            case spells::SpellEffect::DestructionLightning: return 0.8F;
+            case spells::SpellEffect::HellfireStorm: return 3.0F;
+            case spells::SpellEffect::JudgmentBeam: return 2.0F;
+            case spells::SpellEffect::EarthPillars: return 3.0F;
+            case spells::SpellEffect::MirrorArray: return 8.0F;
+            default: return 0.35F;
+            }
+        };
+        const float duration = visualDuration(cast.effect);
+        activeSpellEffects_.push_back({cast.spellId, cast.effectBounds, duration, duration});
         const float multiplier = relics_.outgoingDamageMultiplier()
             * (blessingRemaining_ > 0.0F ? 1.2F : 1.0F);
         if (cast.effect == spells::SpellEffect::FlowerField)
@@ -258,22 +398,258 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             flowerFieldCenterX_ = playerCenter;
             flowerHealingAccumulator_ = 0.0F;
         }
-        else if (cast.effect == spells::SpellEffect::GoddessBlessing) blessingRemaining_ = 8.0F;
+        else if (cast.effect == spells::SpellEffect::GoddessBlessing) blessingRemaining_ = 6.0F;
         else if (cast.effect == spells::SpellEffect::BloodMagic)
         {
             const int cost = std::max(1, (playerHealth_.current() + 9) / 10);
             static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::Event, ++selfDamageSequence_, cost}));
-            damageEnemies(source, cast.sequence, playerHealth_.current() / 2, multiplier, castArea(*definition));
+            damageEnemies(source, cast.sequence, playerHealth_.current() / 2, multiplier, cast.effectBounds);
         }
-        else damageEnemies(source, cast.sequence, cast.damage, multiplier, castArea(*definition));
+        else if (cast.effect == spells::SpellEffect::FrostLance)
+        {
+            damageEnemies(source, cast.sequence, cast.damage, multiplier, cast.effectBounds);
+            for (auto& enemy : enemies_)
+                if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
+                    enemy.frostSlowRemaining = 2.5F;
+        }
+        else if (cast.effect == spells::SpellEffect::FlameBurst)
+        {
+            damageEnemies(source, cast.sequence, cast.damage, multiplier, cast.effectBounds);
+            for (auto& enemy : enemies_)
+                if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
+                {
+                    enemy.burnRemaining = 3.0F;
+                    enemy.burnTickAccumulator = 0.0F;
+                    enemy.burnSequenceBase = cast.sequence * 16U;
+                    enemy.burnTick = 0U;
+                    enemy.burnSource = source;
+                }
+        }
+        else if (cast.effect == spells::SpellEffect::MagicThread)
+        {
+            damageEnemies(source, cast.sequence, cast.damage, multiplier, cast.effectBounds);
+            for (auto& enemy : enemies_)
+                if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
+                {
+                    const float direction = playerCenter < enemy.controller.position().x ? -1.0F : 1.0F;
+                    enemy.controller.translateHorizontal(direction * 126.0F, request_.worldBounds);
+                    enemy.controlRemaining = enemy.archetype == EnemyArchetype::Boss ? 0.4F : 1.2F;
+                }
+        }
+        else if (cast.effect == spells::SpellEffect::StoneShot)
+        {
+            damageEnemies(source, cast.sequence, cast.damage, multiplier, cast.effectBounds);
+            for (auto& enemy : enemies_)
+                if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
+                    enemy.controller.translateHorizontal(player_.facingDirection() * 80.0F,
+                        request_.worldBounds);
+        }
+        else if (cast.effect == spells::SpellEffect::Phantom)
+        {
+            phantomRemaining_ = 3.0F;
+            phantomBounds_ = {player_.position().x, player_.position().y,
+                PlayerController::Width, PlayerController::Height};
+            activeSpellEffects_.back().bounds = phantomBounds_;
+        }
+        else if (cast.effect == spells::SpellEffect::SourGrape)
+        {
+            acidFieldRemaining_ = 5.0F;
+            acidFieldBounds_ = cast.effectBounds;
+        }
+        else if (cast.effect == spells::SpellEffect::Cleaning)
+        {
+            static_cast<void>(playerHealth_.heal(10));
+            cleanseProtectionRemaining_ = 1.0F;
+        }
+        else if (cast.effect == spells::SpellEffect::HotTea)
+        {
+            teaChannelRemaining_ = 1.0F;
+            teaStartX_ = player_.position().x;
+        }
+        else if (cast.effect == spells::SpellEffect::BirdCapture)
+        {
+            const auto distanceToPlayer = [playerCenter](const auto& enemy) {
+                if (!enemy.health.isAlive()) return std::numeric_limits<float>::max();
+                const auto bounds = enemy.controller.bounds();
+                return std::abs(bounds.left + bounds.width * 0.5F - playerCenter);
+            };
+            auto found = std::min_element(enemies_.begin(), enemies_.end(), [&](const auto& left,
+                const auto& right) { return distanceToPlayer(left) < distanceToPlayer(right); });
+            if (found != enemies_.end()
+                && !intersects(cast.effectBounds, found->controller.bounds())) found = enemies_.end();
+            if (found != enemies_.end())
+            {
+                static_cast<void>(found->damageResolver.resolve(found->health,
+                    {source, cast.sequence, cast.damage, multiplier}));
+                const bool boss = found->archetype == EnemyArchetype::Aura
+                    || found->archetype == EnemyArchetype::RedMirrorDragon
+                    || found->archetype == EnemyArchetype::Boss;
+                found->controlRemaining = boss ? 0.7F : 2.5F;
+            }
+        }
+        else if (cast.effect == spells::SpellEffect::ManaTrace)
+        {
+            const auto distanceToPlayer = [playerCenter](const auto& enemy) {
+                if (!enemy.health.isAlive()) return std::numeric_limits<float>::max();
+                const auto bounds = enemy.controller.bounds();
+                return std::abs(bounds.left + bounds.width * 0.5F - playerCenter);
+            };
+            auto found = std::min_element(enemies_.begin(), enemies_.end(), [&](const auto& left,
+                const auto& right) { return distanceToPlayer(left) < distanceToPlayer(right); });
+            if (found != enemies_.end()
+                && !intersects(cast.effectBounds, found->controller.bounds())) found = enemies_.end();
+            if (found != enemies_.end()) found->markedRemaining = 6.0F;
+        }
+        else if (cast.effect == spells::SpellEffect::BossZoltraak)
+        {
+            for (auto& enemy : enemies_)
+            {
+                if (!enemy.health.isAlive() || !intersects(cast.effectBounds, enemy.controller.bounds()))
+                    continue;
+                const bool demon = enemy.archetype == EnemyArchetype::Lugner
+                    || enemy.archetype == EnemyArchetype::Linie
+                    || enemy.archetype == EnemyArchetype::Draht
+                    || enemy.archetype == EnemyArchetype::Aura;
+                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    {source, cast.sequence, cast.damage, multiplier * (demon ? 1.3F : 1.0F)}));
+            }
+        }
+        else if (cast.effect == spells::SpellEffect::GoddessSpears)
+        {
+            bool fullHit = false;
+            for (auto& enemy : enemies_)
+            {
+                if (!enemy.health.isAlive() || !intersects(cast.effectBounds, enemy.controller.bounds()))
+                    continue;
+                std::uint32_t landedSpears = 0U;
+                for (std::uint64_t spear = 1U; spear <= 3U && enemy.health.isAlive(); ++spear)
+                {
+                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                        {source, cast.sequence * 4U + spear, cast.damage, multiplier}));
+                    ++landedSpears;
+                }
+                fullHit = fullHit || landedSpears == 3U;
+            }
+            if (fullHit) static_cast<void>(playerHealth_.heal(12));
+        }
+        else if (cast.effect == spells::SpellEffect::SeveringSlash)
+        {
+            for (auto& enemy : enemies_)
+                if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
+                {
+                    const bool executeRange = enemy.health.current() * 5 <= enemy.health.maximum();
+                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                        {source, cast.sequence, cast.damage,
+                            multiplier * (executeRange ? 1.3F : 1.0F)}));
+                }
+        }
+        else if (cast.effect == spells::SpellEffect::Mimic)
+        {
+            const auto found = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+                return enemy.health.isAlive();
+            });
+            if (found != enemies_.end())
+            {
+                int copiedDamage = 20;
+                switch (found->controller.config().skill)
+                {
+                case ai::EnemySkill::Thread: copiedDamage = 10; break;
+                case ai::EnemySkill::DragonClaw: copiedDamage = 25; break;
+                case ai::EnemySkill::LeapingCleave: copiedDamage = 25; break;
+                case ai::EnemySkill::Blood: copiedDamage = 30; break;
+                case ai::EnemySkill::Domination: copiedDamage = 20; break;
+                default: break;
+                }
+                damageEnemies(source, cast.sequence, static_cast<int>(std::lround(copiedDamage * 1.2F)),
+                    multiplier, cast.effectBounds);
+            }
+        }
+        else if (cast.effect == spells::SpellEffect::DestructionLightning)
+        {
+            Aabb impact = cast.effectBounds;
+            const bool hitsMarked = std::any_of(enemies_.begin(), enemies_.end(), [&](const auto& enemy) {
+                return enemy.health.isAlive() && enemy.markedRemaining > 0.0F
+                    && intersects(impact, enemy.controller.bounds());
+            });
+            if (hitsMarked)
+            {
+                const float growX = impact.width * 0.2F;
+                const float growY = impact.height * 0.2F;
+                impact = {impact.left - growX, impact.top - growY,
+                    impact.width * 1.4F, impact.height * 1.4F};
+                activeSpellEffects_.back().bounds = impact;
+            }
+            pendingSpellImpacts_.push_back({cast.spellId, impact, 0.8F, cast.damage,
+                cast.sequence, source, multiplier});
+        }
+        else if (cast.effect == spells::SpellEffect::HellfireStorm)
+        {
+            hellfireRemaining_ = 3.0F;
+            hellfireTickAccumulator_ = 0.0F;
+            hellfireBounds_ = cast.effectBounds;
+            hellfireSequenceBase_ = cast.sequence * 16U;
+            hellfireTick_ = 0U;
+            hellfireMultiplier_ = multiplier;
+        }
+        else if (cast.effect == spells::SpellEffect::JudgmentBeam)
+        {
+            beamRemaining_ = 2.0F;
+            beamTickAccumulator_ = 0.0F;
+            beamBounds_ = cast.effectBounds;
+            beamSequenceBase_ = cast.sequence * 16U;
+            beamTick_ = 0U;
+            beamMultiplier_ = multiplier;
+        }
+        else if (cast.effect == spells::SpellEffect::EarthPillars)
+        {
+            const float center = cast.effectBounds.left + cast.effectBounds.width * 0.5F;
+            std::vector<std::uint32_t> hitsPerEnemy(enemies_.size(), 0U);
+            for (std::uint64_t pillarIndex = 0U; pillarIndex < 3U; ++pillarIndex)
+            {
+                const Aabb pillar {center - 88.0F + static_cast<float>(pillarIndex) * 64.0F,
+                    request_.worldBounds.groundTop - 160.0F, 48.0F, 160.0F};
+                activeSpellEffects_.push_back({cast.spellId, pillar, 3.0F, 3.0F});
+                for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
+                {
+                    auto& enemy = enemies_[enemyIndex];
+                    if (enemy.health.isAlive() && intersects(pillar, enemy.controller.bounds()))
+                    {
+                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                            {source, cast.sequence * 4U + pillarIndex + 1U,
+                                hitsPerEnemy[enemyIndex] == 0U ? 35 : 25, multiplier}));
+                        ++hitsPerEnemy[enemyIndex];
+                    }
+                }
+            }
+        }
+        else if (cast.effect == spells::SpellEffect::MirrorArray) mirrorCopies_ = 2U;
+        else damageEnemies(source, cast.sequence, cast.damage, multiplier, cast.effectBounds);
     };
     for (std::size_t slot = 0U; slot < intent.spellPressed.size(); ++slot)
     {
         if (!intent.spellPressed[slot] || !canAct) continue;
         const auto id = spells_.view()[slot].id;
-        applyCast(spells_.tryCast(slot, player_.position(), player_.facingDirection(), firstLivingEnemyBounds()),
-            SpellDamageSources[slot], id ? spells::findDefinition(*id) : nullptr);
+        const auto cast = spells_.tryCast(slot, player_.position(), player_.facingDirection(),
+            firstLivingEnemyBounds());
+        applyCast(cast, SpellDamageSources[slot], id ? spells::findDefinition(*id) : nullptr);
+        int mirrorBaseDamage = cast.damage;
+        if (cast.effect == spells::SpellEffect::BloodMagic && cast.cast)
+            mirrorBaseDamage = playerHealth_.current() / 2;
+        if (cast.cast && mirrorCopies_ > 0U && mirrorBaseDamage > 0)
+        {
+            const float mirrorMultiplier = relics_.outgoingDamageMultiplier()
+                * (blessingRemaining_ > 0.0F ? 1.2F : 1.0F);
+            for (std::uint32_t copy = 0U; copy < mirrorCopies_; ++copy)
+                damageEnemies(SpellDamageSources[slot], cast.sequence * 16U + copy + 8U,
+                    static_cast<int>(std::lround(mirrorBaseDamage * 0.35F)),
+                    mirrorMultiplier, cast.effectBounds);
+            std::erase_if(activeSpellEffects_, [](const auto& effect) {
+                return effect.spellId == 2012U;
+            });
+            activeSpellEffects_.push_back({2012U, cast.effectBounds, 0.5F, 0.5F});
+            mirrorCopies_ = 0U;
+        }
     }
     if (intent.ultimateSpellPressed && canAct)
     {
@@ -318,8 +694,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 | enemy.controller.attackSequence();
             const auto result = playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::EnemyAttack, skillSequence, damage,
-                    1.0F, relics_.incomingDamageMultiplier(), 0,
+                    1.0F, relics_.incomingDamageMultiplier()
+                        * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F), 0,
                     player_.isDashing() || guardRemaining_ > 0.0F});
+            if (result.appliedDamage > 0) beamRemaining_ = 0.0F;
             const bool dominationHit = config.skill == ai::EnemySkill::Domination
                 && !player_.isDashing() && guardRemaining_ <= 0.0F;
             if ((result.appliedDamage > 0 || dominationHit) && blessingRemaining_ <= 0.0F)
@@ -342,10 +720,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 && enemy.archetype != EnemyArchetype::Aura
                 && enemy.archetype != EnemyArchetype::RedMirrorDragon;
             const int contactDamage = legacyDamage ? request_.enemyContactDamage : 15;
-            static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
+            const auto contactResult = playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::EnemyContact, contactSequence, contactDamage,
-                    1.0F, relics_.incomingDamageMultiplier(), 0,
-                    player_.isDashing() || guardRemaining_ > 0.0F}));
+                    1.0F, relics_.incomingDamageMultiplier()
+                        * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F), 0,
+                    player_.isDashing() || guardRemaining_ > 0.0F});
+            if (contactResult.appliedDamage > 0) beamRemaining_ = 0.0F;
             enemy.contactCooldown = 1.0F;
         }
     }
@@ -396,6 +776,15 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
             windingUp, active, enemy.slowed, skillBounds});
     }
+    return views;
+}
+
+std::vector<SpellEffectView> CombatSession::spellEffects() const
+{
+    std::vector<SpellEffectView> views;
+    views.reserve(activeSpellEffects_.size());
+    for (const auto& effect : activeSpellEffects_)
+        views.push_back({effect.spellId, effect.bounds, effect.remaining, effect.duration});
     return views;
 }
 

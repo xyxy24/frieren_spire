@@ -90,6 +90,11 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
 }
 
 void EnemyController::markDead() noexcept { action_ = EnemyAction::Dead; }
+void EnemyController::translateHorizontal(const float distance, const WorldBounds& worldBounds) noexcept
+{
+    position_.x = std::clamp(position_.x + distance,
+        worldBounds.left, worldBounds.right - config_.width);
+}
 Vec2 EnemyController::position() const noexcept { return position_; }
 EnemyAction EnemyController::action() const noexcept { return action_; }
 float EnemyController::facingDirection() const noexcept { return facingDirection_; }

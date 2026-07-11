@@ -10,8 +10,15 @@
 
 namespace arcane::game::spells
 {
-enum class SpellEffect : std::uint8_t { DirectDamage, FlowerField, GoddessBlessing, BloodMagic };
-enum class SpellTier : std::uint8_t { Regular, Boss };
+enum class SpellEffect : std::uint8_t {
+    DirectDamage, FlowerField, GoddessBlessing, BloodMagic, FrostLance, FlameBurst,
+    InnateGuard, MagicThread, StoneShot, InnateDash, Phantom, SourGrape,
+    Cleaning, HotTea, BirdCapture, ManaTrace, BossZoltraak, GoddessSpears,
+    SeveringSlash, Mimic, DestructionLightning, HellfireStorm, JudgmentBeam,
+    EarthPillars, MirrorArray
+};
+enum class SpellShape : std::uint8_t { Self, ForwardBox, SelfArea, TargetArea, Summon };
+enum class SpellTier : std::uint8_t { Regular, Innate, Boss };
 
 struct SpellDefinition
 {
@@ -19,6 +26,8 @@ struct SpellDefinition
     const char* name {};
     const char* description {};
     SpellEffect effect {SpellEffect::DirectDamage};
+    SpellShape shape {SpellShape::ForwardBox};
+    // Base damage before combat modifiers.
     int damage {};
     float cooldownSeconds {};
     float range {};
@@ -37,9 +46,12 @@ struct SpellCastResult
 {
     bool cast {};
     bool hit {};
+    // Successful casts retain base damage even when the preview target is missed.
     int damage {};
     std::uint64_t sequence {};
     SpellEffect effect {SpellEffect::DirectDamage};
+    std::uint32_t spellId {};
+    Aabb effectBounds;
 };
 
 [[nodiscard]] const SpellDefinition* findDefinition(std::uint32_t id) noexcept;

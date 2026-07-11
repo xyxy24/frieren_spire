@@ -11,11 +11,12 @@ namespace arcane::app
 {
 namespace
 {
-constexpr std::array<game::run::ContentId, 6> NormalRewardPool {
-    1001U, 1002U, 1003U, 1004U, 1005U, 1006U
+constexpr std::array<game::run::ContentId, 14> NormalRewardPool {
+    1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1008U,
+    1009U, 1011U, 1012U, 1013U, 1014U, 1015U, 1016U
 };
-constexpr std::array<game::run::ContentId, 3> BossRewardPool {
-    2001U, 2002U, 2003U
+constexpr std::array<game::run::ContentId, 9> BossRewardPool {
+    2001U, 2002U, 2003U, 2006U, 2007U, 2009U, 2010U, 2011U, 2012U
 };
 constexpr std::array SpellMerchantCatalog {
     game::economy::CatalogItem {1001U, game::economy::ItemKind::Spell, 10},
@@ -23,7 +24,15 @@ constexpr std::array SpellMerchantCatalog {
     game::economy::CatalogItem {1003U, game::economy::ItemKind::Spell, 20},
     game::economy::CatalogItem {1004U, game::economy::ItemKind::Spell, 10},
     game::economy::CatalogItem {1005U, game::economy::ItemKind::Spell, 15},
-    game::economy::CatalogItem {1006U, game::economy::ItemKind::Spell, 20}
+    game::economy::CatalogItem {1006U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1008U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1009U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1011U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1012U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1013U, game::economy::ItemKind::Spell, 10},
+    game::economy::CatalogItem {1014U, game::economy::ItemKind::Spell, 10},
+    game::economy::CatalogItem {1015U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1016U, game::economy::ItemKind::Spell, 15}
 };
 constexpr std::array RelicMerchantCatalog {
     game::economy::CatalogItem {4001U, game::economy::ItemKind::Relic, 15},

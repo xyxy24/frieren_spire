@@ -95,4 +95,12 @@ struct EnemyStateView
     bool slowed {false};
     std::optional<Aabb> skillEffectBounds;
 };
+
+struct SpellEffectView
+{
+    std::uint32_t spellId {};
+    Aabb bounds;
+    float remaining {};
+    float duration {};
+};
 }

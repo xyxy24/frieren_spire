@@ -183,9 +183,9 @@ bool goddessBlessingBoostsDamageAndPreventsControl()
     arcane::game::PlayerIntent damage;
     damage.spellPressed[1] = true;
     combat.update(damage, 0.01F);
-    return expect(combat.playerState().blessingRemaining > 7.0F, "blessing must last eight seconds")
+    return expect(combat.playerState().blessingRemaining > 5.0F, "blessing must last six seconds")
         && expect(!combat.playerState().stunned, "blessing must prevent control effects")
-        && expect(combat.enemyState().currentHealth == 76, "blessing must increase outgoing damage by 20%");
+        && expect(combat.enemyState().currentHealth == 74, "blessing must increase outgoing damage by 20%");
 }
 
 bool darkDragonHornAppliesRiskAndReward()
@@ -296,9 +296,9 @@ bool spellSlotsHaveIndependentCooldowns()
     const auto blocked = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
     const auto otherSlot = spells.tryCast(1U, {160.0F, 576.0F}, 1.0F, target);
     const auto emptySlot = spells.tryCast(2U, {160.0F, 576.0F}, 1.0F, target);
-    spells.update(0.80F);
+    spells.update(1.50F);
     const auto readyAgain = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
-    return expect(first.cast && first.hit && first.damage == 20, "equipped spell must cast and hit")
+    return expect(first.cast && first.hit && first.damage == 22, "equipped spell must cast and hit")
         && expect(!blocked.cast, "spell must be blocked during its own cooldown")
         && expect(otherSlot.cast, "one slot cooldown must not block another slot")
         && expect(!emptySlot.cast, "empty spell slot must not cast")
@@ -313,12 +313,90 @@ bool spellCooldownIsDeltaTimeStable()
     const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
     static_cast<void>(oneStep.tryCast(0U, {160.0F, 576.0F}, 1.0F, target));
     static_cast<void>(manySteps.tryCast(0U, {160.0F, 576.0F}, 1.0F, target));
-    oneStep.update(0.80F);
-    for (int frame = 0; frame < 8; ++frame) manySteps.update(0.10F);
+    oneStep.update(1.50F);
+    for (int frame = 0; frame < 15; ++frame) manySteps.update(0.10F);
     return expect(oneStep.tryCast(0U, {160.0F, 576.0F}, 1.0F, target).cast,
             "single-step cooldown must finish")
         && expect(manySteps.tryCast(0U, {160.0F, 576.0F}, 1.0F, target).cast,
             "partitioned delta time must finish the same cooldown");
+}
+
+bool regularSpellCatalogHasDefinitionsAndAuthoritativeRanges()
+{
+    using arcane::game::spells::SpellTier;
+    for (std::uint32_t id = 1001U; id <= 1016U; ++id)
+    {
+        const auto* definition = arcane::game::spells::findDefinition(id);
+        if (!expect(definition != nullptr, "every spell from 1001 through 1016 must be defined"))
+            return false;
+        const bool innate = id == 1007U || id == 1010U;
+        if (!expect(definition->tier == (innate ? SpellTier::Innate : SpellTier::Regular),
+                "K/L innate actions must stay separate from collectible spells"))
+            return false;
+    }
+
+    std::array<std::optional<std::uint32_t>, 3> equipped {1001U, 1008U, 1012U};
+    arcane::game::spells::SpellSystem spells(equipped);
+    const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
+    const auto field = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, target);
+    const auto thread = spells.tryCast(1U, {160.0F, 576.0F}, 1.0F, target);
+    const auto acid = spells.tryCast(2U, {160.0F, 576.0F}, 1.0F, target);
+    return expect(field.effectBounds.width == 720.0F && field.effectBounds.height == 360.0F,
+            "self-area spell must expose its full horizontal and vertical diameter")
+        && expect(thread.effectBounds.width == 280.0F && thread.effectBounds.height == 12.0F,
+            "line spell must expose its authoritative line range")
+        && expect(acid.effectBounds.width == 168.0F && acid.effectBounds.height == 168.0F,
+            "target-area spell must expose its authoritative area")
+        && expect(!spells.equip(0U, 1007U) && !spells.equip(0U, 1010U),
+            "innate guard and dash must not occupy learned spell slots");
+}
+
+bool innateActionsExposeSpellEffectPlaceholders()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    arcane::game::CombatSession dashCombat(request);
+    arcane::game::PlayerIntent dash;
+    dash.dashPressed = true;
+    dashCombat.update(dash, 0.01F);
+    const auto dashEffects = dashCombat.spellEffects();
+    if (!expect(dashEffects.size() == 1U && dashEffects.front().spellId == 1010U
+            && dashEffects.front().bounds.width == arcane::game::PlayerController::DashDistance,
+        "K dash must expose its 150px effect placeholder")) return false;
+
+    arcane::game::CombatSession guardCombat(request);
+    arcane::game::PlayerIntent guard;
+    guard.guardPressed = true;
+    guardCombat.update(guard, 0.01F);
+    const auto guardEffects = guardCombat.spellEffects();
+    return expect(guardEffects.size() == 1U && guardEffects.front().spellId == 1007U,
+        "L guard must expose its self effect placeholder");
+}
+
+bool collectibleSpellsEmitEffectPlaceholders()
+{
+    constexpr std::array ids {
+        1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1008U,
+        1009U, 1011U, 1012U, 1013U, 1014U, 1015U, 1016U
+    };
+    for (const std::uint32_t id : ids)
+    {
+        auto request = adjacentEnemyRequest();
+        request.enemyMaximumHealth = 1000;
+        request.enemyContactDamage = 0;
+        request.enemyAttackDamage = 0;
+        request.equippedSpellIds[0] = id;
+        arcane::game::CombatSession combat(request);
+        arcane::game::PlayerIntent cast;
+        cast.spellPressed[0] = true;
+        combat.update(cast, 0.01F);
+        const auto effects = combat.spellEffects();
+        if (!expect(effects.size() == 1U && effects.front().spellId == id
+                && effects.front().bounds.width > 0.0F && effects.front().bounds.height > 0.0F,
+            "every collectible spell must emit a non-empty effect placeholder")) return false;
+    }
+    return true;
 }
 
 bool combatSessionAppliesEquippedSpellDamage()
@@ -358,6 +436,199 @@ bool ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
     spells.update(18.0F);
     return expect(spells.tryCastUltimate({160.0F, 576.0F}, 1.0F, target).cast,
         "ultimate slot must become available after the shared cooldown");
+}
+
+bool spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {
+        {arcane::game::EnemyArchetype::HeadlessKnight, {20.0F, 576.0F}},
+        {arcane::game::EnemyArchetype::HeadlessKnight, {260.0F, 576.0F}}
+    };
+    request.equippedSpellIds[0] = 1004U;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent cast;
+    cast.spellPressed[0] = true;
+    combat.update(cast, 0.01F);
+    const auto enemies = combat.enemyStates();
+    return expect(enemies.size() == 2U && enemies[0].currentHealth == 60,
+            "an out-of-range first enemy must remain undamaged")
+        && expect(enemies[1].currentHealth == 38,
+            "an in-range later enemy must receive spell damage even when the first enemy is missed");
+}
+
+bool bossRewardDescriptionsExposeImplementedEffects()
+{
+    const auto* zoltraak = arcane::game::spells::findDefinition(2001U);
+    const auto* spears = arcane::game::spells::findDefinition(2002U);
+    const auto* severing = arcane::game::spells::findDefinition(2003U);
+    return expect(zoltraak && std::string_view {zoltraak->description}.find("70") != std::string_view::npos,
+            "Zoltraak reward text must state its implemented damage")
+        && expect(spears && std::string_view {spears->description}.find("28") != std::string_view::npos,
+            "Goddess Spears reward text must state its per-hit damage")
+        && expect(severing && std::string_view {severing->description}.find("78") != std::string_view::npos,
+            "Severing Magic reward text must state its implemented damage");
+}
+
+bool selectedBossSpellCatalogIsDefinedAndOmitsRejectedChoices()
+{
+    constexpr std::array ids {2001U, 2002U, 2003U, 2006U, 2007U, 2009U, 2010U, 2011U, 2012U};
+    const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
+    for (const std::uint32_t id : ids)
+    {
+        const auto* definition = arcane::game::spells::findDefinition(id);
+        if (!expect(definition && arcane::game::spells::isBossSpell(id),
+                "every selected Boss reward must have a Boss-tier definition")) return false;
+        arcane::game::spells::SpellSystem spells({}, id);
+        const auto cast = spells.tryCastUltimate({160.0F, 576.0F}, 1.0F, target);
+        if (!expect(cast.cast && cast.effectBounds.width > 0.0F && cast.effectBounds.height > 0.0F,
+                "every selected Boss spell must expose a non-empty effect range")) return false;
+    }
+    return expect(arcane::game::spells::findDefinition(2004U) == nullptr
+            && arcane::game::spells::findDefinition(2005U) == nullptr
+            && arcane::game::spells::findDefinition(2008U) == nullptr,
+        "Boss spells 2004, 2005 and 2008 must stay out of the implemented catalog");
+}
+
+bool goddessSpearsDealsThreeHitsAndHealsOnFullHit()
+{
+    auto request = adjacentEnemyRequest();
+    request.playerCurrentHealth = 50;
+    request.enemyMaximumHealth = 200;
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    request.equippedUltimateSpellId = 2002U;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent cast;
+    cast.ultimateSpellPressed = true;
+    combat.update(cast, 0.01F);
+    return expect(combat.enemyState().currentHealth == 116,
+            "three goddess spears must deal three times twenty-eight damage")
+        && expect(combat.playerState().currentHealth == 62,
+            "landing all three spears must heal twelve HP");
+}
+
+bool delayedAndSustainedBossSpellsResolveOverTime()
+{
+    auto lightningRequest = adjacentEnemyRequest();
+    lightningRequest.enemyArchetype = arcane::game::EnemyArchetype::ChestMimic;
+    lightningRequest.enemyMaximumHealth = 200;
+    lightningRequest.enemyContactDamage = 0;
+    lightningRequest.enemyAttackDamage = 0;
+    lightningRequest.equippedUltimateSpellId = 2007U;
+    arcane::game::CombatSession lightning(lightningRequest);
+    arcane::game::PlayerIntent cast;
+    cast.ultimateSpellPressed = true;
+    lightning.update(cast, 0.01F);
+    if (!expect(lightning.enemyState().currentHealth == 200,
+            "destruction lightning must show its warning before damage")) return false;
+    lightning.update({}, 0.81F);
+    if (!expect(lightning.enemyState().currentHealth == 110,
+            "destruction lightning must strike after its delay")) return false;
+
+    auto fireRequest = adjacentEnemyRequest();
+    fireRequest.enemyMaximumHealth = 200;
+    fireRequest.enemyContactDamage = 0;
+    fireRequest.enemyAttackDamage = 0;
+    fireRequest.equippedUltimateSpellId = 2009U;
+    arcane::game::CombatSession fire(fireRequest);
+    fire.update(cast, 0.01F);
+    fire.update({}, 3.0F);
+    if (!expect(fire.enemyState().currentHealth == 112,
+            "hellfire storm must deal eighty-eight damage over six ticks")) return false;
+
+    auto beamRequest = adjacentEnemyRequest();
+    beamRequest.enemyMaximumHealth = 200;
+    beamRequest.enemyContactDamage = 0;
+    beamRequest.enemyAttackDamage = 0;
+    beamRequest.equippedUltimateSpellId = 2010U;
+    arcane::game::CombatSession beam(beamRequest);
+    beam.update(cast, 0.01F);
+    beam.update({}, 2.0F);
+    return expect(beam.enemyState().currentHealth == 80,
+        "judgment beam must deal eight ticks of fifteen damage when uninterrupted");
+}
+
+bool mirrorArrayRepeatsTheNextRegularDamageSpell()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    request.equippedSpellIds[0] = 1004U;
+    request.equippedUltimateSpellId = 2012U;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent mirror;
+    mirror.ultimateSpellPressed = true;
+    combat.update(mirror, 0.01F);
+    arcane::game::PlayerIntent regular;
+    regular.spellPressed[0] = true;
+    combat.update(regular, 0.01F);
+    return expect(combat.enemyState().currentHealth == 62,
+        "two mirrors must add two rounded thirty-five-percent copies to the next damage spell");
+}
+
+bool directBossSpellsApplyTheirDistinctRules()
+{
+    arcane::game::CombatRequest demonRequest;
+    demonRequest.enemies = {{arcane::game::EnemyArchetype::Lugner, {210.0F, 576.0F}}};
+    demonRequest.equippedUltimateSpellId = 2001U;
+    arcane::game::CombatSession zoltraak(demonRequest);
+    arcane::game::PlayerIntent cast;
+    cast.ultimateSpellPressed = true;
+    zoltraak.update(cast, 0.01F);
+    if (!expect(zoltraak.enemyState().currentHealth == 9,
+            "demon-killing Zoltraak must apply its thirty-percent demon bonus")) return false;
+
+    auto mimicRequest = adjacentEnemyRequest();
+    mimicRequest.enemyMaximumHealth = 100;
+    mimicRequest.enemyContactDamage = 0;
+    mimicRequest.enemyAttackDamage = 0;
+    mimicRequest.equippedUltimateSpellId = 2006U;
+    arcane::game::CombatSession mimic(mimicRequest);
+    mimic.update(cast, 0.01F);
+    if (!expect(mimic.enemyState().currentHealth == 76,
+            "mimic magic must copy the nearby twenty-damage attack at 120 percent")) return false;
+
+    auto earthRequest = adjacentEnemyRequest();
+    earthRequest.enemyMaximumHealth = 200;
+    earthRequest.enemyContactDamage = 0;
+    earthRequest.enemyAttackDamage = 0;
+    earthRequest.equippedUltimateSpellId = 2011U;
+    arcane::game::CombatSession earth(earthRequest);
+    earth.update(cast, 0.01F);
+    return expect(earth.enemyState().currentHealth == 165,
+        "the first earth pillar intersecting a target must deal thirty-five damage");
+}
+
+bool severingMagicGainsExecuteDamageBelowTwentyPercent()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemyMaximumHealth = 500;
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    request.equippedSpellIds[0] = 1004U;
+    request.equippedSpellIds[1] = 1015U;
+    request.equippedUltimateSpellId = 2003U;
+    arcane::game::CombatSession combat(request);
+    for (int castIndex = 0; castIndex < 18; ++castIndex)
+    {
+        arcane::game::PlayerIntent bolt;
+        bolt.spellPressed[0] = true;
+        combat.update(bolt, 0.01F);
+        if (castIndex < 17) combat.update({}, 1.5F);
+    }
+    arcane::game::PlayerIntent capture;
+    capture.spellPressed[1] = true;
+    combat.update(capture, 0.01F);
+    if (!expect(combat.enemyState().currentHealth == 96,
+            "test setup must place the target below twenty percent HP")) return false;
+    arcane::game::PlayerIntent sever;
+    sever.ultimateSpellPressed = true;
+    combat.update(sever, 0.01F);
+    return expect(combat.result().has_value()
+            && combat.result()->outcome == arcane::game::CombatOutcome::Victory,
+        "severing magic must gain enough execute damage to defeat a twenty-percent target");
 }
 
 bool combatSessionCastsUltimateWithDedicatedInput()
@@ -588,7 +859,17 @@ int main()
         && hitStunSuppressesInputAndAppliesKnockback()
         && spellSlotsHaveIndependentCooldowns()
         && spellCooldownIsDeltaTimeStable()
+        && regularSpellCatalogHasDefinitionsAndAuthoritativeRanges()
+        && innateActionsExposeSpellEffectPlaceholders()
+        && collectibleSpellsEmitEffectPlaceholders()
         && ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
+        && bossRewardDescriptionsExposeImplementedEffects()
+        && selectedBossSpellCatalogIsDefinedAndOmitsRejectedChoices()
+        && goddessSpearsDealsThreeHitsAndHealsOnFullHit()
+        && delayedAndSustainedBossSpellsResolveOverTime()
+        && mirrorArrayRepeatsTheNextRegularDamageSpell()
+        && directBossSpellsApplyTheirDistinctRules()
+        && severingMagicGainsExecuteDamageBelowTwentyPercent()
         && combatSessionCastsUltimateWithDedicatedInput()
         && guardBlocksDamageAndUsesItsOwnCooldown()
         && multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
@@ -601,6 +882,7 @@ int main()
         && redMirrorDragonBreathTicksThreeTimes()
         && enemyDirectionLocksWhenWindupBegins()
         && combatSessionAppliesEquippedSpellDamage()
+        && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()
         && flowerFieldHealsAndMoonFlowerAutoCasts()
         && goddessBlessingBoostsDamageAndPreventsControl()

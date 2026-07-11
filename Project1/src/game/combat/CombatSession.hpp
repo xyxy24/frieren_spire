@@ -32,6 +32,7 @@ public:
     [[nodiscard]] PlayerStateView playerState() const noexcept;
     [[nodiscard]] EnemyStateView enemyState() const noexcept;
     [[nodiscard]] std::vector<EnemyStateView> enemyStates() const;
+    [[nodiscard]] std::vector<SpellEffectView> spellEffects() const;
     [[nodiscard]] Aabb attackBounds() const noexcept;
     [[nodiscard]] const std::optional<CombatResult>& result() const noexcept;
     [[nodiscard]] bool equipSpell(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
@@ -63,6 +64,32 @@ private:
         float breathRemaining {};
         float breathTickAccumulator {};
         std::uint64_t breathSequence {};
+        float frostSlowRemaining {};
+        float controlRemaining {};
+        float burnRemaining {};
+        float burnTickAccumulator {};
+        std::uint64_t burnSequenceBase {};
+        std::uint32_t burnTick {};
+        DamageSource burnSource {DamageSource::PlayerSpell0};
+        float exposedRemaining {};
+        float markedRemaining {};
+    };
+    struct ActiveSpellEffect
+    {
+        std::uint32_t spellId {};
+        Aabb bounds;
+        float remaining {};
+        float duration {};
+    };
+    struct PendingSpellImpact
+    {
+        std::uint32_t spellId {};
+        Aabb bounds;
+        float delayRemaining {};
+        int damage {};
+        std::uint64_t sequence {};
+        DamageSource source {DamageSource::PlayerUltimateSpell};
+        float multiplier {1.0F};
     };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
@@ -80,9 +107,31 @@ private:
     float flowerFieldRemaining_ {};
     float flowerFieldCenterX_ {};
     float flowerHealingAccumulator_ {};
+    float acidFieldRemaining_ {};
+    Aabb acidFieldBounds_;
+    float phantomRemaining_ {};
+    Aabb phantomBounds_;
+    float teaChannelRemaining_ {};
+    float teaStartX_ {};
+    float cleanseProtectionRemaining_ {};
+    float hellfireRemaining_ {};
+    float hellfireTickAccumulator_ {};
+    Aabb hellfireBounds_;
+    std::uint64_t hellfireSequenceBase_ {};
+    std::uint32_t hellfireTick_ {};
+    float hellfireMultiplier_ {1.0F};
+    float beamRemaining_ {};
+    float beamTickAccumulator_ {};
+    Aabb beamBounds_;
+    std::uint64_t beamSequenceBase_ {};
+    std::uint32_t beamTick_ {};
+    float beamMultiplier_ {1.0F};
+    std::uint32_t mirrorCopies_ {};
     float guardRemaining_ {};
     float guardCooldownRemaining_ {};
     std::uint64_t selfDamageSequence_ {};
+    std::vector<ActiveSpellEffect> activeSpellEffects_;
+    std::vector<PendingSpellImpact> pendingSpellImpacts_;
     std::optional<CombatResult> result_;
 };
 }

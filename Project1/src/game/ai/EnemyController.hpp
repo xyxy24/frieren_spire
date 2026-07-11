@@ -40,6 +40,7 @@ public:
     void update(const Aabb& playerBounds, float deltaSeconds, const WorldBounds& worldBounds,
         float speedMultiplier = 1.0F) noexcept;
     void markDead() noexcept;
+    void translateHorizontal(float distance, const WorldBounds& worldBounds) noexcept;
     [[nodiscard]] Vec2 position() const noexcept;
     [[nodiscard]] EnemyAction action() const noexcept;
     [[nodiscard]] float facingDirection() const noexcept;

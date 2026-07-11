@@ -12,6 +12,7 @@
 #include <string_view>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <random>
 
 namespace
@@ -87,6 +88,7 @@ std::array<std::uint8_t, 7> glyphRows(const char value)
     case '8': return {14, 17, 17, 14, 17, 17, 14}; case '9': return {14, 17, 17, 15, 1, 1, 14};
     case '+': return {0, 4, 4, 31, 4, 4, 0}; case '-': return {0, 0, 0, 31, 0, 0, 0};
     case '%': return {17, 2, 4, 8, 17, 0, 0}; case ':': return {0, 4, 4, 0, 4, 4, 0};
+    case '.': return {0, 0, 0, 0, 0, 4, 4}; case ',': return {0, 0, 0, 0, 4, 4, 8};
     default: return {};
     }
 }
@@ -111,6 +113,60 @@ void drawPixelText(sf::RenderTarget& target, const std::string_view text, const 
                 }
         cursor.x += 6.0F * scale;
     }
+}
+
+std::string wrapPixelText(const std::string_view text, const std::size_t maximumCharacters)
+{
+    std::string wrapped;
+    std::size_t lineLength = 0U;
+    std::size_t cursor = 0U;
+    while (cursor < text.size())
+    {
+        while (cursor < text.size() && text[cursor] == ' ') ++cursor;
+        const std::size_t wordStart = cursor;
+        while (cursor < text.size() && text[cursor] != ' ') ++cursor;
+        if (wordStart == cursor) break;
+        const std::string_view word = text.substr(wordStart, cursor - wordStart);
+        if (lineLength > 0U && lineLength + 1U + word.size() > maximumCharacters)
+        {
+            wrapped.push_back('\n');
+            lineLength = 0U;
+        }
+        if (lineLength > 0U)
+        {
+            wrapped.push_back(' ');
+            ++lineLength;
+        }
+        wrapped.append(word);
+        lineLength += word.size();
+    }
+    return wrapped;
+}
+
+std::string formatTenths(const float value)
+{
+    const int tenths = static_cast<int>(std::lround(value * 10.0F));
+    if (tenths % 10 == 0) return std::to_string(tenths / 10);
+    return std::to_string(tenths / 10) + "." + std::to_string(std::abs(tenths % 10));
+}
+
+std::string spellRangeText(const arcane::game::spells::SpellDefinition& spell)
+{
+    using arcane::game::spells::SpellShape;
+    switch (spell.shape)
+    {
+    case SpellShape::Self: return "RANGE SELF";
+    case SpellShape::ForwardBox:
+        return "RANGE " + formatTenths(spell.range) + " X " + formatTenths(spell.height);
+    case SpellShape::SelfArea:
+        return "RADIUS " + formatTenths(spell.range) + " X " + formatTenths(spell.height);
+    case SpellShape::TargetArea:
+        return "CAST " + formatTenths(spell.range) + " AREA " + formatTenths(spell.height);
+    case SpellShape::Summon:
+        return spell.range > 0.0F
+            ? "SUMMON SELF AGGRO " + formatTenths(spell.range) : "SUMMON BESIDE SELF";
+    }
+    return "RANGE UNKNOWN";
 }
 
 void drawCard(
@@ -223,12 +279,36 @@ void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession&
     const auto candidates = tower.rewardCandidates();
     if (!candidates) return;
 
+    drawPixelText(target, "CHOOSE ONE SPELLBOOK", {465.0F, 70.0F}, 2.0F,
+        sf::Color {255, 231, 145});
+    drawPixelText(target, "READ THE EFFECT THEN PRESS U I OR O", {390.0F, 110.0F}, 1.3F,
+        sf::Color {182, 174, 215});
+
     constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
+    constexpr std::array<std::string_view, 3> Keys {"U", "I", "O"};
     for (std::size_t index = 0; index < candidates->size(); ++index)
     {
-        drawCard(target, (*candidates)[index], {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
+        drawPixelText(target, Keys[index], {CardX[index] + 96.0F, 150.0F}, 1.5F,
+            sf::Color {255, 231, 145});
+        drawCard(target, (*candidates)[index], {CardX[index], 180.0F}, {210.0F, 340.0F}, false);
         if (const auto* definition = arcane::game::spells::findDefinition((*candidates)[index]))
-            drawPixelText(target, definition->name, {CardX[index], 505.0F}, 1.5F);
+        {
+            sf::RectangleShape informationPanel({194.0F, 154.0F});
+            informationPanel.setPosition({CardX[index] + 8.0F, 358.0F});
+            informationPanel.setFillColor(sf::Color {15, 17, 29, 220});
+            informationPanel.setOutlineColor(sf::Color {225, 220, 240, 180});
+            informationPanel.setOutlineThickness(2.0F);
+            target.draw(informationPanel);
+
+            drawPixelText(target, definition->name, {CardX[index] + 8.0F, 370.0F}, 1.05F,
+                sf::Color {255, 238, 173});
+            drawPixelText(target, wrapPixelText(definition->description, 38U),
+                {CardX[index] + 8.0F, 394.0F}, 0.80F);
+            drawPixelText(target, "CD " + formatTenths(definition->cooldownSeconds) + " SEC",
+                {CardX[index] + 8.0F, 472.0F}, 0.95F, sf::Color {145, 218, 255});
+            drawPixelText(target, spellRangeText(*definition),
+                {CardX[index] + 8.0F, 492.0F}, 0.85F, sf::Color {174, 242, 184});
+        }
     }
 }
 
@@ -241,10 +321,44 @@ void drawMerchantScreen(sf::RenderTarget& target, const arcane::app::TowerSessio
     panel.setOutlineThickness(4.0F);
     target.draw(panel);
     drawPixelText(target, "MERCHANT", {535.0F, 65.0F}, 2.0F, sf::Color {255, 225, 145});
-    drawPixelText(target, "SPELLBOOKS", {125.0F, 125.0F}, 1.35F);
-    drawPixelText(target, "RELICS", {125.0F, 405.0F}, 1.35F);
+    drawPixelText(target, "DETAILS", {130.0F, 125.0F}, 1.35F, sf::Color {255, 225, 145});
+    drawPixelText(target, "SPELLBOOKS", {320.0F, 125.0F}, 1.35F);
+    drawPixelText(target, "RELICS", {320.0F, 405.0F}, 1.35F);
     drawPixelText(target, "WASD SELECT   ENTER BUY   E CLOSE", {390.0F, 660.0F}, 1.15F,
         sf::Color {175, 164, 214});
+
+    sf::RectangleShape detailPanel({190.0F, 450.0F});
+    detailPanel.setPosition({100.0F, 165.0F});
+    detailPanel.setFillColor(sf::Color {12, 14, 25, 225});
+    detailPanel.setOutlineColor(sf::Color {205, 159, 75});
+    detailPanel.setOutlineThickness(2.0F);
+    target.draw(detailPanel);
+
+    if (const auto selected = tower.selectedMerchantItem())
+    {
+        if (const auto* spell = arcane::game::spells::findDefinition(*selected))
+        {
+            drawPixelText(target, "SPELL", {115.0F, 185.0F}, 1.0F,
+                sf::Color {145, 218, 255});
+            drawPixelText(target, wrapPixelText(spell->name, 25U),
+                {115.0F, 215.0F}, 0.95F, sf::Color {255, 238, 173});
+            drawPixelText(target, wrapPixelText(spell->description, 34U),
+                {115.0F, 275.0F}, 0.78F);
+            drawPixelText(target, "CD " + formatTenths(spell->cooldownSeconds) + " SEC",
+                {115.0F, 520.0F}, 0.90F, sf::Color {145, 218, 255});
+            drawPixelText(target, wrapPixelText(spellRangeText(*spell), 30U),
+                {115.0F, 550.0F}, 0.82F, sf::Color {174, 242, 184});
+        }
+        else if (const auto* relic = arcane::game::relics::findDefinition(*selected))
+        {
+            drawPixelText(target, "RELIC", {115.0F, 185.0F}, 1.0F,
+                sf::Color {220, 177, 255});
+            drawPixelText(target, wrapPixelText(relic->name, 25U),
+                {115.0F, 215.0F}, 0.95F, sf::Color {255, 238, 173});
+            drawPixelText(target, wrapPixelText(relic->description, 34U),
+                {115.0F, 275.0F}, 0.78F);
+        }
+    }
 
     constexpr std::array<float, 3> CardX {320.0F, 590.0F, 860.0F};
     const auto& stock = tower.merchantStock();
@@ -529,6 +643,50 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         : sf::Color {142, 115, 200});
     playerShape.setOutlineThickness(3.0F);
     target.draw(playerShape);
+
+    for (const arcane::game::SpellEffectView effect : combat->spellEffects())
+    {
+        const float life = effect.duration > 0.0F
+            ? std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F) : 0.0F;
+        sf::Color color {146, 196, 255};
+        switch (effect.spellId)
+        {
+        case 1001U: color = sf::Color {105, 225, 133}; break;
+        case 1002U: color = sf::Color {255, 226, 125}; break;
+        case 1003U: color = sf::Color {210, 55, 83}; break;
+        case 1004U: color = sf::Color {130, 231, 255}; break;
+        case 1005U: color = sf::Color {105, 174, 255}; break;
+        case 1006U: color = sf::Color {255, 112, 55}; break;
+        case 1007U: color = sf::Color {115, 155, 245}; break;
+        case 1008U: color = sf::Color {202, 137, 255}; break;
+        case 1009U: color = sf::Color {170, 154, 132}; break;
+        case 1010U: color = sf::Color {92, 61, 135}; break;
+        case 1011U: color = sf::Color {172, 114, 237}; break;
+        case 1012U: color = sf::Color {158, 220, 68}; break;
+        case 1013U: color = sf::Color {238, 248, 255}; break;
+        case 1014U: color = sf::Color {222, 171, 105}; break;
+        case 1015U: color = sf::Color {248, 151, 205}; break;
+        case 1016U: color = sf::Color {83, 214, 218}; break;
+        case 2001U: color = sf::Color {108, 228, 255}; break;
+        case 2002U: color = sf::Color {255, 232, 139}; break;
+        case 2003U: color = sf::Color {238, 238, 255}; break;
+        case 2006U: color = sf::Color {194, 129, 255}; break;
+        case 2007U: color = sf::Color {124, 165, 255}; break;
+        case 2009U: color = sf::Color {255, 76, 36}; break;
+        case 2010U: color = sf::Color {255, 245, 185}; break;
+        case 2011U: color = sf::Color {184, 147, 99}; break;
+        case 2012U: color = sf::Color {179, 224, 255}; break;
+        default: break;
+        }
+        sf::RectangleShape rangeShape({effect.bounds.width, effect.bounds.height});
+        rangeShape.setPosition({effect.bounds.left, effect.bounds.top});
+        color.a = static_cast<std::uint8_t>(35.0F + 70.0F * life);
+        rangeShape.setFillColor(color);
+        color.a = static_cast<std::uint8_t>(130.0F + 125.0F * life);
+        rangeShape.setOutlineColor(color);
+        rangeShape.setOutlineThickness(2.0F);
+        target.draw(rangeShape);
+    }
 
     for (const arcane::game::EnemyStateView enemy : combat->enemyStates())
     {
