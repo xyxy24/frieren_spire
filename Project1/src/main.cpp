@@ -167,33 +167,74 @@ void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession&
 
 void drawMerchantScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
 {
-    constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
+    sf::RectangleShape panel({1120.0F, 650.0F});
+    panel.setPosition({80.0F, 45.0F});
+    panel.setFillColor(sf::Color {18, 20, 34, 242});
+    panel.setOutlineColor(sf::Color {205, 159, 75});
+    panel.setOutlineThickness(4.0F);
+    target.draw(panel);
+    drawPixelText(target, "MERCHANT", {535.0F, 65.0F}, 2.0F, sf::Color {255, 225, 145});
+    drawPixelText(target, "SPELLBOOKS", {125.0F, 125.0F}, 1.35F);
+    drawPixelText(target, "RELICS", {125.0F, 405.0F}, 1.35F);
+    drawPixelText(target, "WASD SELECT   ENTER BUY   E CLOSE", {390.0F, 660.0F}, 1.15F,
+        sf::Color {175, 164, 214});
+
+    constexpr std::array<float, 3> CardX {320.0F, 590.0F, 860.0F};
     const auto& stock = tower.merchantStock();
-    for (std::size_t index = 0U; index < stock.size() && index < CardX.size(); ++index)
+    std::size_t spellColumn = 0U;
+    std::size_t relicColumn = 0U;
+    for (const auto& item : stock)
     {
-        drawCard(target, stock[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, stock[index].sold);
-        if (const auto* spell = arcane::game::spells::findDefinition(stock[index].id))
-            drawPixelText(target, spell->name, {CardX[index], 505.0F}, 1.5F);
-        else if (const auto* relic = arcane::game::relics::findDefinition(stock[index].id))
-            drawPixelText(target, relic->name, {CardX[index], 505.0F}, 1.5F);
+        const bool spellItem = item.kind == arcane::game::economy::ItemKind::Spell;
+        const std::size_t column = spellItem ? spellColumn++ : relicColumn++;
+        if (column >= CardX.size()) continue;
+        const float y = spellItem ? 145.0F : 425.0F;
+        const bool selected = tower.selectedMerchantItem() == item.id;
+        drawCard(target, item.id, {CardX[column], y}, {165.0F, 175.0F}, selected);
+        if (const auto* spell = arcane::game::spells::findDefinition(item.id))
+            drawPixelText(target, spell->name, {CardX[column], y + 185.0F}, 1.0F);
+        else if (const auto* relic = arcane::game::relics::findDefinition(item.id))
+            drawPixelText(target, relic->name, {CardX[column], y + 185.0F}, 1.0F);
+        drawPixelText(target, std::to_string(item.price) + " GOLD",
+            {CardX[column], y + 210.0F}, 1.15F, sf::Color {255, 225, 145});
     }
 }
 
 void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
 {
+    sf::RectangleShape panel({1120.0F, 650.0F});
+    panel.setPosition({80.0F, 45.0F});
+    panel.setFillColor(sf::Color {22, 15, 38, 244});
+    panel.setOutlineColor(sf::Color {148, 105, 205});
+    panel.setOutlineThickness(4.0F);
+    target.draw(panel);
+    drawPixelText(target, "LORD ORDEN'S BALL", {430.0F, 70.0F}, 2.1F, sf::Color {255, 231, 145});
+    drawPixelText(target, "LORD ORDEN ASKS STARK TO POSE AS HIS SON AT A SOCIAL BALL.",
+        {175.0F, 115.0F}, 1.15F);
+    drawPixelText(target, "HE PROMISES YOU A REWARD. YOUR CHOICE IS:",
+        {300.0F, 145.0F}, 1.15F);
+
+    constexpr std::array<std::string_view, 3> Effects {
+        "+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"
+    };
     if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
     {
         if (tower.eventResultChoice())
+        {
             drawCard(target, *tower.eventResultChoice(), {535.0F, 205.0F}, {210.0F, 280.0F}, true);
+            const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - 5001U);
+            if (choiceIndex < Effects.size())
+                drawPixelText(target, Effects[choiceIndex], {500.0F, 515.0F}, 1.4F,
+                    sf::Color {255, 231, 145});
+        }
         return;
     }
     constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
     const auto choices = tower.eventChoices();
     for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
         drawCard(target, choices[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
-    constexpr std::array<std::string_view, 3> Names {"DESSERT +30 MAX HP", "GRIMOIRE RANDOM SPELL", "COMMISSION +50 GOLD"};
-    for (std::size_t index = 0U; index < choices.size() && index < Names.size(); ++index)
-        drawPixelText(target, Names[index], {CardX[index], 505.0F}, 1.25F);
+    for (std::size_t index = 0U; index < choices.size() && index < Effects.size(); ++index)
+        drawPixelText(target, Effects[index], {CardX[index], 505.0F}, 1.25F);
 }
 
 void drawStaircase(sf::RenderTarget& target, arcane::game::Aabb bounds, bool unlocked);
@@ -457,16 +498,7 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
         if (tower.currentFloorType() == arcane::game::run::FloorType::Merchant)
         {
             if (!tower.specialPanelOpen()) return title + "MERCHANT ROOM - Meet NPC, E Trade | Rear Staircase Exits";
-            const auto& stock = tower.merchantStock();
-            std::string items;
-            constexpr std::array<char, 3> keys {'U', 'I', 'O'};
-            for (std::size_t index = 0U; index < stock.size() && index < keys.size(); ++index)
-            {
-                if (!items.empty()) items += " | ";
-                items += keys[index] + std::string {"="} + std::to_string(stock[index].id)
-                    + (stock[index].sold ? " SOLD" : " " + std::to_string(stock[index].price) + "g");
-            }
-            return title + "MERCHANT - " + items + " | E Close";
+            return title + "MERCHANT - WASD Select | Enter Buy | E Close";
         }
         if (tower.currentFloorType() == arcane::game::run::FloorType::Event)
         {

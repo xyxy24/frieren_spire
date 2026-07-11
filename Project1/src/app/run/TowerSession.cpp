@@ -3,6 +3,7 @@
 #include "game/spells/SpellSystem.hpp"
 
 #include <array>
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -16,16 +17,28 @@ constexpr std::array<game::run::ContentId, 6> NormalRewardPool {
 constexpr std::array<game::run::ContentId, 3> BossRewardPool {
     2001U, 2002U, 2003U
 };
-constexpr std::array MerchantCatalog {
+constexpr std::array SpellMerchantCatalog {
     game::economy::CatalogItem {1001U, game::economy::ItemKind::Spell, 10},
     game::economy::CatalogItem {1002U, game::economy::ItemKind::Spell, 15},
     game::economy::CatalogItem {1003U, game::economy::ItemKind::Spell, 20},
     game::economy::CatalogItem {1004U, game::economy::ItemKind::Spell, 10},
     game::economy::CatalogItem {1005U, game::economy::ItemKind::Spell, 15},
-    game::economy::CatalogItem {1006U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1006U, game::economy::ItemKind::Spell, 20}
+};
+constexpr std::array RelicMerchantCatalog {
     game::economy::CatalogItem {4001U, game::economy::ItemKind::Relic, 15},
     game::economy::CatalogItem {4002U, game::economy::ItemKind::Relic, 20}
 };
+
+std::size_t eligibleCount(const std::span<const game::economy::CatalogItem> catalog,
+    const game::run::PlayerProgress& player)
+{
+    return static_cast<std::size_t>(std::count_if(catalog.begin(), catalog.end(), [&player](const auto& item) {
+        const auto& owned = item.kind == game::economy::ItemKind::Spell
+            ? player.learnedSpells : player.relics;
+        return std::find(owned.begin(), owned.end(), item.id) == owned.end();
+    }));
+}
 }
 
 TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config)
@@ -40,7 +53,7 @@ TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config
         throw std::invalid_argument("invalid tower session configuration");
     }
 
-    for (const auto& item : MerchantCatalog)
+    for (const auto& item : SpellMerchantCatalog)
     {
         if (item.kind == game::economy::ItemKind::Spell
             && game::spells::findDefinition(item.id) == nullptr)
@@ -249,6 +262,12 @@ const std::vector<game::economy::StockItem>& TowerSession::merchantStock() const
     return merchantStock_;
 }
 
+std::optional<game::run::ContentId> TowerSession::selectedMerchantItem() const noexcept
+{
+    if (merchantStock_.empty() || selectedMerchantIndex_ >= merchantStock_.size()) return std::nullopt;
+    return merchantStock_[selectedMerchantIndex_].id;
+}
+
 std::span<const game::events::EventChoice> TowerSession::eventChoices() const noexcept
 {
     return eventChoices_;
@@ -303,8 +322,23 @@ void TowerSession::startNextFloor()
     if (currentFloorType_ == game::run::FloorType::Merchant)
     {
         static_cast<void>(run_.loadFloor(currentFloorType_, {}));
-        merchantStock_ = game::economy::generateStock(MerchantCatalog, run_.player(),
-            game::run::deriveStreamSeed(run_.context().floorSeed, game::run::RandomStream::Merchant));
+        const auto merchantSeed = game::run::deriveStreamSeed(
+            run_.context().floorSeed, game::run::RandomStream::Merchant);
+        const auto spellCount = std::min<std::size_t>(3U, eligibleCount(SpellMerchantCatalog, run_.player()));
+        if (spellCount > 0U)
+        {
+            auto spells = game::economy::generateStock(
+                SpellMerchantCatalog, run_.player(), merchantSeed, spellCount);
+            merchantStock_.insert(merchantStock_.end(), spells.begin(), spells.end());
+        }
+        const auto relicCount = std::min<std::size_t>(3U, eligibleCount(RelicMerchantCatalog, run_.player()));
+        if (relicCount > 0U)
+        {
+            auto relics = game::economy::generateStock(RelicMerchantCatalog, run_.player(),
+                merchantSeed ^ 0x9e3779b97f4a7c15ULL, relicCount);
+            merchantStock_.insert(merchantStock_.end(), relics.begin(), relics.end());
+        }
+        selectedMerchantIndex_ = 0U;
         explorationPlayer_.emplace(config_.playerSpawn);
         return;
     }
@@ -409,13 +443,33 @@ void TowerSession::updateSpecialFloor(const game::PlayerIntent& intent, const fl
     {
         if (currentFloorType_ == game::run::FloorType::Merchant)
         {
-            for (std::size_t index = 0U; index < intent.spellPressed.size() && index < merchantStock_.size(); ++index)
+            if (!merchantStock_.empty())
             {
-                if (!intent.spellPressed[index]) continue;
-                const auto result = run_.purchaseMerchantItem(merchantStock_, merchantStock_[index].id);
-                if (result == game::economy::PurchaseResult::Success)
-                    merchantStock_.erase(merchantStock_.begin() + static_cast<std::ptrdiff_t>(index));
-                break;
+                const auto selectedKind = merchantStock_[selectedMerchantIndex_].kind;
+                std::vector<std::size_t> sameRow;
+                std::vector<std::size_t> otherRow;
+                for (std::size_t index = 0U; index < merchantStock_.size(); ++index)
+                    (merchantStock_[index].kind == selectedKind ? sameRow : otherRow).push_back(index);
+                const auto current = std::find(sameRow.begin(), sameRow.end(), selectedMerchantIndex_);
+                const auto column = static_cast<std::size_t>(std::distance(sameRow.begin(), current));
+                if (intent.menuPreviousPressed)
+                    selectedMerchantIndex_ = sameRow[(column + sameRow.size() - 1U) % sameRow.size()];
+                if (intent.menuNextPressed)
+                    selectedMerchantIndex_ = sameRow[(column + 1U) % sameRow.size()];
+                if ((intent.menuUpPressed || intent.menuDownPressed) && !otherRow.empty())
+                    selectedMerchantIndex_ = otherRow[std::min(column, otherRow.size() - 1U)];
+                if (intent.menuConfirmPressed)
+                {
+                    const auto result = run_.purchaseMerchantItem(
+                        merchantStock_, merchantStock_[selectedMerchantIndex_].id);
+                    if (result == game::economy::PurchaseResult::Success)
+                    {
+                        merchantStock_.erase(merchantStock_.begin()
+                            + static_cast<std::ptrdiff_t>(selectedMerchantIndex_));
+                        selectedMerchantIndex_ = merchantStock_.empty() ? 0U
+                            : std::min(selectedMerchantIndex_, merchantStock_.size() - 1U);
+                    }
+                }
             }
         }
         else if (eventFloorState_ == EventFloorState::Choosing && eventTransaction_)

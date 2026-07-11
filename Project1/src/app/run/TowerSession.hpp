@@ -53,6 +53,7 @@ public:
     [[nodiscard]] game::Aabb staircaseBounds() const noexcept;
     [[nodiscard]] bool staircaseUnlocked() const noexcept;
     [[nodiscard]] const std::vector<game::economy::StockItem>& merchantStock() const noexcept;
+    [[nodiscard]] std::optional<game::run::ContentId> selectedMerchantItem() const noexcept;
     [[nodiscard]] std::span<const game::events::EventChoice> eventChoices() const noexcept;
     [[nodiscard]] const game::PlayerController* explorationPlayer() const noexcept;
     [[nodiscard]] game::Aabb npcBounds() const noexcept;
@@ -79,6 +80,7 @@ private:
     bool loadoutOpen_ {false};
     LoadoutPage loadoutPage_ {LoadoutPage::Spells};
     std::vector<game::economy::StockItem> merchantStock_;
+    std::size_t selectedMerchantIndex_ {0};
     std::optional<game::events::EventTransaction> eventTransaction_;
     std::array<game::events::EventChoice, 3> eventChoices_;
     EventFloorState eventFloorState_ {EventFloorState::Untriggered};

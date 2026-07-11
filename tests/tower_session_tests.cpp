@@ -39,6 +39,13 @@ void chooseLeftReward(arcane::app::TowerSession& tower)
     tower.update(intent, 0.01F);
 }
 
+void confirmMenu(arcane::app::TowerSession& tower)
+{
+    arcane::game::PlayerIntent intent;
+    intent.menuConfirmPressed = true;
+    tower.update(intent, 0.01F);
+}
+
 void interact(arcane::app::TowerSession& tower)
 {
     arcane::game::PlayerIntent intent;
@@ -219,12 +226,13 @@ bool specialFloorsAdvanceWithoutCombat()
     if (!expect(eventTower.run().context().floorIndex == 1U, "resolved event staircase must advance")) return false;
 
     arcane::app::TowerSession merchantTower(*merchantSeed, config);
-    if (!expect(merchantTower.merchantStock().size() == 3U, "merchant floor must expose three stock items"))
+    if (!expect(merchantTower.merchantStock().size() == 5U,
+        "merchant floor must expose separate spell and relic rows"))
         return false;
     interact(merchantTower);
     const auto purchasedId = merchantTower.merchantStock()[0].id;
-    chooseLeftReward(merchantTower);
-    if (!expect(merchantTower.merchantStock().size() == 2U,
+    confirmMenu(merchantTower);
+    if (!expect(merchantTower.merchantStock().size() == 4U,
             "purchased stock must disappear from the merchant panel")
         || !expect(merchantTower.merchantStock()[0].id != purchasedId,
             "sold content cannot remain purchasable")) return false;
@@ -265,9 +273,13 @@ bool purchasedMerchantSpellCanBeEquippedAndCast()
     arcane::app::TowerSession tower(*merchantSeed, config);
     interact(tower);
     const auto purchasedSpell = tower.merchantStock()[spellStockIndex].id;
-    arcane::game::PlayerIntent purchase;
-    purchase.spellPressed[spellStockIndex] = true;
-    tower.update(purchase, 0.01F);
+    for (std::size_t index = 0U; index < spellStockIndex; ++index)
+    {
+        arcane::game::PlayerIntent next;
+        next.menuNextPressed = true;
+        tower.update(next, 0.01F);
+    }
+    confirmMenu(tower);
     if (!expect(tower.run().player().learnedSpells.size() == 1U
             && tower.run().player().learnedSpells[0] == purchasedSpell,
             "purchased merchant spell must enter the learned list")
