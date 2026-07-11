@@ -420,18 +420,34 @@ void TowerSession::startNextFloor()
             ? ((floor.seed & 1ULL) == 0ULL
                 ? game::EnemyArchetype::Aura : game::EnemyArchetype::RedMirrorDragon)
             : game::EnemyArchetype::Boss)
-        : (run_.context().floorIndex % 2U == 0U
-            ? game::EnemyArchetype::ChestMimic : game::EnemyArchetype::HeadlessKnight);
+        : (config_.normalEnemyHealth > 0 ? game::EnemyArchetype::HeadlessKnight
+            : (run_.context().floorIndex % 2U == 0U
+                ? game::EnemyArchetype::ChestMimic : game::EnemyArchetype::HeadlessKnight));
     if (currentFloorType_ == game::run::FloorType::Combat && config_.normalEnemyHealth == 0)
     {
-        constexpr std::array archetypes {
+        constexpr std::array firstGroup {
             game::EnemyArchetype::ChestMimic, game::EnemyArchetype::HeadlessKnight,
-            game::EnemyArchetype::BirdDemon, game::EnemyArchetype::Lugner,
-            game::EnemyArchetype::Linie, game::EnemyArchetype::Draht
+            game::EnemyArchetype::BirdDemon
         };
-        const std::size_t start = (run_.context().floorIndex % 2U) * 3U;
-        for (std::size_t index = 0U; index < 3U; ++index)
-            request.enemies.push_back({archetypes[(start + index) % archetypes.size()],
+        constexpr std::array fourthGroup {
+            game::EnemyArchetype::Lugner, game::EnemyArchetype::Linie, game::EnemyArchetype::Draht
+        };
+        std::array<game::EnemyArchetype, 3> encounter;
+        const std::uint32_t floorInAct = run_.context().floorIndex % config_.floorsPerBoss;
+        if (floorInAct == 0U)
+            encounter = firstGroup;
+        else if (floorInAct == 3U)
+            encounter = fourthGroup;
+        else
+        {
+            game::run::DeterministicRng rng(game::run::deriveStreamSeed(
+                floor.seed, game::run::RandomStream::Encounter));
+            const std::size_t first = rng.index(3U);
+            const std::size_t second = (first + 1U + rng.index(2U)) % firstGroup.size();
+            encounter = {firstGroup[first], firstGroup[second], fourthGroup[rng.index(3U)]};
+        }
+        for (std::size_t index = 0U; index < encounter.size(); ++index)
+            request.enemies.push_back({encounter[index],
                 {650.0F + static_cast<float>(index) * 220.0F, 576.0F}});
     }
     request.enemyContactDamage = currentFloorType_ == game::run::FloorType::Boss ? 20 : 15;

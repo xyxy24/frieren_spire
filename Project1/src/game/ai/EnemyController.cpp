@@ -17,7 +17,8 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
     const float playerCenter = playerBounds.left + playerBounds.width * 0.5F;
     const float enemyCenter = position_.x + config_.width * 0.5F;
     const float horizontalDelta = playerCenter - enemyCenter;
-    if (horizontalDelta != 0.0F) facingDirection_ = horizontalDelta > 0.0F ? 1.0F : -1.0F;
+    if (action_ == EnemyAction::Chase && horizontalDelta != 0.0F)
+        facingDirection_ = horizontalDelta > 0.0F ? 1.0F : -1.0F;
 
     switch (action_)
     {

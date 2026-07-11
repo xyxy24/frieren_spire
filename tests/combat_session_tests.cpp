@@ -525,11 +525,13 @@ bool auraDominationUsesNinetySixPixelRange()
     request.enemyMaximumHealth = 225;
     arcane::game::CombatSession combat(request);
     combat.update({}, 5.01F);
-    const auto aura = combat.enemyState();
-    return expect(aura.windingUp && aura.skillEffectBounds.has_value(),
-            "Aura must begin domination when the player enters its range")
-        && expect(aura.skillEffectBounds->width == 96.0F,
-            "domination rectangle must be ninety-six pixels wide");
+    const auto winding = combat.enemyState();
+    if (!expect(winding.windingUp && !winding.skillEffectBounds.has_value(),
+        "Aura domination must show windup without drawing a range rectangle")) return false;
+    combat.update({}, 0.50F);
+    combat.update({}, 0.01F);
+    return expect(combat.playerState().stunRemaining > 1.4F,
+        "domination must reach and stun a target inside ninety-six pixels");
 }
 
 bool redMirrorDragonBreathTicksThreeTimes()
@@ -547,9 +549,28 @@ bool redMirrorDragonBreathTicksThreeTimes()
     combat.update({}, 1.01F);
     combat.update({}, 1.0F);
     combat.update({}, 1.0F);
-    combat.update({}, 1.0F);
     return expect(combat.playerState().currentHealth == 55,
-        "dragon flame breath must deal fifteen damage once per second for three seconds");
+        "dragon flame breath must deal fifteen damage every half second for one and a half seconds");
+}
+
+bool enemyDirectionLocksWhenWindupBegins()
+{
+    arcane::game::ai::EnemyConfig config;
+    config.attackRange = 500.0F;
+    config.cooldownSeconds = 0.0F;
+    config.windupSeconds = 0.5F;
+    config.activeSeconds = 1.0F;
+    config.skill = arcane::game::ai::EnemySkill::Dive;
+    arcane::game::ai::EnemyController enemy({500.0F, 476.0F}, config);
+    const arcane::game::WorldBounds world {0.0F, 1280.0F, 640.0F};
+    enemy.update({300.0F, 576.0F, 42.0F, 64.0F}, 0.01F, world);
+    if (!expect(enemy.action() == arcane::game::ai::EnemyAction::Windup
+            && enemy.facingDirection() < 0.0F,
+        "enemy must choose its direction when windup begins")) return false;
+    enemy.update({700.0F, 576.0F, 42.0F, 64.0F}, 0.50F, world);
+    return expect(enemy.action() == arcane::game::ai::EnemyAction::Active
+            && enemy.facingDirection() < 0.0F,
+        "enemy must not turn around after the player crosses during windup");
 }
 }
 
@@ -578,6 +599,7 @@ int main()
         && auraOpensWithTwoHeadlessKnights()
         && auraDominationUsesNinetySixPixelRange()
         && redMirrorDragonBreathTicksThreeTimes()
+        && enemyDirectionLocksWhenWindupBegins()
         && combatSessionAppliesEquippedSpellDamage()
         && bloodMagicUsesCurrentHealth()
         && flowerFieldHealsAndMoonFlowerAutoCasts()

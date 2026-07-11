@@ -35,8 +35,8 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {180.0F, 72.0F, 72.0F, 0.5F, 0.9F, 0.0F, 0.0F,
             42.0F, 64.0F, 5.0F, true, false, EnemySkill::LeapingCleave};
     case EnemyArchetype::Draht:
-        return EnemyConfig {160.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
-            42.0F, 64.0F, 9.0F, false, false, EnemySkill::Thread};
+        return EnemyConfig {160.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 64.0F, 8.0F, false, false, EnemySkill::Thread};
     case EnemyArchetype::Aura:
         return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 10.0F, false, false, EnemySkill::Domination};
@@ -74,7 +74,7 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::BirdDemon: return 45;
             case EnemyArchetype::Lugner: return 100;
             case EnemyArchetype::Linie: return 100;
-            case EnemyArchetype::Draht: return 75;
+            case EnemyArchetype::Draht: return 80;
             case EnemyArchetype::Aura: return 225;
             case EnemyArchetype::RedMirrorDragon: return 300;
             case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
@@ -155,22 +155,23 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 enemy.breathWindup = std::max(0.0F, enemy.breathWindup - deltaSeconds);
                 if (enemy.breathWindup <= 0.0F)
                 {
-                    enemy.breathRemaining = 3.0F;
+                    enemy.breathRemaining = 1.5F;
                     enemy.breathTickAccumulator = 0.0F;
                 }
                 continue;
             }
             if (enemy.breathRemaining > 0.0F)
             {
-                enemy.breathRemaining = std::max(0.0F, enemy.breathRemaining - deltaSeconds);
-                enemy.breathTickAccumulator += deltaSeconds;
+                const float activeDelta = std::min(deltaSeconds, enemy.breathRemaining);
+                enemy.breathRemaining -= activeDelta;
+                enemy.breathTickAccumulator += activeDelta;
                 const auto dragon = enemy.controller.bounds();
                 const float left = enemy.controller.facingDirection() > 0.0F
-                    ? dragon.left + dragon.width : dragon.left - 128.0F;
-                const Aabb flames {left, request_.worldBounds.groundTop - 84.0F, 128.0F, 84.0F};
-                while (enemy.breathTickAccumulator >= 1.0F)
+                    ? dragon.left + dragon.width : dragon.left - 160.0F;
+                const Aabb flames {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
+                while (enemy.breathTickAccumulator >= 0.5F)
                 {
-                    enemy.breathTickAccumulator -= 1.0F;
+                    enemy.breathTickAccumulator -= 0.5F;
                     ++enemy.breathSequence;
                     const std::uint64_t sequence = (1ULL << 63U)
                         | (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
@@ -375,7 +376,7 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
         if ((enemy.controller.action() == ai::EnemyAction::Windup
                 || enemy.controller.action() == ai::EnemyAction::Active)
             && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
-            && skill != ai::EnemySkill::Thread)
+            && skill != ai::EnemySkill::Thread && skill != ai::EnemySkill::Domination)
         {
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -384,8 +385,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             && (enemy.breathWindup > 0.0F || enemy.breathRemaining > 0.0F))
         {
             const float left = enemy.controller.facingDirection() > 0.0F
-                ? bounds.left + bounds.width : bounds.left - 128.0F;
-            skillBounds = Aabb {left, request_.worldBounds.groundTop - 84.0F, 128.0F, 84.0F};
+                ? bounds.left + bounds.width : bounds.left - 160.0F;
+            skillBounds = Aabb {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
         }
         const bool windingUp = enemy.controller.action() == ai::EnemyAction::Windup
             || enemy.breathWindup > 0.0F;
@@ -408,7 +409,7 @@ EnemyStateView CombatSession::enemyState() const noexcept
     if ((enemy.controller.action() == ai::EnemyAction::Windup
             || enemy.controller.action() == ai::EnemyAction::Active)
         && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
-        && skill != ai::EnemySkill::Thread)
+        && skill != ai::EnemySkill::Thread && skill != ai::EnemySkill::Domination)
     {
         const auto area = enemy.controller.attackBounds();
         if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -417,8 +418,8 @@ EnemyStateView CombatSession::enemyState() const noexcept
         && (enemy.breathWindup > 0.0F || enemy.breathRemaining > 0.0F))
     {
         const float left = enemy.controller.facingDirection() > 0.0F
-            ? bounds.left + bounds.width : bounds.left - 128.0F;
-        skillBounds = Aabb {left, request_.worldBounds.groundTop - 84.0F, 128.0F, 84.0F};
+            ? bounds.left + bounds.width : bounds.left - 160.0F;
+        skillBounds = Aabb {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
     }
     return {enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
         enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),

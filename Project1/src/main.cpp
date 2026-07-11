@@ -561,7 +561,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         }
 
         if (primaryBoss)
-            drawHealthBar(target, {32.0F, 105.0F},
+            drawHealthBar(target, {static_cast<float>(WindowWidth) - 332.0F, 28.0F},
                 {300.0F, 22.0F}, enemy.currentHealth, enemy.maximumHealth, sf::Color {218, 92, 103});
         else
             drawHealthBar(target, {enemy.position.x - 4.0F, enemy.position.y - 14.0F},
