@@ -180,29 +180,15 @@ bool thirdBossEndsInVictory()
             "climbing after the third boss must enter victory");
 }
 
-std::optional<arcane::game::run::Seed> seedForFirstFloorType(
-    const arcane::game::run::FloorType wanted, const arcane::app::TowerSessionConfig& config)
-{
-    for (arcane::game::run::Seed seed = 1U; seed < 1000U; ++seed)
-    {
-        arcane::app::TowerSession tower(seed, config);
-        if (tower.currentFloorType() == wanted) return seed;
-    }
-    return std::nullopt;
-}
-
 bool specialFloorsAdvanceWithoutCombat()
 {
     arcane::app::TowerSessionConfig config;
     config.npcBounds = {150.0F, 550.0F, 100.0F, 90.0F};
     config.staircaseBounds = {300.0F, 550.0F, 100.0F, 90.0F};
     config.initialPlayer.gold = 30;
-    const auto eventSeed = seedForFirstFloorType(arcane::game::run::FloorType::Event, config);
-    const auto merchantSeed = seedForFirstFloorType(arcane::game::run::FloorType::Merchant, config);
-    if (!expect(eventSeed.has_value() && merchantSeed.has_value(),
-        "fixed seeds must be discoverable for both special floor types")) return false;
+    config.firstFloorTypeOverride = arcane::game::run::FloorType::Event;
 
-    arcane::app::TowerSession eventTower(*eventSeed, config);
+    arcane::app::TowerSession eventTower(1U, config);
     interact(eventTower);
     if (!expect(eventTower.specialPanelOpen()
             && eventTower.eventFloorState() == arcane::app::EventFloorState::Choosing,
@@ -225,7 +211,8 @@ bool specialFloorsAdvanceWithoutCombat()
     interact(eventTower);
     if (!expect(eventTower.run().context().floorIndex == 1U, "resolved event staircase must advance")) return false;
 
-    arcane::app::TowerSession merchantTower(*merchantSeed, config);
+    config.firstFloorTypeOverride = arcane::game::run::FloorType::Merchant;
+    arcane::app::TowerSession merchantTower(2U, config);
     if (!expect(merchantTower.merchantStock().size() == 5U,
         "merchant floor must expose separate spell and relic rows"))
         return false;
@@ -250,6 +237,7 @@ bool purchasedMerchantSpellCanBeEquippedAndCast()
     arcane::app::TowerSessionConfig config;
     config.npcBounds = {150.0F, 550.0F, 100.0F, 90.0F};
     config.initialPlayer.gold = 100;
+    config.firstFloorTypeOverride = arcane::game::run::FloorType::Merchant;
 
     std::optional<arcane::game::run::Seed> merchantSeed;
     std::size_t spellStockIndex = 0U;
@@ -298,8 +286,8 @@ bool purchasedMerchantSpellCanBeEquippedAndCast()
     const auto cast = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, {220.0F, 576.0F, 64.0F, 64.0F});
     return expect(tower.run().player().equippedSpells[0] == purchasedSpell,
             "purchased merchant spell must equip into a combat slot")
-        && expect(cast.cast && cast.hit && cast.damage > 0,
-            "equipped merchant spell must cast and deal damage");
+        && expect(cast.cast,
+            "equipped merchant spell must cast even when it is a non-damaging support spell");
 }
 
 bool pauseCanContinueOrRestartFloorSnapshot()

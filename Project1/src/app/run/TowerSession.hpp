@@ -26,7 +26,7 @@ struct TowerSessionConfig
     int bossEnemyHealth {200};
     int normalGoldReward {10};
     int bossGoldReward {30};
-    std::uint32_t floorsPerBoss {3};
+    std::uint32_t floorsPerBoss {game::floors::DefaultFloorsPerBoss};
     bool enableSpecialFloors {true};
     std::optional<game::run::FloorType> firstFloorTypeOverride;
 };

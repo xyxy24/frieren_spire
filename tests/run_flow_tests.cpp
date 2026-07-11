@@ -269,6 +269,45 @@ bool merchantStockAndFloorScheduleReproduce()
     return true;
 }
 
+bool defaultScheduleBuildsThreeFiveFloorActs()
+{
+    using namespace arcane::game;
+    floors::FloorScheduler scheduler;
+    run::RunContext context {31415U, 0U, 0U, 1U, 0U};
+    std::uint32_t bossCount = 0U;
+    std::uint32_t combatCount = 0U;
+    std::uint32_t specialCount = 0U;
+
+    for (std::uint32_t floor = 0U; floor < 15U; ++floor)
+    {
+        context.floorIndex = floor;
+        context.floorSeed = run::deriveFloorSeed(context.runSeed, floor);
+        const auto type = scheduler.next(context);
+        const bool expectedBoss = floor == 4U || floor == 9U || floor == 14U;
+        if (!expect((type == run::FloorType::Boss) == expectedBoss,
+                "default schedule must place bosses only on floors five, ten and fifteen")) return false;
+
+        if (type == run::FloorType::Boss)
+        {
+            ++bossCount;
+            if (!expect(combatCount >= 2U,
+                    "each act must provide at least two normal combats before its boss")
+                || !expect(specialCount >= 1U,
+                    "each act must provide at least one merchant or event before its boss")) return false;
+            combatCount = 0U;
+            specialCount = 0U;
+        }
+        else if (type == run::FloorType::Combat)
+            ++combatCount;
+        else
+            ++specialCount;
+    }
+
+    return expect(bossCount == 3U, "the fifteen-floor default run must contain exactly three bosses")
+        && expect(arcane::app::TowerSessionConfig {}.floorsPerBoss == 5U,
+            "tower sessions must use the five-floor act by default");
+}
+
 bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 {
     arcane::app::TowerSessionConfig config;
@@ -364,6 +403,7 @@ int main()
         && merchantPurchaseIsAtomic()
         && eventChoiceIsAtomic() && meteorRestChoiceRestoresToMaximum() && thirdBossVictorySettlesOnce()
         && depletedRewardUsesGoldFallback() && merchantStockAndFloorScheduleReproduce()
+        && defaultScheduleBuildsThreeFiveFloorActs()
         && towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction();
     if (!passed) return 1;
     std::cout << "All run flow tests passed.\n";

@@ -15,7 +15,36 @@ FloorScheduler::FloorScheduler(const FloorScheduleConfig config) : config_(confi
 
 run::FloorType FloorScheduler::next(const run::RunContext& context)
 {
-    if ((context.floorIndex + 1U) % config_.floorsPerBoss == 0U) return run::FloorType::Boss;
+    const std::uint32_t floorInAct = context.floorIndex % config_.floorsPerBoss + 1U;
+    if (floorInAct == config_.floorsPerBoss) return run::FloorType::Boss;
+
+    if (config_.floorsPerBoss == DefaultFloorsPerBoss)
+    {
+        run::DeterministicRng rng(run::deriveStreamSeed(context.floorSeed, run::RandomStream::Encounter));
+        if (floorInAct == 1U || floorInAct == 4U)
+        {
+            record(run::FloorType::Combat);
+            return run::FloorType::Combat;
+        }
+        if (floorInAct == 2U)
+        {
+            const auto type = rng.index(10U) <= 2U
+                ? run::FloorType::Event
+                : run::FloorType::Combat;
+            record(type);
+            return type;
+        }
+
+        run::FloorType special = run::FloorType::Event;
+        if (eligibleSinceEvent_ == 0U || eligibleSinceMerchant_ >= config_.merchantMaxEligibleGap)
+            special = run::FloorType::Merchant;
+        else if (eligibleSinceEvent_ >= config_.eventMaxEligibleGap)
+            special = run::FloorType::Event;
+        else
+            special = rng.index(2U) == 0U ? run::FloorType::Merchant : run::FloorType::Event;
+        record(special);
+        return special;
+    }
 
     run::FloorType type = run::FloorType::Combat;
     if (eligibleSinceMerchant_ >= config_.merchantMaxEligibleGap) type = run::FloorType::Merchant;

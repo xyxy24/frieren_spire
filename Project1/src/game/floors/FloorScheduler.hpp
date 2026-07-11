@@ -6,9 +6,11 @@
 
 namespace arcane::game::floors
 {
+inline constexpr std::uint32_t DefaultFloorsPerBoss = 5U;
+
 struct FloorScheduleConfig
 {
-    std::uint32_t floorsPerBoss {3U};
+    std::uint32_t floorsPerBoss {DefaultFloorsPerBoss};
     std::uint32_t merchantMaxEligibleGap {4U};
     std::uint32_t eventMaxEligibleGap {3U};
 };
