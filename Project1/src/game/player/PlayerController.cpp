@@ -93,6 +93,13 @@ void PlayerController::applyHitReaction(const float horizontalVelocity, const fl
     stunRemaining_ = std::max(stunRemaining_, std::max(0.0F, stunSeconds));
 }
 
+void PlayerController::applyLaunch(const float upwardSpeed, const float stunSeconds) noexcept
+{
+    velocity_.y = -std::abs(upwardSpeed);
+    grounded_ = false;
+    stunRemaining_ = std::max(stunRemaining_, std::max(0.0F, stunSeconds));
+}
+
 bool PlayerController::isStunned() const noexcept { return stunRemaining_ > 0.0F; }
 float PlayerController::stunRemaining() const noexcept { return stunRemaining_; }
 }

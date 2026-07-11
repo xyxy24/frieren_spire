@@ -5,6 +5,7 @@
 #include "game/combat/DamageResolver.hpp"
 
 #include <iostream>
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -101,11 +102,13 @@ bool enemyAttackHasWindupAndHitsOnce()
     request.enemyContactDamage = 0;
     arcane::game::CombatSession combat(request);
 
-    combat.update(arcane::game::PlayerIntent {}, 0.01F);
+    combat.update(arcane::game::PlayerIntent {}, 2.99F);
     combat.update(arcane::game::PlayerIntent {}, 0.30F);
     if (!expect(combat.playerState().currentHealth == 100,
         "enemy windup must not deal early damage")) return false;
-    combat.update(arcane::game::PlayerIntent {}, 0.06F);
+    combat.update(arcane::game::PlayerIntent {}, 0.01F);
+    combat.update(arcane::game::PlayerIntent {}, 0.50F);
+    combat.update(arcane::game::PlayerIntent {}, 0.01F);
     const auto afterHit = combat.playerState();
     combat.update(arcane::game::PlayerIntent {}, 0.05F);
 
@@ -254,6 +257,8 @@ bool enemyChaseIsDeltaTimeStableAndStopsWhenDead()
     const arcane::game::WorldBounds bounds {0.0F, 1280.0F, 640.0F};
     arcane::game::ai::EnemyController oneStep({800.0F, 576.0F});
     arcane::game::ai::EnemyController manySteps({800.0F, 576.0F});
+    oneStep.update(player, 1.1F, bounds);
+    for (int frame = 0; frame < 11; ++frame) manySteps.update(player, 0.1F, bounds);
     oneStep.update(player, 1.0F, bounds);
     for (int frame = 0; frame < 10; ++frame) manySteps.update(player, 0.1F, bounds);
     const float oneStepX = oneStep.position().x;
@@ -374,6 +379,30 @@ bool combatSessionCastsUltimateWithDedicatedInput()
         && expect(afterFirst.ultimateSpellSlot.cooldownRemaining == 18.0F,
             "combat view must expose the authoritative ultimate cooldown");
 }
+
+bool multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
+{
+    arcane::game::CombatRequest request;
+    request.enemies = {
+        {arcane::game::EnemyArchetype::ChestMimic, {500.0F, 0.0F}},
+        {arcane::game::EnemyArchetype::HeadlessKnight, {700.0F, 0.0F}},
+        {arcane::game::EnemyArchetype::BirdDemon, {900.0F, 0.0F}}
+    };
+    arcane::game::CombatSession combat(request);
+    const auto initial = combat.enemyStates();
+    combat.update({}, 0.1F);
+    const auto afterUpdate = combat.enemyStates();
+    return expect(initial.size() == 3U, "normal encounter must own three enemy instances")
+        && expect(initial[0].currentHealth == 75 && initial[0].width == 42.0F && initial[0].height == 42.0F,
+            "chest mimic content values must be authoritative")
+        && expect(initial[1].currentHealth == 60 && initial[1].width == 42.0F && initial[1].height == 58.0F,
+            "headless knight content values must be authoritative")
+        && expect(initial[2].currentHealth == 45 && initial[2].position.y == 476.0F,
+            "bird demon must start 132 pixels above ground using its own height")
+        && expect(std::none_of(afterUpdate.begin(), afterUpdate.end(), [](const auto& enemy) {
+            return enemy.windingUp || enemy.attackActive;
+        }), "all enemy skills must begin on cooldown");
+}
 }
 
 int main()
@@ -392,6 +421,7 @@ int main()
         && spellCooldownIsDeltaTimeStable()
         && ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
         && combatSessionCastsUltimateWithDedicatedInput()
+        && multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
         && combatSessionAppliesEquippedSpellDamage()
         && bloodMagicUsesCurrentHealth()
         && flowerFieldHealsAndMoonFlowerAutoCasts()

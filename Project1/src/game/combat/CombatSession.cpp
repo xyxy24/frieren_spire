@@ -9,54 +9,82 @@ namespace arcane::game
 namespace
 {
 constexpr std::array SpellDamageSources {
-    DamageSource::PlayerSpell0,
-    DamageSource::PlayerSpell1,
-    DamageSource::PlayerSpell2
+    DamageSource::PlayerSpell0, DamageSource::PlayerSpell1, DamageSource::PlayerSpell2
 };
+}
 
-ai::EnemyConfig enemyConfigFor(const EnemyArchetype archetype)
+ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
 {
+    using ai::EnemyConfig;
+    using ai::EnemySkill;
     switch (archetype)
     {
     case EnemyArchetype::ChestMimic:
-        return {0.0F, 76.0F, 72.0F, 0.50F, 0.15F, 3.35F, 90.0F};
+        return EnemyConfig {0.0F, 64.0F, 64.0F, 0.5F, 64.0F / 520.0F, 0.0F, 64.0F,
+            42.0F, 42.0F, 4.0F, true, false, EnemySkill::Thrust};
     case EnemyArchetype::HeadlessKnight:
-        return {180.0F, 62.0F, 72.0F, 0.35F, 0.12F, 2.53F, 0.0F};
+        return EnemyConfig {320.0F, 42.0F, 42.0F, 0.5F, 0.12F, 0.0F, 0.0F,
+            42.0F, 58.0F, 3.0F, true, false, EnemySkill::Slash};
+    case EnemyArchetype::BirdDemon:
+        return EnemyConfig {240.0F, 192.0F, 192.0F, 0.5F, 192.0F / 320.0F, 0.0F, 0.0F,
+            42.0F, 32.0F, 7.0F, false, true, EnemySkill::Dive};
+    case EnemyArchetype::Lugner:
+        return EnemyConfig {240.0F, 72.0F, 72.0F, 0.5F, 0.12F, 0.0F, 0.0F,
+            42.0F, 72.0F, 7.0F, false, false, EnemySkill::Blood};
+    case EnemyArchetype::Linie:
+        return EnemyConfig {260.0F, 64.0F, 64.0F, 0.5F, 0.9F, 0.0F, 0.0F,
+            42.0F, 64.0F, 6.0F, true, false, EnemySkill::LeapingCleave};
+    case EnemyArchetype::Draht:
+        return EnemyConfig {240.0F, 72.0F, 72.0F, 0.5F, 0.12F, 0.0F, 0.0F,
+            42.0F, 64.0F, 9.0F, false, false, EnemySkill::Thread};
     case EnemyArchetype::Boss:
-        return {125.0F, 72.0F, 90.0F, 0.55F, 0.16F, 1.30F, 20.0F};
+        return EnemyConfig {125.0F, 72.0F, 90.0F, 0.55F, 0.16F, 0.0F, 20.0F,
+            48.0F, 64.0F, 1.3F, true, false, EnemySkill::BossAttack};
     }
     return {};
 }
-}
 
 CombatSession::CombatSession(CombatRequest request)
-    : request_(std::move(request)),
-      player_(request_.playerSpawn),
+    : request_(std::move(request)), player_(request_.playerSpawn),
       playerHealth_(request_.playerMaximumHealth, request_.playerCurrentHealth),
-      enemy_(request_.enemySpawn, enemyConfigFor(request_.enemyArchetype)),
-      enemyHealth_(request_.enemyMaximumHealth, request_.enemyMaximumHealth),
-      spells_(request_.equippedSpellIds, request_.equippedUltimateSpellId),
-      relics_(request_.relicIds)
+      spells_(request_.equippedSpellIds, request_.equippedUltimateSpellId), relics_(request_.relicIds)
 {
+    auto spawns = request_.enemies;
+    if (spawns.empty()) spawns.push_back({request_.enemyArchetype, request_.enemySpawn});
+    enemies_.reserve(spawns.size());
+    for (const auto& spawn : spawns)
+    {
+        const auto config = enemyConfigFor(spawn.archetype);
+        Vec2 position = spawn.position;
+        if (!request_.enemies.empty()) position.y = request_.worldBounds.groundTop - config.height;
+        if (config.flying) position.y = request_.worldBounds.groundTop - 132.0F - config.height;
+        const int health = request_.enemies.empty() ? request_.enemyMaximumHealth : [&] {
+            switch (spawn.archetype)
+            {
+            case EnemyArchetype::ChestMimic: return 75;
+            case EnemyArchetype::HeadlessKnight: return 60;
+            case EnemyArchetype::BirdDemon: return 45;
+            case EnemyArchetype::Lugner: return 100;
+            case EnemyArchetype::Linie: return 90;
+            case EnemyArchetype::Draht: return 75;
+            case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
+            }
+            return 1;
+        }();
+        enemies_.push_back({spawn.archetype, ai::EnemyController(position, config), Health(health, health)});
+    }
     if (relics_.castsFlowerFieldOnCombatStart())
     {
         flowerFieldRemaining_ = 4.0F;
         flowerFieldCenterX_ = player_.position().x + PlayerController::Width * 0.5F;
     }
-    if (!playerHealth_.isAlive())
-    {
-        finish(CombatOutcome::Defeat);
-    }
+    if (!playerHealth_.isAlive()) finish(CombatOutcome::Defeat);
 }
 
 void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
 {
-    if (deltaSeconds <= 0.0F)
-    {
-        return;
-    }
-
-    if (result_.has_value())
+    if (deltaSeconds <= 0.0F) return;
+    if (result_)
     {
         if (result_->outcome == CombatOutcome::Victory)
         {
@@ -71,13 +99,19 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     relics_.update(deltaSeconds);
     blessingRemaining_ = std::max(0.0F, blessingRemaining_ - deltaSeconds);
     flowerFieldRemaining_ = std::max(0.0F, flowerFieldRemaining_ - deltaSeconds);
-    contactDamageCooldownRemaining_ = std::max(0.0F, contactDamageCooldownRemaining_ - deltaSeconds);
     player_.update(intent, deltaSeconds, request_.worldBounds);
-    const float enemyCenter = enemy_.position().x + EnemyWidth * 0.5F;
-    enemySlowed_ = flowerFieldRemaining_ > 0.0F
-        && std::abs(enemyCenter - flowerFieldCenterX_) <= 360.0F;
-    enemy_.update(playerBounds(), deltaSeconds, request_.worldBounds, enemySlowed_ ? 0.5F : 1.0F);
     const float playerCenter = player_.position().x + PlayerController::Width * 0.5F;
+
+    for (auto& enemy : enemies_)
+    {
+        if (!enemy.health.isAlive()) continue;
+        enemy.contactCooldown = std::max(0.0F, enemy.contactCooldown - deltaSeconds);
+        const auto bounds = enemy.controller.bounds();
+        enemy.slowed = flowerFieldRemaining_ > 0.0F
+            && std::abs(bounds.left + bounds.width * 0.5F - flowerFieldCenterX_) <= 360.0F;
+        enemy.controller.update(playerBounds(), deltaSeconds, request_.worldBounds, enemy.slowed ? 0.5F : 1.0F);
+    }
+
     if (flowerFieldRemaining_ > 0.0F && std::abs(playerCenter - flowerFieldCenterX_) <= 360.0F)
     {
         flowerHealingAccumulator_ += 5.0F * deltaSeconds;
@@ -88,17 +122,28 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             flowerHealingAccumulator_ -= static_cast<float>(healing);
         }
     }
+    if (intent.attackPressed && !player_.isStunned()) attack_.tryStart();
 
-    if (intent.attackPressed && !player_.isStunned())
+    const auto damageEnemies = [this](const DamageSource source, const std::uint64_t sequence,
+        const int damage, const float multiplier, const Aabb& area)
     {
-        attack_.tryStart();
-    }
-
-    const auto applySpellCast = [this, playerCenter](const spells::SpellCastResult& cast,
-        const DamageSource damageSource)
+        for (auto& enemy : enemies_)
+            if (enemy.health.isAlive() && intersects(area, enemy.controller.bounds()))
+                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    {source, sequence, damage, multiplier}));
+    };
+    const auto castArea = [this](const spells::SpellDefinition& definition) {
+        const auto position = player_.position();
+        const float left = player_.facingDirection() > 0.0F
+            ? position.x + PlayerController::Width : position.x - definition.range;
+        return Aabb {left, position.y + (PlayerController::Height - definition.height) * 0.5F,
+            definition.range, definition.height};
+    };
+    const auto applyCast = [&](const spells::SpellCastResult& cast, const DamageSource source,
+        const spells::SpellDefinition* definition)
     {
-        if (!cast.cast) return;
-        const float outgoingMultiplier = relics_.outgoingDamageMultiplier()
+        if (!cast.cast || !definition) return;
+        const float multiplier = relics_.outgoingDamageMultiplier()
             * (blessingRemaining_ > 0.0F ? 1.2F : 1.0F);
         if (cast.effect == spells::SpellEffect::FlowerField)
         {
@@ -106,154 +151,147 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             flowerFieldCenterX_ = playerCenter;
             flowerHealingAccumulator_ = 0.0F;
         }
-        else if (cast.effect == spells::SpellEffect::GoddessBlessing)
-        {
-            blessingRemaining_ = 8.0F;
-        }
+        else if (cast.effect == spells::SpellEffect::GoddessBlessing) blessingRemaining_ = 8.0F;
         else if (cast.effect == spells::SpellEffect::BloodMagic)
         {
-            const int healthCost = std::max(1, (playerHealth_.current() + 9) / 10);
+            const int cost = std::max(1, (playerHealth_.current() + 9) / 10);
             static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
-                {DamageSource::Event, ++selfDamageSequence_, healthCost}));
-            if (cast.hit)
-                static_cast<void>(enemyDamageResolver_.resolve(enemyHealth_,
-                    {damageSource, cast.sequence, playerHealth_.current() / 2,
-                        outgoingMultiplier}));
+                {DamageSource::Event, ++selfDamageSequence_, cost}));
+            damageEnemies(source, cast.sequence, playerHealth_.current() / 2, multiplier, castArea(*definition));
         }
-        else if (cast.hit)
-            static_cast<void>(enemyDamageResolver_.resolve(enemyHealth_,
-                {damageSource, cast.sequence, cast.damage, outgoingMultiplier}));
+        else damageEnemies(source, cast.sequence, cast.damage, multiplier, castArea(*definition));
     };
-
     for (std::size_t slot = 0U; slot < intent.spellPressed.size(); ++slot)
     {
         if (!intent.spellPressed[slot] || player_.isStunned()) continue;
-        const auto cast = spells_.tryCast(slot, player_.position(), player_.facingDirection(), enemyBounds());
-        applySpellCast(cast, SpellDamageSources[slot]);
+        const auto id = spells_.view()[slot].id;
+        applyCast(spells_.tryCast(slot, player_.position(), player_.facingDirection(), firstLivingEnemyBounds()),
+            SpellDamageSources[slot], id ? spells::findDefinition(*id) : nullptr);
     }
-
     if (intent.ultimateSpellPressed && !player_.isStunned())
-        applySpellCast(spells_.tryCastUltimate(player_.position(), player_.facingDirection(), enemyBounds()),
-            DamageSource::PlayerUltimateSpell);
-
-    if (attack_.isActive()
-        && intersects(attackBounds(), enemyBounds()))
     {
-        static_cast<void>(enemyDamageResolver_.resolve(enemyHealth_,
-            {DamageSource::PlayerBasicAttack, attack_.sequence(), AttackDamage,
-                relics_.outgoingDamageMultiplier() * (blessingRemaining_ > 0.0F ? 1.2F : 1.0F)}));
+        const auto id = spells_.ultimateView().id;
+        applyCast(spells_.tryCastUltimate(player_.position(), player_.facingDirection(), firstLivingEnemyBounds()),
+            DamageSource::PlayerUltimateSpell, id ? spells::findDefinition(*id) : nullptr);
     }
+    if (attack_.isActive())
+        damageEnemies(DamageSource::PlayerBasicAttack, attack_.sequence(), AttackDamage,
+            relics_.outgoingDamageMultiplier() * (blessingRemaining_ > 0.0F ? 1.2F : 1.0F), attackBounds());
 
-    if (!enemyHealth_.isAlive())
+    for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
     {
-        enemy_.markDead();
+        auto& enemy = enemies_[enemyIndex];
+        if (!enemy.health.isAlive())
+        {
+            enemy.controller.markDead();
+            continue;
+        }
+        const auto& config = enemy.controller.config();
+        if (enemy.controller.action() == ai::EnemyAction::Active
+            && enemy.handledSkillSequence != enemy.controller.attackSequence())
+        {
+            enemy.handledSkillSequence = enemy.controller.attackSequence();
+            if (config.skill == ai::EnemySkill::Blood)
+                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    {DamageSource::Event, enemy.handledSkillSequence, 10}));
+        }
+        if (enemy.controller.action() == ai::EnemyAction::Active
+            && intersects(playerBounds(), enemy.controller.attackBounds()))
+        {
+            int damage = 20;
+            if (config.skill == ai::EnemySkill::Thread) damage = 10;
+            if (config.skill == ai::EnemySkill::Blood)
+                damage = (enemy.health.maximum() - enemy.health.current()) / 2;
+            if (request_.enemies.empty()) damage = request_.enemyAttackDamage;
+            const std::uint64_t skillSequence = (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
+                | enemy.controller.attackSequence();
+            const auto result = playerDamageResolver_.resolve(playerHealth_,
+                {DamageSource::EnemyAttack, skillSequence, damage,
+                    1.0F, relics_.incomingDamageMultiplier()});
+            if (result.appliedDamage > 0 && blessingRemaining_ <= 0.0F)
+            {
+                if (config.skill == ai::EnemySkill::Thread) player_.applyLaunch(540.0F, 0.28F);
+                else player_.applyHitReaction(enemy.controller.facingDirection() * KnockbackSpeed,
+                    config.skill == ai::EnemySkill::Thrust ? 1.0F : HitStunSeconds);
+            }
+        }
+        if (config.hasContactDamage && enemy.contactCooldown <= 0.0F
+            && intersects(playerBounds(), enemy.controller.bounds()))
+        {
+            const std::uint64_t contactSequence = (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
+                | ++enemy.contactSequence;
+            const int contactDamage = request_.enemies.empty() ? request_.enemyContactDamage : 15;
+            static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
+                {DamageSource::EnemyContact, contactSequence, contactDamage,
+                    1.0F, relics_.incomingDamageMultiplier()}));
+            enemy.contactCooldown = 1.0F;
+        }
+    }
+    if (std::none_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) { return enemy.health.isAlive(); }))
         finish(CombatOutcome::Victory);
-        return;
-    }
-
-    if (enemy_.action() == ai::EnemyAction::Active
-        && intersects(playerBounds(), enemy_.attackBounds()))
-    {
-        const auto damage = playerDamageResolver_.resolve(playerHealth_,
-            {DamageSource::EnemyAttack, enemy_.attackSequence(), request_.enemyAttackDamage,
-                1.0F, relics_.incomingDamageMultiplier()});
-        if (damage.appliedDamage > 0 && blessingRemaining_ <= 0.0F)
-            player_.applyHitReaction(enemy_.facingDirection() * KnockbackSpeed, request_.enemyControlSeconds);
-    }
-    if (contactDamageCooldownRemaining_ <= 0.0F && intersects(playerBounds(), enemyBounds()))
-    {
-        const auto damage = playerDamageResolver_.resolve(playerHealth_,
-            {DamageSource::EnemyContact, ++contactDamageSequence_, request_.enemyContactDamage,
-                1.0F, relics_.incomingDamageMultiplier()});
-        if (damage.appliedDamage > 0 && blessingRemaining_ <= 0.0F)
-            player_.applyHitReaction(enemy_.facingDirection() * KnockbackSpeed, HitStunSeconds);
-        contactDamageCooldownRemaining_ = 1.0F;
-    }
-
-    if (!playerHealth_.isAlive())
-    {
-        finish(CombatOutcome::Defeat);
-    }
+    else if (!playerHealth_.isAlive()) finish(CombatOutcome::Defeat);
 }
 
 PlayerStateView CombatSession::playerState() const noexcept
 {
-    return {
-        player_.position(),
-        playerHealth_.current(),
-        playerHealth_.maximum(),
-        player_.isGrounded(),
-        player_.facingDirection(),
-        attack_.isActive(),
-        attack_.cooldownRemaining(),
-        spells_.view(),
-        spells_.ultimateView(),
-        player_.isStunned(),
-        player_.stunRemaining(),
-        blessingRemaining_,
-        relics_.vulnerableRemaining(),
-        flowerFieldRemaining_
-    };
+    return {player_.position(), playerHealth_.current(), playerHealth_.maximum(), player_.isGrounded(),
+        player_.facingDirection(), attack_.isActive(), attack_.cooldownRemaining(), spells_.view(),
+        spells_.ultimateView(), player_.isStunned(), player_.stunRemaining(), blessingRemaining_,
+        relics_.vulnerableRemaining(), flowerFieldRemaining_};
+}
+
+std::vector<EnemyStateView> CombatSession::enemyStates() const
+{
+    std::vector<EnemyStateView> views;
+    views.reserve(enemies_.size());
+    for (const auto& enemy : enemies_)
+    {
+        const auto bounds = enemy.controller.bounds();
+        views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
+            enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
+            enemy.controller.action() == ai::EnemyAction::Windup,
+            enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed});
+    }
+    return views;
 }
 
 EnemyStateView CombatSession::enemyState() const noexcept
 {
-    return {
-        enemy_.position(),
-        enemyHealth_.current(),
-        enemyHealth_.maximum(),
-        enemyHealth_.isAlive(),
-        enemy_.action() == ai::EnemyAction::Windup,
-        enemy_.action() == ai::EnemyAction::Active,
-        enemySlowed_
-    };
+    if (enemies_.empty()) return {};
+    const auto& enemy = enemies_.front();
+    const auto bounds = enemy.controller.bounds();
+    return {enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
+        enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
+        enemy.controller.action() == ai::EnemyAction::Windup,
+        enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed};
 }
 
 Aabb CombatSession::attackBounds() const noexcept
 {
-    const Vec2 position = player_.position();
+    const auto position = player_.position();
     const float left = player_.facingDirection() > 0.0F
-        ? position.x + PlayerController::Width
-        : position.x - AttackRange;
-
+        ? position.x + PlayerController::Width : position.x - AttackRange;
     return {left, position.y + AttackVerticalOffset, AttackRange, AttackHeight};
 }
 
-const std::optional<CombatResult>& CombatSession::result() const noexcept
-{
-    return result_;
-}
-
+const std::optional<CombatResult>& CombatSession::result() const noexcept { return result_; }
 bool CombatSession::equipSpell(const std::size_t slot, const std::optional<std::uint32_t> id) noexcept
-{
-    return spells_.equip(slot, id);
-}
-
+{ return spells_.equip(slot, id); }
 bool CombatSession::equipUltimateSpell(const std::optional<std::uint32_t> id) noexcept
-{
-    return spells_.equipUltimate(id);
-}
-
+{ return spells_.equipUltimate(id); }
 Aabb CombatSession::playerBounds() const noexcept
+{ const auto p = player_.position(); return {p.x, p.y, PlayerController::Width, PlayerController::Height}; }
+Aabb CombatSession::firstLivingEnemyBounds() const noexcept
 {
-    const Vec2 position = player_.position();
-    return {position.x, position.y, PlayerController::Width, PlayerController::Height};
+    const auto found = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.health.isAlive();
+    });
+    return found == enemies_.end() ? Aabb {} : found->controller.bounds();
 }
-
-Aabb CombatSession::enemyBounds() const noexcept
-{
-    const auto position = enemy_.position();
-    return {position.x, position.y, EnemyWidth, EnemyHeight};
-}
-
 void CombatSession::finish(const CombatOutcome outcome) noexcept
 {
-    result_ = CombatResult {
-        outcome,
-        request_.encounterId,
-        outcome == CombatOutcome::Victory ? 1 : 0,
-        outcome == CombatOutcome::Victory ? request_.goldReward : 0,
-        playerHealth_.current()
-    };
+    result_ = {outcome, request_.encounterId,
+        outcome == CombatOutcome::Victory ? static_cast<int>(enemies_.size()) : 0,
+        outcome == CombatOutcome::Victory ? request_.goldReward : 0, playerHealth_.current()};
 }
 }

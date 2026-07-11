@@ -307,6 +307,7 @@ const game::PlayerController* TowerSession::explorationPlayer() const noexcept
 game::Aabb TowerSession::npcBounds() const noexcept { return config_.npcBounds; }
 bool TowerSession::specialPanelOpen() const noexcept { return specialPanelOpen_; }
 EventFloorState TowerSession::eventFloorState() const noexcept { return eventFloorState_; }
+EventKind TowerSession::eventKind() const noexcept { return eventKind_; }
 std::optional<game::run::ContentId> TowerSession::eventResultChoice() const noexcept
 {
     return eventResultChoice_;
@@ -377,11 +378,22 @@ void TowerSession::startNextFloor()
             game::run::deriveStreamSeed(run_.context().floorSeed, game::run::RandomStream::Event));
         const auto randomSpell = spellOffer.kind == game::rewards::RewardKind::SpellChoice
             ? spellOffer.candidates[0] : 0U;
-        eventChoices_ = {{
-            game::events::EventChoice {5001U, 0, 0, 0U, 30, 0U},
-            game::events::EventChoice {5002U, 0, randomSpell == 0U ? 15 : 0, 0U, 0, randomSpell},
-            game::events::EventChoice {5003U, 0, 50, 0U, 0, 0U}
-        }};
+        game::run::DeterministicRng eventRng(game::run::deriveStreamSeed(
+            run_.context().floorSeed, game::run::RandomStream::Event));
+        eventKind_ = eventRng.index(2U) == 0U
+            ? EventKind::AldenBall : EventKind::HalfCenturyMeteorShower;
+        if (eventKind_ == EventKind::AldenBall)
+            eventChoices_ = {{
+                game::events::EventChoice {5001U, 0, 0, 0U, 30, 0U, false},
+                game::events::EventChoice {5002U, 0, randomSpell == 0U ? 15 : 0, 0U, 0, randomSpell, false},
+                game::events::EventChoice {5003U, 0, 50, 0U, 0, 0U, false}
+            }};
+        else
+            eventChoices_ = {{
+                game::events::EventChoice {5101U, 0, randomSpell == 0U ? 15 : 0, 0U, 0, randomSpell, false},
+                game::events::EventChoice {5102U, 0, 0, 0U, 0, 0U, true},
+                game::events::EventChoice {5103U, 0, eventRng.index(2U) == 0U ? 99 : 0, 0U, 0, 0U, false}
+            }};
         explorationPlayer_.emplace(config_.playerSpawn);
         return;
     }
@@ -407,6 +419,18 @@ void TowerSession::startNextFloor()
         ? game::EnemyArchetype::Boss
         : (run_.context().floorIndex % 2U == 0U
             ? game::EnemyArchetype::ChestMimic : game::EnemyArchetype::HeadlessKnight);
+    if (currentFloorType_ == game::run::FloorType::Combat && config_.normalEnemyHealth == 0)
+    {
+        constexpr std::array archetypes {
+            game::EnemyArchetype::ChestMimic, game::EnemyArchetype::HeadlessKnight,
+            game::EnemyArchetype::BirdDemon, game::EnemyArchetype::Lugner,
+            game::EnemyArchetype::Linie, game::EnemyArchetype::Draht
+        };
+        const std::size_t start = (run_.context().floorIndex / 2U * 3U) % archetypes.size();
+        for (std::size_t index = 0U; index < 3U; ++index)
+            request.enemies.push_back({archetypes[(start + index) % archetypes.size()],
+                {650.0F + static_cast<float>(index) * 220.0F, 576.0F}});
+    }
     request.enemyContactDamage = currentFloorType_ == game::run::FloorType::Boss ? 20 : 15;
     request.enemyAttackDamage = request.enemyArchetype == game::EnemyArchetype::HeadlessKnight ? 20 : 15;
     request.enemyControlSeconds = request.enemyArchetype == game::EnemyArchetype::ChestMimic ? 1.0F : 0.28F;

@@ -190,6 +190,20 @@ bool eventChoiceIsAtomic()
             "event can resolve only once");
 }
 
+bool meteorRestChoiceRestoresToMaximum()
+{
+    using namespace arcane::game;
+    run::PlayerProgress player;
+    player.currentHp = 23;
+    player.maxHp = 100;
+    events::EventTransaction event;
+    const std::array choices {events::EventChoice {5102U, 0, 0, 0U, 0, 0U, true}};
+    return expect(event.choose(player, choices, 5102U) == events::EventResult::Success,
+            "meteor rest choice must resolve")
+        && expect(player.currentHp == player.maxHp,
+            "meteor rest choice must restore current HP to maximum");
+}
+
 bool thirdBossVictorySettlesOnce()
 {
     constexpr std::array<arcane::game::run::ContentId, 1> boss {99U};
@@ -348,7 +362,7 @@ int main()
         && healsHalfMissingRoundedUp() && bossRewardUnlocksOnlyTheUltimateCollection()
         && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
         && merchantPurchaseIsAtomic()
-        && eventChoiceIsAtomic() && thirdBossVictorySettlesOnce()
+        && eventChoiceIsAtomic() && meteorRestChoiceRestoresToMaximum() && thirdBossVictorySettlesOnce()
         && depletedRewardUsesGoldFallback() && merchantStockAndFloorScheduleReproduce()
         && towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction();
     if (!passed) return 1;

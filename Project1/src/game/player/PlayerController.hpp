@@ -27,6 +27,7 @@ public:
     [[nodiscard]] bool isGrounded() const noexcept;
     [[nodiscard]] float facingDirection() const noexcept;
     void applyHitReaction(float horizontalVelocity, float stunSeconds) noexcept;
+    void applyLaunch(float upwardSpeed, float stunSeconds) noexcept;
     [[nodiscard]] bool isStunned() const noexcept;
     [[nodiscard]] float stunRemaining() const noexcept;
 

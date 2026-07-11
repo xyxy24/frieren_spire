@@ -9,6 +9,7 @@
 namespace arcane::game::ai
 {
 enum class EnemyAction : std::uint8_t { Chase, Windup, Active, Recovery, Dead };
+enum class EnemySkill : std::uint8_t { Thrust, Slash, Dive, Blood, LeapingCleave, Thread, BossAttack };
 
 struct EnemyConfig
 {
@@ -19,6 +20,12 @@ struct EnemyConfig
     float activeSeconds {0.12F};
     float recoverySeconds {0.55F};
     float activeDashDistance {};
+    float width {48.0F};
+    float height {64.0F};
+    float cooldownSeconds {1.0F};
+    bool hasContactDamage {true};
+    bool flying {};
+    EnemySkill skill {EnemySkill::Slash};
 };
 
 class EnemyController
@@ -36,6 +43,8 @@ public:
     [[nodiscard]] float facingDirection() const noexcept;
     [[nodiscard]] std::uint64_t attackSequence() const noexcept;
     [[nodiscard]] Aabb attackBounds() const noexcept;
+    [[nodiscard]] Aabb bounds() const noexcept;
+    [[nodiscard]] const EnemyConfig& config() const noexcept;
 
 private:
     void beginWindup() noexcept;
@@ -45,5 +54,6 @@ private:
     float stateRemaining_ {};
     float facingDirection_ {-1.0F};
     std::uint64_t attackSequence_ {};
+    float activeElapsed_ {};
 };
 }

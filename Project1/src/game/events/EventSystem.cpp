@@ -8,7 +8,7 @@ EventResult EventTransaction::choose(run::PlayerProgress& player, const std::spa
     if (resolved_) return EventResult::AlreadyResolved;
     const auto choice = std::find_if(choices.begin(), choices.end(), [choiceId](const EventChoice& value) { return value.id == choiceId; });
     if (choice == choices.end()) return EventResult::ChoiceNotFound;
-    const int newHp = player.currentHp + choice->hpDelta;
+    const int newHp = choice->restoreToMaximum ? player.maxHp : player.currentHp + choice->hpDelta;
     const int newGold = player.gold + choice->goldDelta;
     const int newMaxHp = player.maxHp + choice->maxHpDelta;
     if (newMaxHp <= 0 || newHp <= 0 || newHp > newMaxHp || newGold < 0) return EventResult::InvalidOutcome;

@@ -234,24 +234,37 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     panel.setOutlineColor(sf::Color {148, 105, 205});
     panel.setOutlineThickness(4.0F);
     target.draw(panel);
-    drawPixelText(target, "LORD ORDEN'S BALL", {430.0F, 70.0F}, 2.1F, sf::Color {255, 231, 145});
-    drawPixelText(target, "LORD ORDEN ASKS STARK TO POSE AS HIS SON AT A SOCIAL BALL.",
+    const bool meteor = tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower;
+    drawPixelText(target, meteor ? "HALF CENTURY METEOR SHOWER" : "LORD ORDEN'S BALL",
+        {meteor ? 315.0F : 430.0F, 70.0F}, 2.1F, sf::Color {255, 231, 145});
+    drawPixelText(target, meteor
+        ? "A METEOR SHOWER SEEN ONCE IN FIFTY YEARS PASSES ABOVE."
+        : "LORD ORDEN ASKS STARK TO POSE AS HIS SON AT A SOCIAL BALL.",
         {175.0F, 115.0F}, 1.15F);
-    drawPixelText(target, "HE PROMISES YOU A REWARD. YOUR CHOICE IS:",
-        {300.0F, 145.0F}, 1.15F);
+    drawPixelText(target, meteor
+        ? "TO YOU IT IS NOT SO RARE. HOW WILL YOU SPEND THE NIGHT?"
+        : "HE PROMISES YOU A REWARD. YOUR CHOICE IS:",
+        {245.0F, 145.0F}, 1.15F);
 
-    constexpr std::array<std::string_view, 3> Effects {
-        "+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"
-    };
+    const std::array<std::string_view, 3> effects = meteor
+        ? std::array<std::string_view, 3> {"GAIN A RANDOM SPELLBOOK", "RESTORE HP TO MAX", "50 PERCENT CHANCE OF 99 GOLD"}
+        : std::array<std::string_view, 3> {"+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"};
     if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
     {
         if (tower.eventResultChoice())
         {
             drawCard(target, *tower.eventResultChoice(), {535.0F, 205.0F}, {210.0F, 280.0F}, true);
-            const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - 5001U);
-            if (choiceIndex < Effects.size())
-                drawPixelText(target, Effects[choiceIndex], {500.0F, 515.0F}, 1.4F,
+            const auto base = meteor ? 5101U : 5001U;
+            const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - base);
+            if (choiceIndex < effects.size())
+            {
+                std::string resultText {effects[choiceIndex]};
+                if (meteor && choiceIndex == 2U)
+                    resultText = tower.eventChoices()[2].goldDelta == 99
+                        ? "WISH GRANTED +99 GOLD" : "THE WISH RECEIVED NO ANSWER";
+                drawPixelText(target, resultText, {440.0F, 515.0F}, 1.4F,
                     sf::Color {255, 231, 145});
+            }
         }
         return;
     }
@@ -259,8 +272,8 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     const auto choices = tower.eventChoices();
     for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
         drawCard(target, choices[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
-    for (std::size_t index = 0U; index < choices.size() && index < Effects.size(); ++index)
-        drawPixelText(target, Effects[index], {CardX[index], 505.0F}, 1.25F);
+    for (std::size_t index = 0U; index < choices.size() && index < effects.size(); ++index)
+        drawPixelText(target, effects[index], {CardX[index], 505.0F}, 1.25F);
 }
 
 void drawStaircase(sf::RenderTarget& target, arcane::game::Aabb bounds, bool unlocked);
@@ -472,13 +485,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     playerShape.setOutlineThickness(3.0F);
     target.draw(playerShape);
 
-    const arcane::game::EnemyStateView enemy = combat->enemyState();
-    if (enemy.alive)
+    for (const arcane::game::EnemyStateView enemy : combat->enemyStates())
     {
-        sf::RectangleShape enemyShape({
-            arcane::game::CombatSession::EnemyWidth,
-            arcane::game::CombatSession::EnemyHeight
-        });
+        if (!enemy.alive) continue;
+        sf::RectangleShape enemyShape({enemy.width, enemy.height});
         enemyShape.setPosition({enemy.position.x, enemy.position.y});
         sf::Color enemyColor = tower.currentFloorType() == arcane::game::run::FloorType::Boss
             ? sf::Color {129, 68, 172} : sf::Color {176, 70, 78};
@@ -489,13 +499,13 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         enemyShape.setOutlineThickness(tower.currentFloorType() == arcane::game::run::FloorType::Boss ? 6.0F : 3.0F);
         target.draw(enemyShape);
 
-        drawHealthBar(
-            target,
-            {static_cast<float>(WindowWidth) - 332.0F, 28.0F},
-            {300.0F, 22.0F},
-            enemy.currentHealth,
-            enemy.maximumHealth,
-            sf::Color {218, 92, 103});
+        if (tower.currentFloorType() == arcane::game::run::FloorType::Boss)
+            drawHealthBar(target, {static_cast<float>(WindowWidth) - 332.0F, 28.0F},
+                {300.0F, 22.0F}, enemy.currentHealth, enemy.maximumHealth, sf::Color {218, 92, 103});
+        else
+            drawHealthBar(target, {enemy.position.x - 4.0F, enemy.position.y - 14.0F},
+                {enemy.width + 8.0F, 7.0F}, enemy.currentHealth, enemy.maximumHealth,
+                sf::Color {218, 92, 103});
     }
 
     if (player.attackActive)

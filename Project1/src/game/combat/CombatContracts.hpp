@@ -17,7 +17,15 @@ enum class CombatOutcome
     Victory,
     Defeat
 };
-enum class EnemyArchetype : std::uint8_t { ChestMimic, HeadlessKnight, Boss };
+enum class EnemyArchetype : std::uint8_t {
+    ChestMimic, HeadlessKnight, BirdDemon, Lugner, Linie, Draht, Boss
+};
+
+struct EnemySpawn
+{
+    EnemyArchetype archetype {EnemyArchetype::HeadlessKnight};
+    Vec2 position {800.0F, 576.0F};
+};
 
 struct CombatRequest
 {
@@ -33,6 +41,7 @@ struct CombatRequest
     int enemyAttackDamage {10};
     float enemyControlSeconds {0.28F};
     EnemyArchetype enemyArchetype {EnemyArchetype::HeadlessKnight};
+    std::vector<EnemySpawn> enemies;
     int goldReward {10};
     std::array<std::optional<std::uint32_t>, 3> equippedSpellIds;
     std::optional<std::uint32_t> equippedUltimateSpellId;
@@ -68,7 +77,10 @@ struct PlayerStateView
 
 struct EnemyStateView
 {
+    EnemyArchetype archetype {EnemyArchetype::HeadlessKnight};
     Vec2 position;
+    float width {48.0F};
+    float height {64.0F};
     int currentHealth {0};
     int maximumHealth {0};
     bool alive {false};

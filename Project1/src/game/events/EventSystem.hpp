@@ -11,6 +11,7 @@ struct EventChoice
     run::ContentId relicId {};
     int maxHpDelta {};
     run::ContentId spellId {};
+    bool restoreToMaximum {};
 };
 enum class EventResult : std::uint8_t { Success, ChoiceNotFound, AlreadyResolved, InvalidOutcome, AlreadyOwned };
 class EventTransaction

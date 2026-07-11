@@ -32,6 +32,7 @@ struct TowerSessionConfig
 };
 
 enum class EventFloorState : std::uint8_t { Untriggered, Choosing, Result };
+enum class EventKind : std::uint8_t { AldenBall, HalfCenturyMeteorShower };
 enum class LoadoutPage : std::uint8_t { Spells, Relics };
 enum class SpellLoadoutSection : std::uint8_t { Regular, Boss };
 
@@ -61,6 +62,7 @@ public:
     [[nodiscard]] game::Aabb npcBounds() const noexcept;
     [[nodiscard]] bool specialPanelOpen() const noexcept;
     [[nodiscard]] EventFloorState eventFloorState() const noexcept;
+    [[nodiscard]] EventKind eventKind() const noexcept;
     [[nodiscard]] std::optional<game::run::ContentId> eventResultChoice() const noexcept;
     void restartCurrentFloor();
 
@@ -88,6 +90,7 @@ private:
     std::optional<game::events::EventTransaction> eventTransaction_;
     std::array<game::events::EventChoice, 3> eventChoices_;
     EventFloorState eventFloorState_ {EventFloorState::Untriggered};
+    EventKind eventKind_ {EventKind::AldenBall};
     std::optional<game::run::ContentId> eventResultChoice_;
     bool specialPanelOpen_ {};
     std::optional<RunController> floorStartRun_;

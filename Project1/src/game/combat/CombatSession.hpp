@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace arcane::game
 {
@@ -28,6 +29,7 @@ public:
 
     [[nodiscard]] PlayerStateView playerState() const noexcept;
     [[nodiscard]] EnemyStateView enemyState() const noexcept;
+    [[nodiscard]] std::vector<EnemyStateView> enemyStates() const;
     [[nodiscard]] Aabb attackBounds() const noexcept;
     [[nodiscard]] const std::optional<CombatResult>& result() const noexcept;
     [[nodiscard]] bool equipSpell(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
@@ -42,27 +44,34 @@ private:
     static constexpr float KnockbackSpeed = 360.0F;
 
     [[nodiscard]] Aabb playerBounds() const noexcept;
-    [[nodiscard]] Aabb enemyBounds() const noexcept;
+    struct EnemyRuntime
+    {
+        EnemyArchetype archetype;
+        ai::EnemyController controller;
+        Health health;
+        DamageResolver damageResolver;
+        float contactCooldown {};
+        std::uint64_t contactSequence {};
+        std::uint64_t handledSkillSequence {};
+        bool slowed {};
+    };
+    [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
+    [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
     void finish(CombatOutcome outcome) noexcept;
 
     CombatRequest request_;
     PlayerController player_;
     Health playerHealth_;
-    ai::EnemyController enemy_;
-    Health enemyHealth_;
+    std::vector<EnemyRuntime> enemies_;
     AttackState attack_;
     spells::SpellSystem spells_;
     relics::RelicRuntime relics_;
     DamageResolver playerDamageResolver_;
-    DamageResolver enemyDamageResolver_;
     float blessingRemaining_ {};
     float flowerFieldRemaining_ {};
     float flowerFieldCenterX_ {};
     float flowerHealingAccumulator_ {};
     std::uint64_t selfDamageSequence_ {};
-    bool enemySlowed_ {};
-    float contactDamageCooldownRemaining_ {};
-    std::uint64_t contactDamageSequence_ {};
     std::optional<CombatResult> result_;
 };
 }
