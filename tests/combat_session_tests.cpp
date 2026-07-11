@@ -380,6 +380,28 @@ bool combatSessionCastsUltimateWithDedicatedInput()
             "combat view must expose the authoritative ultimate cooldown");
 }
 
+bool guardBlocksDamageAndUsesItsOwnCooldown()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemyArchetype = arcane::game::EnemyArchetype::ChestMimic;
+    request.enemySpawn = {180.0F, 576.0F};
+    request.enemyAttackDamage = 0;
+    request.enemyContactDamage = 10;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent guard;
+    guard.guardPressed = true;
+    combat.update(guard, 0.01F);
+    const auto guarded = combat.playerState();
+    if (!expect(guarded.currentHealth == 100 && guarded.guarding,
+            "innate guard must block overlapping enemy contact damage")
+        || !expect(guarded.guardCooldownRemaining == arcane::game::CombatSession::GuardCooldownSeconds,
+            "guard must start its independent two-second cooldown")) return false;
+
+    combat.update({}, 1.01F);
+    return expect(combat.playerState().currentHealth == 90,
+        "contact damage must apply again after the guard window expires");
+}
+
 bool multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
 {
     arcane::game::CombatRequest request;
@@ -459,6 +481,7 @@ int main()
         && spellCooldownIsDeltaTimeStable()
         && ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
         && combatSessionCastsUltimateWithDedicatedInput()
+        && guardBlocksDamageAndUsesItsOwnCooldown()
         && multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
         && chestMimicTriggersFromTheFrontAfterHalfCooldown()
         && enemyChasePreservesConfiguredBodyGap()

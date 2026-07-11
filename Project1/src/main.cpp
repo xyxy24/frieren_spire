@@ -175,6 +175,35 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
     drawPixelText(target, player.ultimateSpellUnlocked ? "R" : "LOCK",
         {ultimateX + (player.ultimateSpellUnlocked ? 27.0F : 10.0F), 607.0F}, 1.0F,
         player.ultimateSpellUnlocked ? sf::Color {255, 221, 130} : sf::Color {105, 105, 118});
+
+    const auto drawInnateAbility = [&](const float x, const std::string_view label,
+        const float cooldownRemaining, const float cooldownDuration, const bool active,
+        const sf::Color readyColor)
+    {
+        sf::RectangleShape bar({92.0F, 18.0F});
+        bar.setPosition({x, 661.0F});
+        bar.setFillColor(active ? readyColor : sf::Color {42, 45, 56});
+        bar.setOutlineColor(readyColor);
+        bar.setOutlineThickness(2.0F);
+        target.draw(bar);
+        if (cooldownRemaining > 0.0F)
+        {
+            const float ratio = std::clamp(cooldownRemaining / cooldownDuration, 0.0F, 1.0F);
+            sf::RectangleShape cooldown({92.0F * ratio, 18.0F});
+            cooldown.setPosition({x, 661.0F});
+            cooldown.setFillColor(sf::Color {8, 10, 18, 205});
+            target.draw(cooldown);
+        }
+        drawPixelText(target, label, {x + 8.0F, 638.0F}, 1.0F, readyColor);
+    };
+    drawInnateAbility(startX - 218.0F, "K DASH",
+        combatView ? combatView->dashCooldownRemaining : 0.0F,
+        arcane::game::PlayerController::DashCooldownSeconds,
+        combatView && combatView->dashRemaining > 0.0F, sf::Color {100, 220, 245});
+    drawInnateAbility(startX - 110.0F, "L GUARD",
+        combatView ? combatView->guardCooldownRemaining : 0.0F,
+        arcane::game::CombatSession::GuardCooldownSeconds,
+        combatView && combatView->guarding, sf::Color {125, 170, 255});
 }
 
 void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
@@ -479,8 +508,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const arcane::game::PlayerStateView player = combat->playerState();
     sf::RectangleShape playerShape({arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
     playerShape.setPosition({player.position.x, player.position.y});
-    playerShape.setFillColor(player.stunned ? sf::Color {112, 180, 235}
-        : (player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242}));
+    playerShape.setFillColor(player.dashRemaining > 0.0F ? sf::Color {100, 230, 250}
+        : (player.guarding ? sf::Color {115, 155, 245}
+            : (player.stunned ? sf::Color {112, 180, 235}
+                : (player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242}))));
     playerShape.setOutlineColor(sf::Color {142, 115, 200});
     playerShape.setOutlineThickness(3.0F);
     target.draw(playerShape);
@@ -583,7 +614,7 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
                 return title + "EVENT RESULT - E Close";
             return title + "ALDEN BALL - U Dessert(+30 MaxHP), I Grimoire(Random Spell), O Commission(+50 Gold), E Close";
         }
-        return title + "A/D Move, Space Jump, J Attack, U/I/O Spells, R Ultimate, Tab Loadout";
+        return title + "A/D Move, Space Jump, J Attack, K Dash, L Guard, U/I/O Spells, R Ultimate, Tab Loadout";
     case arcane::game::run::RunPhase::LootPending:
         return title + "ENEMY DROP - Move To Drop, E Inspect Reward | Tab Loadout";
     case arcane::game::run::RunPhase::Reward:

@@ -84,6 +84,27 @@ bool landsOnGround()
         && expect(nearlyEqual(player.velocity().y, 0.0F), "vertical velocity should reset after landing")
         && expect(player.isGrounded(), "landed player should be grounded");
 }
+
+bool dashIsAnInnateBoundedCooldownAbility()
+{
+    arcane::game::PlayerController player;
+    arcane::game::PlayerIntent dash;
+    dash.dashPressed = true;
+    player.update(dash, 0.01F, TestBounds);
+    if (!expect(nearlyEqual(player.position().x,
+            160.0F + arcane::game::PlayerController::DashDistance),
+            "dash must move the player 150 pixels in the facing direction")
+        || !expect(player.isDashing(), "dash must provide a short active invulnerability window")
+        || !expect(nearlyEqual(player.dashCooldownRemaining(),
+            arcane::game::PlayerController::DashCooldownSeconds),
+            "dash must start its innate cooldown")) return false;
+
+    player.update(dash, 0.20F, TestBounds);
+    return expect(nearlyEqual(player.position().x,
+            160.0F + arcane::game::PlayerController::DashDistance),
+            "dash input must not work again while cooling down")
+        && expect(!player.isDashing(), "dash invulnerability must expire independently of cooldown");
+}
 }
 
 int main()
@@ -92,7 +113,8 @@ int main()
         && clampsToWorldBounds()
         && remembersLastMovementDirection()
         && jumpsFromGround()
-        && landsOnGround();
+        && landsOnGround()
+        && dashIsAnInnateBoundedCooldownAbility();
 
     if (!passed)
     {

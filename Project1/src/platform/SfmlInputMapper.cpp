@@ -23,6 +23,8 @@ game::PlayerIntent SfmlInputMapper::sample()
 
     const bool jump = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
     const bool attack = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::J);
+    const bool dash = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::K);
+    const bool guard = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L);
     const bool spell0 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::U);
     const bool spell1 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::I);
     const bool spell2 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::O);
@@ -44,6 +46,8 @@ game::PlayerIntent SfmlInputMapper::sample()
     intent.moveAxis = static_cast<float>(moveRight) - static_cast<float>(moveLeft);
     intent.jumpPressed = pressedOnce(jump, previousJump_);
     intent.attackPressed = pressedOnce(attack, previousAttack_);
+    intent.dashPressed = pressedOnce(dash, previousDash_);
+    intent.guardPressed = pressedOnce(guard, previousGuard_);
     intent.spellPressed[0] = pressedOnce(spell0, previousSpell0_);
     intent.spellPressed[1] = pressedOnce(spell1, previousSpell1_);
     intent.spellPressed[2] = pressedOnce(spell2, previousSpell2_);

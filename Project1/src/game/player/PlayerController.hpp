@@ -17,6 +17,9 @@ class PlayerController
 public:
     static constexpr float Width = 42.0F;
     static constexpr float Height = 64.0F;
+    static constexpr float DashDistance = 150.0F;
+    static constexpr float DashInvulnerabilitySeconds = 0.20F;
+    static constexpr float DashCooldownSeconds = 1.20F;
 
     explicit PlayerController(Vec2 spawnPosition = {160.0F, 576.0F});
 
@@ -30,6 +33,9 @@ public:
     void applyLaunch(float upwardSpeed, float stunSeconds) noexcept;
     [[nodiscard]] bool isStunned() const noexcept;
     [[nodiscard]] float stunRemaining() const noexcept;
+    [[nodiscard]] bool isDashing() const noexcept;
+    [[nodiscard]] float dashRemaining() const noexcept;
+    [[nodiscard]] float dashCooldownRemaining() const noexcept;
 
 private:
     static constexpr float MoveSpeed = 260.0F;
@@ -42,5 +48,7 @@ private:
     bool grounded_ {false};
     float facingDirection_ {1.0F};
     float stunRemaining_ {};
+    float dashRemaining_ {};
+    float dashCooldownRemaining_ {};
 };
 }

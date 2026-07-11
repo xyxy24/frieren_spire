@@ -31,8 +31,9 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     }
 
     stunRemaining_ = std::max(0.0F, stunRemaining_ - deltaSeconds);
+    dashRemaining_ = std::max(0.0F, dashRemaining_ - deltaSeconds);
+    dashCooldownRemaining_ = std::max(0.0F, dashCooldownRemaining_ - deltaSeconds);
     const float moveAxis = stunRemaining_ > 0.0F ? 0.0F : std::clamp(intent.moveAxis, -1.0F, 1.0F);
-    if (stunRemaining_ <= 0.0F) velocity_.x = moveAxis * MoveSpeed;
 
     if (moveAxis > 0.0F)
     {
@@ -42,6 +43,18 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     {
         facingDirection_ = -1.0F;
     }
+
+    if (intent.dashPressed && stunRemaining_ <= 0.0F && dashCooldownRemaining_ <= 0.0F)
+    {
+        position_.x = std::clamp(position_.x + facingDirection_ * DashDistance,
+            bounds.left, bounds.right - Width);
+        velocity_.x = 0.0F;
+        dashRemaining_ = DashInvulnerabilitySeconds;
+        dashCooldownRemaining_ = DashCooldownSeconds;
+        return;
+    }
+
+    if (stunRemaining_ <= 0.0F) velocity_.x = moveAxis * MoveSpeed;
 
     if (intent.jumpPressed && grounded_ && stunRemaining_ <= 0.0F)
     {
@@ -102,4 +115,7 @@ void PlayerController::applyLaunch(const float upwardSpeed, const float stunSeco
 
 bool PlayerController::isStunned() const noexcept { return stunRemaining_ > 0.0F; }
 float PlayerController::stunRemaining() const noexcept { return stunRemaining_; }
+bool PlayerController::isDashing() const noexcept { return dashRemaining_ > 0.0F; }
+float PlayerController::dashRemaining() const noexcept { return dashRemaining_; }
+float PlayerController::dashCooldownRemaining() const noexcept { return dashCooldownRemaining_; }
 }

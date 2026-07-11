@@ -12,6 +12,8 @@ public:
 private:
     bool previousJump_ {false};
     bool previousAttack_ {false};
+    bool previousDash_ {false};
+    bool previousGuard_ {false};
     bool previousInteract_ {false};
     bool previousSpell0_ {false};
     bool previousSpell1_ {false};

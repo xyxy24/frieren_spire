@@ -22,6 +22,8 @@ class CombatSession
 public:
     static constexpr float EnemyWidth = ai::EnemyController::Width;
     static constexpr float EnemyHeight = ai::EnemyController::Height;
+    static constexpr float GuardDurationSeconds = 0.60F;
+    static constexpr float GuardCooldownSeconds = 2.0F;
 
     explicit CombatSession(CombatRequest request);
 
@@ -71,6 +73,8 @@ private:
     float flowerFieldRemaining_ {};
     float flowerFieldCenterX_ {};
     float flowerHealingAccumulator_ {};
+    float guardRemaining_ {};
+    float guardCooldownRemaining_ {};
     std::uint64_t selfDamageSequence_ {};
     std::optional<CombatResult> result_;
 };

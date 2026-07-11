@@ -69,6 +69,11 @@ struct PlayerStateView
     float attackCooldownRemaining {0.0F};
     std::array<spells::SpellSlotView, 3> spellSlots;
     spells::SpellSlotView ultimateSpellSlot;
+    float dashRemaining {0.0F};
+    float dashCooldownRemaining {0.0F};
+    bool guarding {false};
+    float guardRemaining {0.0F};
+    float guardCooldownRemaining {0.0F};
     bool stunned {false};
     float stunRemaining {0.0F};
     float blessingRemaining {0.0F};

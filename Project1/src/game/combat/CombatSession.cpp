@@ -99,8 +99,17 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     relics_.update(deltaSeconds);
     blessingRemaining_ = std::max(0.0F, blessingRemaining_ - deltaSeconds);
     flowerFieldRemaining_ = std::max(0.0F, flowerFieldRemaining_ - deltaSeconds);
+    guardRemaining_ = std::max(0.0F, guardRemaining_ - deltaSeconds);
+    guardCooldownRemaining_ = std::max(0.0F, guardCooldownRemaining_ - deltaSeconds);
     player_.update(intent, deltaSeconds, request_.worldBounds);
+    if (intent.guardPressed && !player_.isStunned() && !player_.isDashing()
+        && guardCooldownRemaining_ <= 0.0F)
+    {
+        guardRemaining_ = GuardDurationSeconds;
+        guardCooldownRemaining_ = GuardCooldownSeconds;
+    }
     const float playerCenter = player_.position().x + PlayerController::Width * 0.5F;
+    const bool canAct = !player_.isStunned() && !player_.isDashing() && guardRemaining_ <= 0.0F;
 
     for (auto& enemy : enemies_)
     {
@@ -122,7 +131,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             flowerHealingAccumulator_ -= static_cast<float>(healing);
         }
     }
-    if (intent.attackPressed && !player_.isStunned()) attack_.tryStart();
+    if (intent.attackPressed && canAct) attack_.tryStart();
 
     const auto damageEnemies = [this](const DamageSource source, const std::uint64_t sequence,
         const int damage, const float multiplier, const Aabb& area)
@@ -163,12 +172,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     };
     for (std::size_t slot = 0U; slot < intent.spellPressed.size(); ++slot)
     {
-        if (!intent.spellPressed[slot] || player_.isStunned()) continue;
+        if (!intent.spellPressed[slot] || !canAct) continue;
         const auto id = spells_.view()[slot].id;
         applyCast(spells_.tryCast(slot, player_.position(), player_.facingDirection(), firstLivingEnemyBounds()),
             SpellDamageSources[slot], id ? spells::findDefinition(*id) : nullptr);
     }
-    if (intent.ultimateSpellPressed && !player_.isStunned())
+    if (intent.ultimateSpellPressed && canAct)
     {
         const auto id = spells_.ultimateView().id;
         applyCast(spells_.tryCastUltimate(player_.position(), player_.facingDirection(), firstLivingEnemyBounds()),
@@ -207,7 +216,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 | enemy.controller.attackSequence();
             const auto result = playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::EnemyAttack, skillSequence, damage,
-                    1.0F, relics_.incomingDamageMultiplier()});
+                    1.0F, relics_.incomingDamageMultiplier(), 0,
+                    player_.isDashing() || guardRemaining_ > 0.0F});
             if (result.appliedDamage > 0 && blessingRemaining_ <= 0.0F)
             {
                 if (config.skill == ai::EnemySkill::Thread) player_.applyLaunch(540.0F, 0.28F);
@@ -223,7 +233,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const int contactDamage = request_.enemies.empty() ? request_.enemyContactDamage : 15;
             static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::EnemyContact, contactSequence, contactDamage,
-                    1.0F, relics_.incomingDamageMultiplier()}));
+                    1.0F, relics_.incomingDamageMultiplier(), 0,
+                    player_.isDashing() || guardRemaining_ > 0.0F}));
             enemy.contactCooldown = 1.0F;
         }
     }
@@ -236,7 +247,9 @@ PlayerStateView CombatSession::playerState() const noexcept
 {
     return {player_.position(), playerHealth_.current(), playerHealth_.maximum(), player_.isGrounded(),
         player_.facingDirection(), attack_.isActive(), attack_.cooldownRemaining(), spells_.view(),
-        spells_.ultimateView(), player_.isStunned(), player_.stunRemaining(), blessingRemaining_,
+        spells_.ultimateView(), player_.dashRemaining(), player_.dashCooldownRemaining(),
+        guardRemaining_ > 0.0F, guardRemaining_, guardCooldownRemaining_,
+        player_.isStunned(), player_.stunRemaining(), blessingRemaining_,
         relics_.vulnerableRemaining(), flowerFieldRemaining_};
 }
 
