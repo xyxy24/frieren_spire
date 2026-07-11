@@ -403,6 +403,44 @@ bool multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
             return enemy.windingUp || enemy.attackActive;
         }), "all enemy skills must begin on cooldown");
 }
+
+bool chestMimicTriggersFromTheFrontAfterHalfCooldown()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::ChestMimic, {223.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.49F);
+    if (!expect(!combat.enemyState().windingUp,
+        "chest mimic must begin with half of its five-second cooldown")) return false;
+    combat.update({}, 0.02F);
+    return expect(combat.enemyState().windingUp,
+        "player entering the front half-range must trigger chest mimic windup");
+}
+
+bool enemyChasePreservesConfiguredBodyGap()
+{
+    const arcane::game::Aabb player {160.0F, 576.0F, 42.0F, 64.0F};
+    const arcane::game::WorldBounds world {0.0F, 1280.0F, 640.0F};
+    arcane::game::ai::EnemyConfig contactConfig;
+    contactConfig.moveSpeed = 1000.0F;
+    contactConfig.attackRange = 1.0F;
+    contactConfig.width = 42.0F;
+    contactConfig.hasContactDamage = true;
+    contactConfig.cooldownSeconds = 100.0F;
+    arcane::game::ai::EnemyController contact({600.0F, 576.0F}, contactConfig);
+    contact.update(player, 1.0F, world);
+
+    auto rangedConfig = contactConfig;
+    rangedConfig.hasContactDamage = false;
+    arcane::game::ai::EnemyController ranged({600.0F, 576.0F}, rangedConfig);
+    ranged.update(player, 1.0F, world);
+    const float playerRight = player.left + player.width;
+    return expect(std::abs(contact.position().x - playerRight - 20.0F) < 0.01F,
+            "contact enemies must preserve a twenty-pixel body gap")
+        && expect(std::abs(ranged.position().x - playerRight - 42.0F) < 0.01F,
+            "non-contact enemies must preserve a forty-two-pixel body gap");
+}
 }
 
 int main()
@@ -422,6 +460,8 @@ int main()
         && ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
         && combatSessionCastsUltimateWithDedicatedInput()
         && multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
+        && chestMimicTriggersFromTheFrontAfterHalfCooldown()
+        && enemyChasePreservesConfiguredBodyGap()
         && combatSessionAppliesEquippedSpellDamage()
         && bloodMagicUsesCurrentHealth()
         && flowerFieldHealsAndMoonFlowerAutoCasts()

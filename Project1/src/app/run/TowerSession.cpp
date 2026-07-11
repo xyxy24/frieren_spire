@@ -426,7 +426,7 @@ void TowerSession::startNextFloor()
             game::EnemyArchetype::BirdDemon, game::EnemyArchetype::Lugner,
             game::EnemyArchetype::Linie, game::EnemyArchetype::Draht
         };
-        const std::size_t start = (run_.context().floorIndex / 2U * 3U) % archetypes.size();
+        const std::size_t start = (run_.context().floorIndex % 2U) * 3U;
         for (std::size_t index = 0U; index < 3U; ++index)
             request.enemies.push_back({archetypes[(start + index) % archetypes.size()],
                 {650.0F + static_cast<float>(index) * 220.0F, 576.0F}});

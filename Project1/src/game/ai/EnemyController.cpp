@@ -6,13 +6,13 @@
 namespace arcane::game::ai
 {
 EnemyController::EnemyController(const Vec2 spawnPosition, const EnemyConfig config)
-    : config_(config), position_(spawnPosition), action_(EnemyAction::Recovery),
-      stateRemaining_(config.cooldownSeconds) {}
+    : config_(config), position_(spawnPosition), cooldownRemaining_(config.cooldownSeconds * 0.5F) {}
 
 void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
     const WorldBounds& worldBounds, const float speedMultiplier) noexcept
 {
     if (deltaSeconds <= 0.0F || action_ == EnemyAction::Dead) return;
+    cooldownRemaining_ = std::max(0.0F, cooldownRemaining_ - deltaSeconds);
     const float playerCenter = playerBounds.left + playerBounds.width * 0.5F;
     const float enemyCenter = position_.x + config_.width * 0.5F;
     const float horizontalDelta = playerCenter - enemyCenter;
@@ -22,14 +22,18 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
     {
     case EnemyAction::Chase:
     {
-        const float triggerDistance = std::max(0.0F, config_.attackRange - playerBounds.width * 0.5F);
-        if (std::abs(horizontalDelta) <= triggerDistance)
+        const float triggerDistance = config_.width * 0.5F + config_.attackRange;
+        if (cooldownRemaining_ <= 0.0F && std::abs(horizontalDelta) <= triggerDistance)
         {
             beginWindup();
         }
         else
         {
-            const float maximumTravel = std::max(0.0F, std::abs(horizontalDelta) - triggerDistance);
+            const float desiredGap = config_.hasContactDamage ? 20.0F : 42.0F;
+            const float desiredCenterDistance = config_.width * 0.5F
+                + playerBounds.width * 0.5F + desiredGap;
+            const float maximumTravel = std::max(0.0F,
+                std::abs(horizontalDelta) - desiredCenterDistance);
             const float travel = std::min(config_.moveSpeed * std::max(0.0F, speedMultiplier)
                 * deltaSeconds, maximumTravel);
             position_.x += facingDirection_ * travel;
@@ -63,7 +67,7 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
         }
         else if (config_.skill == EnemySkill::LeapingCleave)
         {
-            position_.x += facingDirection_ * 160.0F * deltaSeconds;
+            position_.x += facingDirection_ * 120.0F * deltaSeconds;
             const float progress = std::clamp(activeElapsed_ / std::max(config_.activeSeconds, 0.01F), 0.0F, 1.0F);
             position_.y = worldBounds.groundTop - config_.height - 162.0F * 4.0F * progress * (1.0F - progress);
         }
@@ -71,30 +75,12 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
         stateRemaining_ -= deltaSeconds;
         if (stateRemaining_ <= 0.0F)
         {
-            action_ = EnemyAction::Recovery;
-            stateRemaining_ = config_.cooldownSeconds;
+            action_ = EnemyAction::Chase;
+            cooldownRemaining_ = config_.cooldownSeconds;
         }
         break;
     case EnemyAction::Recovery:
-        stateRemaining_ -= deltaSeconds;
-        if (stateRemaining_ <= 0.0F)
-        {
-            const float remainingDelta = -stateRemaining_;
-            action_ = EnemyAction::Chase;
-            const float triggerDistance = std::max(0.0F,
-                config_.attackRange - playerBounds.width * 0.5F);
-            if (std::abs(horizontalDelta) <= triggerDistance)
-                beginWindup();
-            else
-            {
-                const float maximumTravel = std::max(0.0F, std::abs(horizontalDelta) - triggerDistance);
-                const float travel = std::min(config_.moveSpeed * std::max(0.0F, speedMultiplier)
-                    * remainingDelta, maximumTravel);
-                position_.x += facingDirection_ * travel;
-                position_.x = std::clamp(position_.x,
-                    worldBounds.left, worldBounds.right - config_.width);
-            }
-        }
+        action_ = EnemyAction::Chase;
         break;
     case EnemyAction::Dead:
         break;

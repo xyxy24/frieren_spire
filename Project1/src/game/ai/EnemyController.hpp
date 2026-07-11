@@ -55,5 +55,6 @@ private:
     float facingDirection_ {-1.0F};
     std::uint64_t attackSequence_ {};
     float activeElapsed_ {};
+    float cooldownRemaining_ {};
 };
 }

@@ -21,21 +21,21 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
     {
     case EnemyArchetype::ChestMimic:
         return EnemyConfig {0.0F, 64.0F, 64.0F, 0.5F, 64.0F / 520.0F, 0.0F, 64.0F,
-            42.0F, 42.0F, 4.0F, true, false, EnemySkill::Thrust};
+            42.0F, 42.0F, 5.0F, true, false, EnemySkill::Thrust};
     case EnemyArchetype::HeadlessKnight:
-        return EnemyConfig {320.0F, 42.0F, 42.0F, 0.5F, 0.12F, 0.0F, 0.0F,
-            42.0F, 58.0F, 3.0F, true, false, EnemySkill::Slash};
+        return EnemyConfig {240.0F, 42.0F, 42.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 58.0F, 2.0F, true, false, EnemySkill::Slash};
     case EnemyArchetype::BirdDemon:
-        return EnemyConfig {240.0F, 192.0F, 192.0F, 0.5F, 192.0F / 320.0F, 0.0F, 0.0F,
-            42.0F, 32.0F, 7.0F, false, true, EnemySkill::Dive};
+        return EnemyConfig {180.0F, 392.0F, 392.0F, 0.5F, 392.0F / 320.0F, 0.0F, 0.0F,
+            42.0F, 32.0F, 6.0F, false, true, EnemySkill::Dive};
     case EnemyArchetype::Lugner:
-        return EnemyConfig {240.0F, 72.0F, 72.0F, 0.5F, 0.12F, 0.0F, 0.0F,
+        return EnemyConfig {160.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 72.0F, 7.0F, false, false, EnemySkill::Blood};
     case EnemyArchetype::Linie:
-        return EnemyConfig {260.0F, 64.0F, 64.0F, 0.5F, 0.9F, 0.0F, 0.0F,
-            42.0F, 64.0F, 6.0F, true, false, EnemySkill::LeapingCleave};
+        return EnemyConfig {180.0F, 64.0F, 64.0F, 0.5F, 0.9F, 0.0F, 0.0F,
+            42.0F, 64.0F, 5.0F, true, false, EnemySkill::LeapingCleave};
     case EnemyArchetype::Draht:
-        return EnemyConfig {240.0F, 72.0F, 72.0F, 0.5F, 0.12F, 0.0F, 0.0F,
+        return EnemyConfig {160.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 9.0F, false, false, EnemySkill::Thread};
     case EnemyArchetype::Boss:
         return EnemyConfig {125.0F, 72.0F, 90.0F, 0.55F, 0.16F, 0.0F, 20.0F,
@@ -247,10 +247,20 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
     for (const auto& enemy : enemies_)
     {
         const auto bounds = enemy.controller.bounds();
+        std::optional<Aabb> skillBounds;
+        const auto skill = enemy.controller.config().skill;
+        if ((enemy.controller.action() == ai::EnemyAction::Windup
+                || enemy.controller.action() == ai::EnemyAction::Active)
+            && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
+            && skill != ai::EnemySkill::Thread)
+        {
+            const auto area = enemy.controller.attackBounds();
+            if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
+        }
         views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
             enemy.controller.action() == ai::EnemyAction::Windup,
-            enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed});
+            enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed, skillBounds});
     }
     return views;
 }
@@ -260,10 +270,20 @@ EnemyStateView CombatSession::enemyState() const noexcept
     if (enemies_.empty()) return {};
     const auto& enemy = enemies_.front();
     const auto bounds = enemy.controller.bounds();
+    std::optional<Aabb> skillBounds;
+    const auto skill = enemy.controller.config().skill;
+    if ((enemy.controller.action() == ai::EnemyAction::Windup
+            || enemy.controller.action() == ai::EnemyAction::Active)
+        && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
+        && skill != ai::EnemySkill::Thread)
+    {
+        const auto area = enemy.controller.attackBounds();
+        if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
+    }
     return {enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
         enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
         enemy.controller.action() == ai::EnemyAction::Windup,
-        enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed};
+        enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed, skillBounds};
 }
 
 Aabb CombatSession::attackBounds() const noexcept

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game/math/Vec2.hpp"
+#include "game/combat/Aabb.hpp"
 #include "game/player/PlayerController.hpp"
 
 #include <cstdint>
@@ -87,5 +88,6 @@ struct EnemyStateView
     bool windingUp {false};
     bool attackActive {false};
     bool slowed {false};
+    std::optional<Aabb> skillEffectBounds;
 };
 }

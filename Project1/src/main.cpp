@@ -499,6 +499,19 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         enemyShape.setOutlineThickness(tower.currentFloorType() == arcane::game::run::FloorType::Boss ? 6.0F : 3.0F);
         target.draw(enemyShape);
 
+        if (enemy.skillEffectBounds)
+        {
+            const auto area = *enemy.skillEffectBounds;
+            sf::RectangleShape skillShape({area.width, area.height});
+            skillShape.setPosition({area.left, area.top});
+            skillShape.setFillColor(enemy.attackActive
+                ? sf::Color {242, 92, 92, 105} : sf::Color {242, 174, 72, 65});
+            skillShape.setOutlineColor(enemy.attackActive
+                ? sf::Color {255, 120, 120} : sf::Color {255, 201, 105});
+            skillShape.setOutlineThickness(2.0F);
+            target.draw(skillShape);
+        }
+
         if (tower.currentFloorType() == arcane::game::run::FloorType::Boss)
             drawHealthBar(target, {static_cast<float>(WindowWidth) - 332.0F, 28.0F},
                 {300.0F, 22.0F}, enemy.currentHealth, enemy.maximumHealth, sf::Color {218, 92, 103});
