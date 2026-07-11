@@ -11,6 +11,8 @@
 #include <string>
 #include <string_view>
 #include <cctype>
+#include <chrono>
+#include <random>
 
 namespace
 {
@@ -18,6 +20,16 @@ constexpr unsigned int WindowWidth = 1280;
 constexpr unsigned int WindowHeight = 720;
 constexpr float GroundTop = 640.0F;
 constexpr float MaximumFrameTime = 0.05F;
+
+arcane::game::run::Seed makeRuntimeSeed()
+{
+    std::random_device device;
+    const auto entropy = (static_cast<std::uint64_t>(device()) << 32U)
+        ^ static_cast<std::uint64_t>(device());
+    const auto clock = static_cast<std::uint64_t>(
+        std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    return entropy ^ clock;
+}
 
 void drawHealthBar(
     sf::RenderTarget& target,
@@ -574,6 +586,7 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
     const auto& run = tower.run();
     const auto& player = run.player();
     std::string title = "Arcane Spire | Floor " + std::to_string(run.context().floorIndex + 1U)
+        + " | Seed " + std::to_string(run.context().runSeed)
         + " | HP " + std::to_string(player.currentHp) + "/" + std::to_string(player.maxHp)
         + " | Gold " + std::to_string(player.gold)
         + " | Boss " + std::to_string(run.context().bossesDefeated) + "/3 | ";
@@ -734,7 +747,7 @@ int main()
     arcane::platform::SfmlInputMapper inputMapper;
     arcane::app::TowerSessionConfig config;
     config.worldBounds = {0.0F, static_cast<float>(WindowWidth), GroundTop};
-    arcane::app::AppFlowController app(0xC0FFEEU, config);
+    arcane::app::AppFlowController app(makeRuntimeSeed(), config);
     sf::Clock frameClock;
 
     while (window.isOpen())
