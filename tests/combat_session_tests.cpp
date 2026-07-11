@@ -508,11 +508,48 @@ bool auraOpensWithTwoHeadlessKnights()
     const auto enemies = combat.enemyStates();
     return expect(enemies.size() == 3U, "Aura must open combat by summoning two knights")
         && expect(enemies[0].archetype == arcane::game::EnemyArchetype::Aura
-                && enemies[0].currentHealth == 225,
-            "first boss must be Guillotine Aura with 225 HP")
+                && enemies[0].currentHealth == 225
+                && enemies[0].width == 42.0F && enemies[0].height == 64.0F,
+            "first boss must be Guillotine Aura with 225 HP and a 42 by 64 body")
         && expect(enemies[1].archetype == arcane::game::EnemyArchetype::HeadlessKnight
                 && enemies[2].archetype == arcane::game::EnemyArchetype::HeadlessKnight,
             "Aura opening army must contain two headless knights");
+}
+
+bool auraDominationUsesNinetySixPixelRange()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::Aura;
+    request.enemySpawn = {257.0F, 576.0F};
+    request.enemyMaximumHealth = 225;
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 5.01F);
+    const auto aura = combat.enemyState();
+    return expect(aura.windingUp && aura.skillEffectBounds.has_value(),
+            "Aura must begin domination when the player enters its range")
+        && expect(aura.skillEffectBounds->width == 96.0F,
+            "domination rectangle must be ninety-six pixels wide");
+}
+
+bool redMirrorDragonBreathTicksThreeTimes()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemySpawn = {300.0F, 556.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::RedMirrorDragon;
+    request.enemyMaximumHealth = 300;
+    arcane::game::CombatSession combat(request);
+    const auto dragon = combat.enemyState();
+    if (!expect(dragon.currentHealth == 300 && dragon.width == 128.0F && dragon.height == 84.0F,
+        "red mirror dragon content values must be authoritative")) return false;
+    combat.update({}, 6.01F);
+    combat.update({}, 1.01F);
+    combat.update({}, 1.0F);
+    combat.update({}, 1.0F);
+    combat.update({}, 1.0F);
+    return expect(combat.playerState().currentHealth == 55,
+        "dragon flame breath must deal fifteen damage once per second for three seconds");
 }
 }
 
@@ -539,6 +576,8 @@ int main()
         && chestMimicBiteStunsWithoutKnockback()
         && linieUsesGroundedMediumImpactArea()
         && auraOpensWithTwoHeadlessKnights()
+        && auraDominationUsesNinetySixPixelRange()
+        && redMirrorDragonBreathTicksThreeTimes()
         && combatSessionAppliesEquippedSpellDamage()
         && bloodMagicUsesCurrentHealth()
         && flowerFieldHealsAndMoonFlowerAutoCasts()

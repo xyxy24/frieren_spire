@@ -521,15 +521,18 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     for (const arcane::game::EnemyStateView enemy : combat->enemyStates())
     {
         if (!enemy.alive) continue;
+        const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
+            || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
+            || enemy.archetype == arcane::game::EnemyArchetype::Boss;
         sf::RectangleShape enemyShape({enemy.width, enemy.height});
         enemyShape.setPosition({enemy.position.x, enemy.position.y});
-        sf::Color enemyColor = tower.currentFloorType() == arcane::game::run::FloorType::Boss
+        sf::Color enemyColor = primaryBoss
             ? sf::Color {129, 68, 172} : sf::Color {176, 70, 78};
         if (enemy.windingUp) enemyColor = sf::Color {242, 154, 69};
         if (enemy.attackActive) enemyColor = sf::Color {248, 222, 105};
         enemyShape.setFillColor(enemyColor);
         enemyShape.setOutlineColor(sf::Color {245, 176, 129});
-        enemyShape.setOutlineThickness(tower.currentFloorType() == arcane::game::run::FloorType::Boss ? 6.0F : 3.0F);
+        enemyShape.setOutlineThickness(primaryBoss ? 6.0F : 3.0F);
         target.draw(enemyShape);
 
         if (enemy.skillEffectBounds)
@@ -545,8 +548,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             target.draw(skillShape);
         }
 
-        if (tower.currentFloorType() == arcane::game::run::FloorType::Boss)
-            drawHealthBar(target, {static_cast<float>(WindowWidth) - 332.0F, 28.0F},
+        if (primaryBoss)
+            drawHealthBar(target, {32.0F, 105.0F},
                 {300.0F, 22.0F}, enemy.currentHealth, enemy.maximumHealth, sf::Color {218, 92, 103});
         else
             drawHealthBar(target, {enemy.position.x - 4.0F, enemy.position.y - 14.0F},

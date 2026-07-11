@@ -19,7 +19,7 @@ enum class CombatOutcome
     Defeat
 };
 enum class EnemyArchetype : std::uint8_t {
-    ChestMimic, HeadlessKnight, BirdDemon, Lugner, Linie, Draht, Aura, Boss
+    ChestMimic, HeadlessKnight, BirdDemon, Lugner, Linie, Draht, Aura, RedMirrorDragon, Boss
 };
 
 struct EnemySpawn

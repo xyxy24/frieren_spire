@@ -38,8 +38,11 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {160.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 9.0F, false, false, EnemySkill::Thread};
     case EnemyArchetype::Aura:
-        return EnemyConfig {120.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
-            48.0F, 72.0F, 10.0F, false, false, EnemySkill::Domination};
+        return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 64.0F, 10.0F, false, false, EnemySkill::Domination};
+    case EnemyArchetype::RedMirrorDragon:
+        return EnemyConfig {96.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            128.0F, 84.0F, 7.0F, true, false, EnemySkill::DragonClaw};
     case EnemyArchetype::Boss:
         return EnemyConfig {125.0F, 72.0F, 90.0F, 0.55F, 0.16F, 0.0F, 20.0F,
             48.0F, 64.0F, 1.3F, true, false, EnemySkill::BossAttack};
@@ -59,7 +62,9 @@ CombatSession::CombatSession(CombatRequest request)
     {
         const auto config = enemyConfigFor(spawn.archetype);
         Vec2 position = spawn.position;
-        if (!request_.enemies.empty()) position.y = request_.worldBounds.groundTop - config.height;
+        if (!request_.enemies.empty() || spawn.archetype == EnemyArchetype::Aura
+            || spawn.archetype == EnemyArchetype::RedMirrorDragon)
+            position.y = request_.worldBounds.groundTop - config.height;
         if (config.flying) position.y = request_.worldBounds.groundTop - 132.0F - config.height;
         const int health = request_.enemies.empty() ? request_.enemyMaximumHealth : [&] {
             switch (spawn.archetype)
@@ -71,12 +76,15 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::Linie: return 100;
             case EnemyArchetype::Draht: return 75;
             case EnemyArchetype::Aura: return 225;
+            case EnemyArchetype::RedMirrorDragon: return 300;
             case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
             }
             return 1;
         }();
         enemies_.push_back({spawn.archetype, ai::EnemyController(position, config), Health(health, health),
             {}, 0.0F, 0U, 0U, false, spawn.archetype == EnemyArchetype::Aura ? 12.0F : 0.0F, 0U});
+        if (spawn.archetype == EnemyArchetype::RedMirrorDragon)
+            enemies_.back().breathCooldown = 6.0F;
     }
     const auto aura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Aura;
@@ -131,13 +139,58 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     const float playerCenter = player_.position().x + PlayerController::Width * 0.5F;
     const bool canAct = !player_.isStunned() && !player_.isDashing() && guardRemaining_ <= 0.0F;
 
-    for (auto& enemy : enemies_)
+    for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
     {
+        auto& enemy = enemies_[enemyIndex];
         if (!enemy.health.isAlive()) continue;
         enemy.contactCooldown = std::max(0.0F, enemy.contactCooldown - deltaSeconds);
         const auto bounds = enemy.controller.bounds();
         enemy.slowed = flowerFieldRemaining_ > 0.0F
             && std::abs(bounds.left + bounds.width * 0.5F - flowerFieldCenterX_) <= 360.0F;
+        if (enemy.archetype == EnemyArchetype::RedMirrorDragon)
+        {
+            enemy.breathCooldown = std::max(0.0F, enemy.breathCooldown - deltaSeconds);
+            if (enemy.breathWindup > 0.0F)
+            {
+                enemy.breathWindup = std::max(0.0F, enemy.breathWindup - deltaSeconds);
+                if (enemy.breathWindup <= 0.0F)
+                {
+                    enemy.breathRemaining = 3.0F;
+                    enemy.breathTickAccumulator = 0.0F;
+                }
+                continue;
+            }
+            if (enemy.breathRemaining > 0.0F)
+            {
+                enemy.breathRemaining = std::max(0.0F, enemy.breathRemaining - deltaSeconds);
+                enemy.breathTickAccumulator += deltaSeconds;
+                const auto dragon = enemy.controller.bounds();
+                const float left = enemy.controller.facingDirection() > 0.0F
+                    ? dragon.left + dragon.width : dragon.left - 128.0F;
+                const Aabb flames {left, request_.worldBounds.groundTop - 84.0F, 128.0F, 84.0F};
+                while (enemy.breathTickAccumulator >= 1.0F)
+                {
+                    enemy.breathTickAccumulator -= 1.0F;
+                    ++enemy.breathSequence;
+                    const std::uint64_t sequence = (1ULL << 63U)
+                        | (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
+                        | enemy.breathSequence;
+                    if (intersects(playerBounds(), flames))
+                        static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
+                            {DamageSource::EnemyAttack, sequence, 15, 1.0F,
+                                relics_.incomingDamageMultiplier(), 0,
+                                player_.isDashing() || guardRemaining_ > 0.0F}));
+                }
+                if (enemy.breathRemaining <= 0.0F) enemy.breathCooldown = 12.0F;
+                continue;
+            }
+            if (enemy.breathCooldown <= 0.0F
+                && enemy.controller.action() == ai::EnemyAction::Chase)
+            {
+                enemy.breathWindup = 1.0F;
+                continue;
+            }
+        }
         enemy.controller.update(playerBounds(), deltaSeconds, request_.worldBounds, enemy.slowed ? 0.5F : 1.0F);
     }
 
@@ -254,9 +307,11 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             int damage = 20;
             if (config.skill == ai::EnemySkill::Thread) damage = 10;
             if (config.skill == ai::EnemySkill::Domination) damage = 0;
+            if (config.skill == ai::EnemySkill::DragonClaw) damage = 25;
             if (config.skill == ai::EnemySkill::Blood)
                 damage = (enemy.health.maximum() - enemy.health.current()) / 2;
-            if (request_.enemies.empty() && enemy.archetype != EnemyArchetype::Aura)
+            if (request_.enemies.empty() && enemy.archetype != EnemyArchetype::Aura
+                && enemy.archetype != EnemyArchetype::RedMirrorDragon)
                 damage = request_.enemyAttackDamage;
             const std::uint64_t skillSequence = (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
                 | enemy.controller.attackSequence();
@@ -282,7 +337,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         {
             const std::uint64_t contactSequence = (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
                 | ++enemy.contactSequence;
-            const int contactDamage = request_.enemies.empty() ? request_.enemyContactDamage : 15;
+            const bool legacyDamage = request_.enemies.empty()
+                && enemy.archetype != EnemyArchetype::Aura
+                && enemy.archetype != EnemyArchetype::RedMirrorDragon;
+            const int contactDamage = legacyDamage ? request_.enemyContactDamage : 15;
             static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::EnemyContact, contactSequence, contactDamage,
                     1.0F, relics_.incomingDamageMultiplier(), 0,
@@ -322,10 +380,20 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
         }
+        if (enemy.archetype == EnemyArchetype::RedMirrorDragon
+            && (enemy.breathWindup > 0.0F || enemy.breathRemaining > 0.0F))
+        {
+            const float left = enemy.controller.facingDirection() > 0.0F
+                ? bounds.left + bounds.width : bounds.left - 128.0F;
+            skillBounds = Aabb {left, request_.worldBounds.groundTop - 84.0F, 128.0F, 84.0F};
+        }
+        const bool windingUp = enemy.controller.action() == ai::EnemyAction::Windup
+            || enemy.breathWindup > 0.0F;
+        const bool active = enemy.controller.action() == ai::EnemyAction::Active
+            || enemy.breathRemaining > 0.0F;
         views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
-            enemy.controller.action() == ai::EnemyAction::Windup,
-            enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed, skillBounds});
+            windingUp, active, enemy.slowed, skillBounds});
     }
     return views;
 }
@@ -345,10 +413,18 @@ EnemyStateView CombatSession::enemyState() const noexcept
         const auto area = enemy.controller.attackBounds();
         if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
     }
+    if (enemy.archetype == EnemyArchetype::RedMirrorDragon
+        && (enemy.breathWindup > 0.0F || enemy.breathRemaining > 0.0F))
+    {
+        const float left = enemy.controller.facingDirection() > 0.0F
+            ? bounds.left + bounds.width : bounds.left - 128.0F;
+        skillBounds = Aabb {left, request_.worldBounds.groundTop - 84.0F, 128.0F, 84.0F};
+    }
     return {enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
         enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
-        enemy.controller.action() == ai::EnemyAction::Windup,
-        enemy.controller.action() == ai::EnemyAction::Active, enemy.slowed, skillBounds};
+        enemy.controller.action() == ai::EnemyAction::Windup || enemy.breathWindup > 0.0F,
+        enemy.controller.action() == ai::EnemyAction::Active || enemy.breathRemaining > 0.0F,
+        enemy.slowed, skillBounds};
 }
 
 Aabb CombatSession::attackBounds() const noexcept

@@ -10,7 +10,7 @@ namespace arcane::game::ai
 {
 enum class EnemyAction : std::uint8_t { Chase, Windup, Active, Recovery, Dead };
 enum class EnemySkill : std::uint8_t {
-    Thrust, Slash, Dive, Blood, LeapingCleave, Thread, Domination, BossAttack
+    Thrust, Slash, Dive, Blood, LeapingCleave, Thread, Domination, DragonClaw, BossAttack
 };
 
 struct EnemyConfig

@@ -58,6 +58,11 @@ private:
         bool slowed {};
         float summonCooldown {};
         std::uint32_t summonCount {};
+        float breathCooldown {};
+        float breathWindup {};
+        float breathRemaining {};
+        float breathTickAccumulator {};
+        std::uint64_t breathSequence {};
     };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
