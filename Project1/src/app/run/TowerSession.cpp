@@ -416,7 +416,8 @@ void TowerSession::startNextFloor()
         : (config_.normalEnemyHealth > 0 ? config_.normalEnemyHealth
             : (run_.context().floorIndex % 2U == 0U ? 60 : 45));
     request.enemyArchetype = currentFloorType_ == game::run::FloorType::Boss
-        ? game::EnemyArchetype::Boss
+        ? (run_.context().bossesDefeated == 0U && config_.bossEnemyHealth == 225
+            ? game::EnemyArchetype::Aura : game::EnemyArchetype::Boss)
         : (run_.context().floorIndex % 2U == 0U
             ? game::EnemyArchetype::ChestMimic : game::EnemyArchetype::HeadlessKnight);
     if (currentFloorType_ == game::run::FloorType::Combat && config_.normalEnemyHealth == 0)

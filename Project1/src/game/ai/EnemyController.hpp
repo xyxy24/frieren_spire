@@ -9,7 +9,9 @@
 namespace arcane::game::ai
 {
 enum class EnemyAction : std::uint8_t { Chase, Windup, Active, Recovery, Dead };
-enum class EnemySkill : std::uint8_t { Thrust, Slash, Dive, Blood, LeapingCleave, Thread, BossAttack };
+enum class EnemySkill : std::uint8_t {
+    Thrust, Slash, Dive, Blood, LeapingCleave, Thread, Domination, BossAttack
+};
 
 struct EnemyConfig
 {
@@ -56,5 +58,6 @@ private:
     std::uint64_t attackSequence_ {};
     float activeElapsed_ {};
     float cooldownRemaining_ {};
+    float groundTop_ {640.0F};
 };
 }

@@ -463,6 +463,57 @@ bool enemyChasePreservesConfiguredBodyGap()
         && expect(std::abs(ranged.position().x - playerRight - 42.0F) < 0.01F,
             "non-contact enemies must preserve a forty-two-pixel body gap");
 }
+
+bool chestMimicBiteStunsWithoutKnockback()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::ChestMimic, {223.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.51F);
+    combat.update({}, 0.50F);
+    combat.update({}, 0.05F);
+    const auto bitten = combat.playerState();
+    combat.update({}, 0.10F);
+    return expect(bitten.stunned && bitten.stunRemaining > 0.9F,
+            "chest mimic bite must hold the player for one second")
+        && expect(std::abs(combat.playerState().position.x - bitten.position.x) < 0.01F,
+            "chest mimic bite must not knock the player away");
+}
+
+bool linieUsesGroundedMediumImpactArea()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Linie, {223.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    if (!expect(combat.enemyState().currentHealth == 100, "Linie must have one hundred HP")) return false;
+    combat.update({}, 2.51F);
+    combat.update({}, 0.50F);
+    combat.update({}, 0.80F);
+    const auto area = combat.enemyState().skillEffectBounds;
+    return expect(area.has_value(), "Linie landing must expose its impact rectangle")
+        && expect(area->top == 616.0F && area->height == 24.0F,
+            "Linie impact rectangle must sit on the ground and be twenty-four pixels high")
+        && expect(area->width == 186.0F,
+            "Linie impact must extend seventy-two pixels on both sides");
+}
+
+bool auraOpensWithTwoHeadlessKnights()
+{
+    arcane::game::CombatRequest request;
+    request.enemyArchetype = arcane::game::EnemyArchetype::Aura;
+    request.enemyMaximumHealth = 225;
+    arcane::game::CombatSession combat(request);
+    const auto enemies = combat.enemyStates();
+    return expect(enemies.size() == 3U, "Aura must open combat by summoning two knights")
+        && expect(enemies[0].archetype == arcane::game::EnemyArchetype::Aura
+                && enemies[0].currentHealth == 225,
+            "first boss must be Guillotine Aura with 225 HP")
+        && expect(enemies[1].archetype == arcane::game::EnemyArchetype::HeadlessKnight
+                && enemies[2].archetype == arcane::game::EnemyArchetype::HeadlessKnight,
+            "Aura opening army must contain two headless knights");
+}
 }
 
 int main()
@@ -485,6 +536,9 @@ int main()
         && multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
         && chestMimicTriggersFromTheFrontAfterHalfCooldown()
         && enemyChasePreservesConfiguredBodyGap()
+        && chestMimicBiteStunsWithoutKnockback()
+        && linieUsesGroundedMediumImpactArea()
+        && auraOpensWithTwoHeadlessKnights()
         && combatSessionAppliesEquippedSpellDamage()
         && bloodMagicUsesCurrentHealth()
         && flowerFieldHealsAndMoonFlowerAutoCasts()

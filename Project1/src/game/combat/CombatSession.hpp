@@ -56,6 +56,8 @@ private:
         std::uint64_t contactSequence {};
         std::uint64_t handledSkillSequence {};
         bool slowed {};
+        float summonCooldown {};
+        std::uint32_t summonCount {};
     };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;

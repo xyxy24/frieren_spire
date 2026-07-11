@@ -23,7 +23,7 @@ struct TowerSessionConfig
     game::Aabb staircaseBounds {1150.0F, 520.0F, 90.0F, 120.0F};
     game::Aabb npcBounds {600.0F, 560.0F, 56.0F, 80.0F};
     int normalEnemyHealth {0};
-    int bossEnemyHealth {200};
+    int bossEnemyHealth {225};
     int normalGoldReward {10};
     int bossGoldReward {30};
     std::uint32_t floorsPerBoss {game::floors::DefaultFloorsPerBoss};

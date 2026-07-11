@@ -12,6 +12,7 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
     const WorldBounds& worldBounds, const float speedMultiplier) noexcept
 {
     if (deltaSeconds <= 0.0F || action_ == EnemyAction::Dead) return;
+    groundTop_ = worldBounds.groundTop;
     cooldownRemaining_ = std::max(0.0F, cooldownRemaining_ - deltaSeconds);
     const float playerCenter = playerBounds.left + playerBounds.width * 0.5F;
     const float enemyCenter = position_.x + config_.width * 0.5F;
@@ -100,8 +101,8 @@ Aabb EnemyController::attackBounds() const noexcept
     if (config_.skill == EnemySkill::LeapingCleave)
     {
         if (activeElapsed_ < config_.activeSeconds * 0.85F) return {};
-        return {position_.x - config_.attackRange, position_.y,
-            config_.width + config_.attackRange * 2.0F, config_.height};
+        return {position_.x - config_.attackRange, groundTop_ - 24.0F,
+            config_.width + config_.attackRange * 2.0F, 24.0F};
     }
     const float left = facingDirection_ > 0.0F
         ? position_.x + config_.width : position_.x - config_.attackRange;

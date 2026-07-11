@@ -26,17 +26,20 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {240.0F, 42.0F, 42.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 58.0F, 2.0F, true, false, EnemySkill::Slash};
     case EnemyArchetype::BirdDemon:
-        return EnemyConfig {180.0F, 392.0F, 392.0F, 0.5F, 392.0F / 320.0F, 0.0F, 0.0F,
+        return EnemyConfig {180.0F, 480.0F, 480.0F, 0.5F, 480.0F / 320.0F, 0.0F, 0.0F,
             42.0F, 32.0F, 6.0F, false, true, EnemySkill::Dive};
     case EnemyArchetype::Lugner:
         return EnemyConfig {160.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 72.0F, 7.0F, false, false, EnemySkill::Blood};
     case EnemyArchetype::Linie:
-        return EnemyConfig {180.0F, 64.0F, 64.0F, 0.5F, 0.9F, 0.0F, 0.0F,
+        return EnemyConfig {180.0F, 72.0F, 72.0F, 0.5F, 0.9F, 0.0F, 0.0F,
             42.0F, 64.0F, 5.0F, true, false, EnemySkill::LeapingCleave};
     case EnemyArchetype::Draht:
         return EnemyConfig {160.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 9.0F, false, false, EnemySkill::Thread};
+    case EnemyArchetype::Aura:
+        return EnemyConfig {120.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            48.0F, 72.0F, 10.0F, false, false, EnemySkill::Domination};
     case EnemyArchetype::Boss:
         return EnemyConfig {125.0F, 72.0F, 90.0F, 0.55F, 0.16F, 0.0F, 20.0F,
             48.0F, 64.0F, 1.3F, true, false, EnemySkill::BossAttack};
@@ -65,13 +68,30 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::HeadlessKnight: return 60;
             case EnemyArchetype::BirdDemon: return 45;
             case EnemyArchetype::Lugner: return 100;
-            case EnemyArchetype::Linie: return 90;
+            case EnemyArchetype::Linie: return 100;
             case EnemyArchetype::Draht: return 75;
+            case EnemyArchetype::Aura: return 225;
             case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
             }
             return 1;
         }();
-        enemies_.push_back({spawn.archetype, ai::EnemyController(position, config), Health(health, health)});
+        enemies_.push_back({spawn.archetype, ai::EnemyController(position, config), Health(health, health),
+            {}, 0.0F, 0U, 0U, false, spawn.archetype == EnemyArchetype::Aura ? 12.0F : 0.0F, 0U});
+    }
+    const auto aura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.archetype == EnemyArchetype::Aura;
+    });
+    if (aura != enemies_.end())
+    {
+        const float auraX = aura->controller.position().x;
+        for (const float offset : std::array {-110.0F, 110.0F})
+        {
+            const auto config = enemyConfigFor(EnemyArchetype::HeadlessKnight);
+            const Vec2 position {std::clamp(auraX + offset, request_.worldBounds.left,
+                request_.worldBounds.right - config.width), request_.worldBounds.groundTop - config.height};
+            enemies_.push_back({EnemyArchetype::HeadlessKnight, ai::EnemyController(position, config),
+                Health(60, 60)});
+        }
     }
     if (relics_.castsFlowerFieldOnCombatStart())
     {
@@ -119,6 +139,30 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         enemy.slowed = flowerFieldRemaining_ > 0.0F
             && std::abs(bounds.left + bounds.width * 0.5F - flowerFieldCenterX_) <= 360.0F;
         enemy.controller.update(playerBounds(), deltaSeconds, request_.worldBounds, enemy.slowed ? 0.5F : 1.0F);
+    }
+
+    std::vector<Vec2> summonedKnights;
+    for (auto& enemy : enemies_)
+    {
+        if (enemy.archetype != EnemyArchetype::Aura || !enemy.health.isAlive()) continue;
+        enemy.summonCooldown = std::max(0.0F, enemy.summonCooldown - deltaSeconds);
+        if (enemy.summonCooldown <= 0.0F && enemy.controller.action() == ai::EnemyAction::Chase)
+        {
+            const float auraX = enemy.controller.position().x;
+            summonedKnights.push_back({auraX - 110.0F, 0.0F});
+            summonedKnights.push_back({auraX + 110.0F, 0.0F});
+            enemy.summonCooldown = 12.0F;
+            ++enemy.summonCount;
+        }
+    }
+    for (auto position : summonedKnights)
+    {
+        const auto config = enemyConfigFor(EnemyArchetype::HeadlessKnight);
+        position.x = std::clamp(position.x, request_.worldBounds.left,
+            request_.worldBounds.right - config.width);
+        position.y = request_.worldBounds.groundTop - config.height;
+        enemies_.push_back({EnemyArchetype::HeadlessKnight, ai::EnemyController(position, config),
+            Health(60, 60)});
     }
 
     if (flowerFieldRemaining_ > 0.0F && std::abs(playerCenter - flowerFieldCenterX_) <= 360.0F)
@@ -209,20 +253,28 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         {
             int damage = 20;
             if (config.skill == ai::EnemySkill::Thread) damage = 10;
+            if (config.skill == ai::EnemySkill::Domination) damage = 0;
             if (config.skill == ai::EnemySkill::Blood)
                 damage = (enemy.health.maximum() - enemy.health.current()) / 2;
-            if (request_.enemies.empty()) damage = request_.enemyAttackDamage;
+            if (request_.enemies.empty() && enemy.archetype != EnemyArchetype::Aura)
+                damage = request_.enemyAttackDamage;
             const std::uint64_t skillSequence = (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
                 | enemy.controller.attackSequence();
             const auto result = playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::EnemyAttack, skillSequence, damage,
                     1.0F, relics_.incomingDamageMultiplier(), 0,
                     player_.isDashing() || guardRemaining_ > 0.0F});
-            if (result.appliedDamage > 0 && blessingRemaining_ <= 0.0F)
+            const bool dominationHit = config.skill == ai::EnemySkill::Domination
+                && !player_.isDashing() && guardRemaining_ <= 0.0F;
+            if ((result.appliedDamage > 0 || dominationHit) && blessingRemaining_ <= 0.0F)
             {
                 if (config.skill == ai::EnemySkill::Thread) player_.applyLaunch(540.0F, 0.28F);
+                else if (config.skill == ai::EnemySkill::Domination)
+                    player_.applyHitReaction(0.0F, 1.5F);
+                else if (config.skill == ai::EnemySkill::Thrust)
+                    player_.applyHitReaction(0.0F, 1.0F);
                 else player_.applyHitReaction(enemy.controller.facingDirection() * KnockbackSpeed,
-                    config.skill == ai::EnemySkill::Thrust ? 1.0F : HitStunSeconds);
+                    HitStunSeconds);
             }
         }
         if (config.hasContactDamage && enemy.contactCooldown <= 0.0F
