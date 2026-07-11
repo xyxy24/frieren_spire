@@ -1,5 +1,6 @@
 #include "app/run/TowerSession.hpp"
 #include "game/run/DeterministicRng.hpp"
+#include "game/spells/SpellSystem.hpp"
 
 #include <array>
 #include <stdexcept>
@@ -39,6 +40,15 @@ TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config
         throw std::invalid_argument("invalid tower session configuration");
     }
 
+    for (const auto& item : MerchantCatalog)
+    {
+        if (item.kind == game::economy::ItemKind::Spell
+            && game::spells::findDefinition(item.id) == nullptr)
+        {
+            throw std::logic_error("merchant spell has no combat definition");
+        }
+    }
+
     startNextFloor();
 }
 
@@ -47,17 +57,31 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
     if (intent.toggleLoadoutPressed)
     {
         loadoutOpen_ = !loadoutOpen_;
+        if (loadoutOpen_) loadoutPage_ = LoadoutPage::Spells;
         const auto learnedCount = run_.player().learnedSpells.size();
         if (learnedCount > 0U && selectedLearnedSpellIndex_ >= learnedCount)
         {
             selectedLearnedSpellIndex_ = learnedCount - 1U;
+        }
+        const auto relicCount = run_.player().relics.size();
+        if (relicCount > 0U && selectedRelicIndex_ >= relicCount)
+        {
+            selectedRelicIndex_ = relicCount - 1U;
         }
         return;
     }
 
     if (loadoutOpen_)
     {
-        updateLoadout(intent);
+        if (intent.menuPagePreviousPressed || intent.menuPageNextPressed)
+        {
+            loadoutPage_ = loadoutPage_ == LoadoutPage::Spells
+                ? LoadoutPage::Relics
+                : LoadoutPage::Spells;
+            return;
+        }
+        if (loadoutPage_ == LoadoutPage::Spells) updateLoadout(intent);
+        else updateRelicPage(intent);
         return;
     }
 
@@ -188,11 +212,23 @@ bool TowerSession::loadoutOpen() const noexcept
     return loadoutOpen_;
 }
 
+LoadoutPage TowerSession::loadoutPage() const noexcept
+{
+    return loadoutPage_;
+}
+
 std::optional<game::run::ContentId> TowerSession::selectedLearnedSpell() const noexcept
 {
     const auto& learned = run_.player().learnedSpells;
     if (learned.empty() || selectedLearnedSpellIndex_ >= learned.size()) return std::nullopt;
     return learned[selectedLearnedSpellIndex_];
+}
+
+std::optional<game::run::ContentId> TowerSession::selectedRelic() const noexcept
+{
+    const auto& relics = run_.player().relics;
+    if (relics.empty() || selectedRelicIndex_ >= relics.size()) return std::nullopt;
+    return relics[selectedRelicIndex_];
 }
 
 game::Aabb TowerSession::staircaseBounds() const noexcept
@@ -249,10 +285,13 @@ void TowerSession::startNextFloor()
 
     floorStartRun_ = run_;
     floorStartScheduler_ = scheduler_;
-    currentFloorType_ = config_.enableSpecialFloors
-        ? scheduler_.next(run_.context())
-        : ((run_.context().floorIndex + 1U) % config_.floorsPerBoss == 0U
-            ? game::run::FloorType::Boss : game::run::FloorType::Combat);
+    if (run_.context().floorIndex == 0U && config_.firstFloorTypeOverride)
+        currentFloorType_ = *config_.firstFloorTypeOverride;
+    else
+        currentFloorType_ = config_.enableSpecialFloors
+            ? scheduler_.next(run_.context())
+            : ((run_.context().floorIndex + 1U) % config_.floorsPerBoss == 0U
+                ? game::run::FloorType::Boss : game::run::FloorType::Combat);
     merchantStock_.clear();
     eventTransaction_.reset();
     combat_.reset();
@@ -342,6 +381,23 @@ void TowerSession::updateLoadout(const game::PlayerIntent& intent)
         {
             static_cast<void>(run_.equip(slot, learned[selectedLearnedSpellIndex_]));
         }
+    }
+}
+
+void TowerSession::updateRelicPage(const game::PlayerIntent& intent)
+{
+    const auto& relics = run_.player().relics;
+    if (relics.empty()) return;
+
+    if (intent.menuPreviousPressed)
+    {
+        selectedRelicIndex_ = selectedRelicIndex_ == 0U
+            ? relics.size() - 1U
+            : selectedRelicIndex_ - 1U;
+    }
+    if (intent.menuNextPressed)
+    {
+        selectedRelicIndex_ = (selectedRelicIndex_ + 1U) % relics.size();
     }
 }
 

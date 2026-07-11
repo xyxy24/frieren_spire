@@ -19,8 +19,13 @@ private:
     bool previousToggleLoadout_ {false};
     bool previousMenuLeft_ {false};
     bool previousMenuRight_ {false};
+    bool previousMenuPageLeft_ {false};
+    bool previousMenuPageRight_ {false};
+    bool previousMenuUp_ {false};
+    bool previousMenuDown_ {false};
     bool previousPause_ {false};
     bool previousConfirm_ {false};
     bool previousSecondary_ {false};
+    bool previousDebugEventPreview_ {false};
 };
 }

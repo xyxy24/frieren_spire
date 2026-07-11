@@ -14,8 +14,13 @@ struct PlayerIntent
     bool toggleLoadoutPressed {false};
     bool menuPreviousPressed {false};
     bool menuNextPressed {false};
+    bool menuPagePreviousPressed {false};
+    bool menuPageNextPressed {false};
+    bool menuUpPressed {false};
+    bool menuDownPressed {false};
     bool pausePressed {false};
     bool menuConfirmPressed {false};
     bool menuSecondaryPressed {false};
+    bool debugEventPreviewPressed {false};
 };
 }

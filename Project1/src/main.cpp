@@ -1,4 +1,6 @@
 #include "app/run/AppFlowController.hpp"
+#include "game/relics/RelicSystem.hpp"
+#include "game/spells/SpellSystem.hpp"
 #include "platform/SfmlInputMapper.hpp"
 
 #include <SFML/Graphics.hpp>
@@ -227,6 +229,64 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
     overlay.setFillColor(sf::Color {14, 12, 25, 235});
     target.draw(overlay);
 
+    const bool spellPage = tower.loadoutPage() == arcane::app::LoadoutPage::Spells;
+    drawPixelText(target, "SPELLS PAGE 1 OF 2", {120.0F, 30.0F}, 1.6F,
+        spellPage ? sf::Color {255, 231, 145} : sf::Color {125, 126, 145});
+    drawPixelText(target, "Q E SWITCH PAGE", {510.0F, 32.0F}, 1.4F, sf::Color {182, 174, 215});
+    drawPixelText(target, "RELICS PAGE 2 OF 2", {875.0F, 30.0F}, 1.6F,
+        spellPage ? sf::Color {125, 126, 145} : sf::Color {255, 231, 145});
+
+    if (!spellPage)
+    {
+        const auto& relics = tower.run().player().relics;
+        constexpr std::size_t Columns = 6U;
+        constexpr float CardWidth = 140.0F;
+        constexpr float CardHeight = 90.0F;
+        constexpr float HorizontalGap = 25.0F;
+        constexpr float VerticalGap = 50.0F;
+        constexpr float StartX = 157.5F;
+        constexpr float StartY = 90.0F;
+
+        if (relics.empty())
+        {
+            drawPixelText(target, "NO RELICS ACQUIRED", {465.0F, 300.0F}, 2.0F,
+                sf::Color {160, 160, 180});
+            return;
+        }
+
+        for (std::size_t index = 0U; index < relics.size(); ++index)
+        {
+            const std::size_t column = index % Columns;
+            const std::size_t row = index / Columns;
+            const sf::Vector2f position {
+                StartX + static_cast<float>(column) * (CardWidth + HorizontalGap),
+                StartY + static_cast<float>(row) * (CardHeight + VerticalGap)
+            };
+            drawCard(target, relics[index], position, {CardWidth, CardHeight},
+                tower.selectedRelic() == relics[index]);
+            if (const auto* definition = arcane::game::relics::findDefinition(relics[index]))
+                drawPixelText(target, definition->name, {position.x, position.y + CardHeight + 10.0F}, 1.0F);
+            else
+                drawPixelText(target, "UNKNOWN RELIC", {position.x, position.y + CardHeight + 10.0F}, 1.0F);
+        }
+
+        if (tower.selectedRelic())
+        {
+            if (const auto* definition = arcane::game::relics::findDefinition(*tower.selectedRelic()))
+            {
+                drawPixelText(target, definition->name, {157.5F, 535.0F}, 1.8F,
+                    sf::Color {255, 231, 145});
+                drawPixelText(target, definition->description, {157.5F, 570.0F}, 1.25F);
+            }
+            else
+            {
+                drawPixelText(target, "RELIC DEFINITION MISSING", {157.5F, 535.0F}, 1.5F,
+                    sf::Color {235, 105, 105});
+            }
+        }
+        return;
+    }
+
     const auto& learned = tower.run().player().learnedSpells;
     constexpr std::size_t Columns = 8U;
     constexpr float CardWidth = 90.0F;
@@ -277,9 +337,10 @@ void drawStaircase(
     const float stepHeight = bounds.height / static_cast<float>(StepCount);
     for (int step = 0; step < StepCount; ++step)
     {
-        const float width = bounds.width * static_cast<float>(step + 1) / static_cast<float>(StepCount);
+        const float width = bounds.width * static_cast<float>(StepCount - step) / static_cast<float>(StepCount);
         sf::RectangleShape shape({width, stepHeight});
-        shape.setPosition({bounds.left, bounds.top + bounds.height - stepHeight * static_cast<float>(step + 1)});
+        shape.setPosition({bounds.left + bounds.width - width,
+            bounds.top + bounds.height - stepHeight * static_cast<float>(step + 1)});
         shape.setFillColor(unlocked ? sf::Color {146, 124, 174} : sf::Color {68, 69, 80});
         shape.setOutlineColor(unlocked ? sf::Color {226, 207, 244} : sf::Color {105, 106, 118});
         shape.setOutlineThickness(1.5F);
@@ -371,13 +432,23 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
 
     if (tower.loadoutOpen())
     {
+        if (tower.loadoutPage() == arcane::app::LoadoutPage::Relics)
+        {
+            const std::string selected = tower.selectedRelic()
+                ? (arcane::game::relics::findDefinition(*tower.selectedRelic())
+                    ? arcane::game::relics::findDefinition(*tower.selectedRelic())->name
+                    : std::to_string(*tower.selectedRelic()))
+                : std::string {"None"};
+            return title + "RELIC COLLECTION - Selected " + selected
+                + " | A/D Select, Q/E Spell Page, Tab Close";
+        }
         const std::string selected = tower.selectedLearnedSpell()
             ? (arcane::game::spells::findDefinition(*tower.selectedLearnedSpell())
                 ? arcane::game::spells::findDefinition(*tower.selectedLearnedSpell())->name
                 : std::to_string(*tower.selectedLearnedSpell()))
             : std::string {"None"};
         return title + "SPELL LOADOUT - Selected " + selected
-            + " | A/D Select, U/I/O Equip Slot, Tab Close";
+            + " | A/D Select, U/I/O Equip Slot, Q/E Relic Page, Tab Close";
     }
 
     switch (run.phase())
@@ -435,17 +506,52 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
     return title;
 }
 
-void drawMenuPanels(sf::RenderTarget& target, const std::size_t count, const sf::Color color)
+void drawMenuPanel(sf::RenderTarget& target, const float y, const sf::Color color,
+    const std::string_view label, const bool selected)
 {
-    for (std::size_t index = 0U; index < count; ++index)
-    {
-        sf::RectangleShape panel({420.0F, 82.0F});
-        panel.setPosition({430.0F, 270.0F + static_cast<float>(index) * 110.0F});
-        panel.setFillColor(color);
-        panel.setOutlineColor(sf::Color {225, 220, 240});
-        panel.setOutlineThickness(3.0F);
-        target.draw(panel);
-    }
+    sf::RectangleShape panel({520.0F, 82.0F});
+    panel.setPosition({380.0F, y});
+    panel.setFillColor(selected ? sf::Color {
+        static_cast<std::uint8_t>(std::min(255, static_cast<int>(color.r) + 35)),
+        static_cast<std::uint8_t>(std::min(255, static_cast<int>(color.g) + 35)),
+        static_cast<std::uint8_t>(std::min(255, static_cast<int>(color.b) + 35))
+    } : color);
+    panel.setOutlineColor(selected ? sf::Color {255, 231, 145} : sf::Color {175, 170, 195});
+    panel.setOutlineThickness(selected ? 6.0F : 3.0F);
+    target.draw(panel);
+    drawPixelText(target, label, {410.0F, y + 28.0F}, 2.0F,
+        selected ? sf::Color {255, 241, 184} : sf::Color {225, 220, 240});
+}
+
+void drawStartMenu(sf::RenderTarget& target, const bool canContinue)
+{
+    drawPixelText(target, "ARCANE SPIRE", {485.0F, 150.0F}, 2.5F, sf::Color {232, 218, 255});
+    drawMenuPanel(target, 270.0F, canContinue ? sf::Color {55, 105, 130} : sf::Color {63, 116, 82},
+        canContinue ? "CONTINUE" : "START NEW RUN", true);
+    drawPixelText(target, "ENTER CONFIRM", {520.0F, 380.0F}, 1.5F);
+    drawPixelText(target, "F2 EVENT PREVIEW", {500.0F, 430.0F}, 1.5F, sf::Color {190, 174, 225});
+}
+
+void drawPauseMenu(sf::RenderTarget& target, const arcane::app::PauseMenuItem selection)
+{
+    drawPixelText(target, "PAUSED", {555.0F, 150.0F}, 2.5F, sf::Color {232, 218, 255});
+    drawMenuPanel(target, 250.0F, sf::Color {74, 66, 105}, "REPLAY CURRENT FLOOR",
+        selection == arcane::app::PauseMenuItem::ReplayCurrentFloor);
+    drawMenuPanel(target, 370.0F, sf::Color {74, 66, 105}, "SAVE AND EXIT",
+        selection == arcane::app::PauseMenuItem::SaveAndExit);
+    drawPixelText(target, "W S OR UP DOWN SELECT", {445.0F, 500.0F}, 1.4F);
+    drawPixelText(target, "ENTER CONFIRM   ESC RESUME", {420.0F, 540.0F}, 1.4F);
+    drawPixelText(target, "SAVE IS RETAINED UNTIL APP CLOSES", {380.0F, 590.0F}, 1.2F,
+        sf::Color {170, 164, 190});
+}
+
+void drawResultMenu(sf::RenderTarget& target, const bool victory)
+{
+    drawPixelText(target, victory ? "VICTORY" : "DEFEAT", victory
+        ? sf::Vector2f {535.0F, 170.0F} : sf::Vector2f {545.0F, 170.0F}, 2.5F,
+        sf::Color {242, 232, 190});
+    drawMenuPanel(target, 300.0F, victory ? sf::Color {63, 116, 82} : sf::Color {116, 63, 72},
+        "START NEW RUN", true);
 }
 
 void drawDigit(sf::RenderTarget& target, const int digit, const sf::Vector2f origin)
@@ -499,9 +605,11 @@ int main()
         const float deltaSeconds = std::min(frameClock.restart().asSeconds(), MaximumFrameTime);
         app.update(inputMapper.sample(), deltaSeconds);
         if (app.screen() == arcane::app::AppScreen::Start)
-            window.setTitle(app.canContinue() ? "Arcane Spire | CONTINUE - Enter" : "Arcane Spire | START - Enter");
+            window.setTitle(app.canContinue()
+                ? "Arcane Spire | CONTINUE - Enter | F2 Event Preview"
+                : "Arcane Spire | START - Enter | F2 Event Preview");
         else if (app.screen() == arcane::app::AppScreen::Pause)
-            window.setTitle("Arcane Spire | PAUSE - Esc Resume | Enter Exit To Start | R Restart Floor");
+            window.setTitle("Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume");
         else if (app.screen() == arcane::app::AppScreen::Result)
             window.setTitle(app.victory() ? "Arcane Spire | WIN - Enter Start" : "Arcane Spire | DEFEAT - Enter Start");
         else if (app.tower()) window.setTitle(makeWindowTitle(*app.tower()) + " | Esc Pause");
@@ -512,11 +620,11 @@ int main()
         window.clear(background);
 
         if (app.screen() == arcane::app::AppScreen::Start)
-            drawMenuPanels(window, 1U, app.canContinue() ? sf::Color {55, 105, 130} : sf::Color {63, 116, 82});
+            drawStartMenu(window, app.canContinue());
         else if (app.screen() == arcane::app::AppScreen::Pause)
-            drawMenuPanels(window, 2U, sf::Color {74, 66, 105});
+            drawPauseMenu(window, app.pauseMenuItem());
         else if (app.screen() == arcane::app::AppScreen::Result)
-            drawMenuPanels(window, 1U, app.victory() ? sf::Color {63, 116, 82} : sf::Color {116, 63, 72});
+            drawResultMenu(window, app.victory());
         else if (const auto* tower = app.tower())
         {
             const auto phase = tower->run().phase();

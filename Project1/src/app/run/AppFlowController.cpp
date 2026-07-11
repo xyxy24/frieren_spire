@@ -13,7 +13,12 @@ void AppFlowController::update(const game::PlayerIntent& intent, const float del
     switch (screen_)
     {
     case AppScreen::Start:
-        if (intent.menuConfirmPressed)
+        if (intent.debugEventPreviewPressed)
+        {
+            startEventPreview();
+            screen_ = AppScreen::Playing;
+        }
+        else if (intent.menuConfirmPressed)
         {
             if (!tower_) startNewRun();
             screen_ = AppScreen::Playing;
@@ -22,6 +27,7 @@ void AppFlowController::update(const game::PlayerIntent& intent, const float del
     case AppScreen::Playing:
         if (intent.pausePressed)
         {
+            pauseMenuItem_ = PauseMenuItem::ReplayCurrentFloor;
             screen_ = AppScreen::Pause;
             break;
         }
@@ -36,7 +42,23 @@ void AppFlowController::update(const game::PlayerIntent& intent, const float del
         break;
     case AppScreen::Pause:
         if (intent.pausePressed) screen_ = AppScreen::Playing;
-        else if (intent.menuConfirmPressed) screen_ = AppScreen::Start;
+        else if (intent.menuUpPressed || intent.menuDownPressed)
+        {
+            pauseMenuItem_ = pauseMenuItem_ == PauseMenuItem::ReplayCurrentFloor
+                ? PauseMenuItem::SaveAndExit
+                : PauseMenuItem::ReplayCurrentFloor;
+        }
+        else if (intent.menuConfirmPressed)
+        {
+            if (pauseMenuItem_ == PauseMenuItem::ReplayCurrentFloor)
+            {
+                if (!tower_) throw std::logic_error("pause screen requires a tower session");
+                tower_->restartCurrentFloor();
+                screen_ = AppScreen::Playing;
+            }
+            else
+                screen_ = AppScreen::Start;
+        }
         else if (intent.menuSecondaryPressed)
         {
             if (!tower_) throw std::logic_error("pause screen requires a tower session");
@@ -57,11 +79,20 @@ void AppFlowController::update(const game::PlayerIntent& intent, const float del
 AppScreen AppFlowController::screen() const noexcept { return screen_; }
 bool AppFlowController::canContinue() const noexcept { return screen_ == AppScreen::Start && tower_.has_value(); }
 bool AppFlowController::victory() const noexcept { return victory_; }
+PauseMenuItem AppFlowController::pauseMenuItem() const noexcept { return pauseMenuItem_; }
 const TowerSession* AppFlowController::tower() const noexcept { return tower_ ? &*tower_ : nullptr; }
 
 void AppFlowController::startNewRun()
 {
     tower_.emplace(seed_, config_);
+    victory_ = false;
+}
+
+void AppFlowController::startEventPreview()
+{
+    TowerSessionConfig previewConfig = config_;
+    previewConfig.firstFloorTypeOverride = game::run::FloorType::Event;
+    tower_.emplace(seed_, std::move(previewConfig));
     victory_ = false;
 }
 }

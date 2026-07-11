@@ -28,9 +28,16 @@ game::PlayerIntent SfmlInputMapper::sample()
     const bool spell2 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::O);
     const bool interact = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E);
     const bool toggleLoadout = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Tab);
+    const bool menuPageLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q);
+    const bool menuPageRight = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E);
+    const bool menuUp = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)
+        || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up);
+    const bool menuDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)
+        || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down);
     const bool pause = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape);
     const bool confirm = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter);
     const bool secondary = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R);
+    const bool debugEventPreview = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F2);
 
     game::PlayerIntent intent;
     intent.moveAxis = static_cast<float>(moveRight) - static_cast<float>(moveLeft);
@@ -43,9 +50,14 @@ game::PlayerIntent SfmlInputMapper::sample()
     intent.toggleLoadoutPressed = pressedOnce(toggleLoadout, previousToggleLoadout_);
     intent.menuPreviousPressed = pressedOnce(moveLeft, previousMenuLeft_);
     intent.menuNextPressed = pressedOnce(moveRight, previousMenuRight_);
+    intent.menuPagePreviousPressed = pressedOnce(menuPageLeft, previousMenuPageLeft_);
+    intent.menuPageNextPressed = pressedOnce(menuPageRight, previousMenuPageRight_);
+    intent.menuUpPressed = pressedOnce(menuUp, previousMenuUp_);
+    intent.menuDownPressed = pressedOnce(menuDown, previousMenuDown_);
     intent.pausePressed = pressedOnce(pause, previousPause_);
     intent.menuConfirmPressed = pressedOnce(confirm, previousConfirm_);
     intent.menuSecondaryPressed = pressedOnce(secondary, previousSecondary_);
+    intent.debugEventPreviewPressed = pressedOnce(debugEventPreview, previousDebugEventPreview_);
     return intent;
 }
 }

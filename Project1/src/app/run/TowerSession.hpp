@@ -28,9 +28,11 @@ struct TowerSessionConfig
     int bossGoldReward {30};
     std::uint32_t floorsPerBoss {3};
     bool enableSpecialFloors {true};
+    std::optional<game::run::FloorType> firstFloorTypeOverride;
 };
 
 enum class EventFloorState : std::uint8_t { Untriggered, Choosing, Result };
+enum class LoadoutPage : std::uint8_t { Spells, Relics };
 
 class TowerSession
 {
@@ -45,7 +47,9 @@ public:
     [[nodiscard]] std::optional<std::array<game::run::ContentId, 3>> rewardCandidates() const;
     [[nodiscard]] std::optional<game::Aabb> lootDropBounds() const noexcept;
     [[nodiscard]] bool loadoutOpen() const noexcept;
+    [[nodiscard]] LoadoutPage loadoutPage() const noexcept;
     [[nodiscard]] std::optional<game::run::ContentId> selectedLearnedSpell() const noexcept;
+    [[nodiscard]] std::optional<game::run::ContentId> selectedRelic() const noexcept;
     [[nodiscard]] game::Aabb staircaseBounds() const noexcept;
     [[nodiscard]] bool staircaseUnlocked() const noexcept;
     [[nodiscard]] const std::vector<game::economy::StockItem>& merchantStock() const noexcept;
@@ -60,6 +64,7 @@ public:
 private:
     void startNextFloor();
     void updateLoadout(const game::PlayerIntent& intent);
+    void updateRelicPage(const game::PlayerIntent& intent);
     void updateSpecialFloor(const game::PlayerIntent& intent, float deltaSeconds);
 
     RunController run_;
@@ -70,7 +75,9 @@ private:
     std::optional<game::PlayerController> explorationPlayer_;
     game::run::FloorType currentFloorType_ {game::run::FloorType::Combat};
     std::size_t selectedLearnedSpellIndex_ {0};
+    std::size_t selectedRelicIndex_ {0};
     bool loadoutOpen_ {false};
+    LoadoutPage loadoutPage_ {LoadoutPage::Spells};
     std::vector<game::economy::StockItem> merchantStock_;
     std::optional<game::events::EventTransaction> eventTransaction_;
     std::array<game::events::EventChoice, 3> eventChoices_;

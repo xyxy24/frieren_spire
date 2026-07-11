@@ -7,6 +7,7 @@
 namespace arcane::app
 {
 enum class AppScreen : std::uint8_t { Start, Playing, Pause, Result };
+enum class PauseMenuItem : std::uint8_t { ReplayCurrentFloor, SaveAndExit };
 
 class AppFlowController
 {
@@ -16,14 +17,17 @@ public:
     [[nodiscard]] AppScreen screen() const noexcept;
     [[nodiscard]] bool canContinue() const noexcept;
     [[nodiscard]] bool victory() const noexcept;
+    [[nodiscard]] PauseMenuItem pauseMenuItem() const noexcept;
     [[nodiscard]] const TowerSession* tower() const noexcept;
 
 private:
     void startNewRun();
+    void startEventPreview();
     game::run::Seed seed_;
     TowerSessionConfig config_;
     std::optional<TowerSession> tower_;
     AppScreen screen_ {AppScreen::Start};
+    PauseMenuItem pauseMenuItem_ {PauseMenuItem::ReplayCurrentFloor};
     bool victory_ {};
 };
 }

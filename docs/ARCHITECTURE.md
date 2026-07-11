@@ -83,7 +83,9 @@ GameApp
 
 ## 6. 顶层状态机
 
-`AppFlowController` 持有可选的 `TowerSession` 并管理 `Start/Playing/Pause/Result` 页面。暂退到 Start 时保留同一个 `TowerSession` 供 Continue 使用；结果页确认则创建新实例。`TowerSession` 在每层调度前保存 `RunController` 与 `FloorScheduler` 快照，本层重开时恢复快照后重新生成同一种子楼层，不保存或复用旧层实体。
+`AppFlowController` 持有可选的 `TowerSession` 并管理 `Start/Playing/Pause/Result` 页面。暂停页由 `PauseMenuItem::ReplayCurrentFloor/SaveAndExit` 保存当前高亮项；上下输入只修改菜单选择，确认后才重开本层或暂退。暂退到 Start 时保留同一个 `TowerSession` 供 Continue 使用，但当前没有磁盘序列化，进程关闭后不会保留。结果页确认则创建新实例。`TowerSession` 在每层调度前保存 `RunController` 与 `FloorScheduler` 快照，本层重开时恢复快照后重新生成同一种子楼层，不保存或复用旧层实体。
+
+事件验收入口使用 `TowerSessionConfig::firstFloorTypeOverride` 显式覆盖首层类型；正式新局不设置该字段，仍由 `FloorScheduler` 的确定性随机流和保底规则决定楼层。该入口只改变测试会话的首层描述，不在调度器中加入环境相关的随机分支。
 
 ```mermaid
 stateDiagram-v2
@@ -105,7 +107,7 @@ stateDiagram-v2
     Result --> MainMenu
 ```
 
-`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是顶层流程状态，而是可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的暂停覆盖层；关闭后恢复原状态。
+`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是顶层流程状态，而是可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的暂停覆盖层；关闭后恢复原状态。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页：魔法页可选择并提交三槽装备命令，遗物页只读取本局遗物集合和内容定义并显示效果，不复制或修改遗物权威状态。
 
 ## 7. 战斗与时间
 

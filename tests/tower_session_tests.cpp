@@ -1,4 +1,5 @@
 #include "app/run/AppFlowController.hpp"
+#include "game/spells/SpellSystem.hpp"
 
 #include <iostream>
 #include <optional>
@@ -88,6 +89,54 @@ bool combatRewardLoadoutAndStairsFormOneFlow()
         && expect(tower.run().phase() == arcane::game::run::RunPhase::InEncounter,
             "the next combat must start after climbing")
         && expect(tower.run().player().gold == 10, "victory gold must be awarded once");
+}
+
+bool loadoutSeparatesSpellAndRelicPages()
+{
+    auto config = fastFlowConfig();
+    config.initialPlayer.learnedSpells = {1004U};
+    config.initialPlayer.relics = {4001U, 4002U};
+    arcane::app::TowerSession tower(808U, config);
+    const auto initialPhase = tower.run().phase();
+
+    arcane::game::PlayerIntent toggle;
+    toggle.toggleLoadoutPressed = true;
+    tower.update(toggle, 0.01F);
+    if (!expect(tower.loadoutOpen()
+            && tower.loadoutPage() == arcane::app::LoadoutPage::Spells,
+            "Tab must open the spell page first")) return false;
+
+    arcane::game::PlayerIntent nextPage;
+    nextPage.menuPageNextPressed = true;
+    tower.update(nextPage, 0.01F);
+    if (!expect(tower.loadoutPage() == arcane::app::LoadoutPage::Relics,
+            "page input must switch to the separate relic page")
+        || !expect(tower.selectedRelic() == 4001U,
+            "relic page must select the first acquired relic")) return false;
+
+    arcane::game::PlayerIntent nextRelic;
+    nextRelic.menuNextPressed = true;
+    tower.update(nextRelic, 0.01F);
+    if (!expect(tower.selectedRelic() == 4002U,
+            "A/D navigation must select acquired relics on the relic page")) return false;
+
+    arcane::game::PlayerIntent spellKey;
+    spellKey.spellPressed[0] = true;
+    tower.update(spellKey, 0.01F);
+    if (!expect(!tower.run().player().equippedSpells[0],
+            "spell slot keys must not equip anything from the relic page")) return false;
+
+    arcane::game::PlayerIntent previousPage;
+    previousPage.menuPagePreviousPressed = true;
+    tower.update(previousPage, 0.01F);
+    tower.update(spellKey, 0.01F);
+    if (!expect(tower.loadoutPage() == arcane::app::LoadoutPage::Spells
+            && tower.run().player().equippedSpells[0] == 1004U,
+            "returning to the spell page must preserve spell equipment controls")) return false;
+
+    tower.update(toggle, 0.01F);
+    return expect(!tower.loadoutOpen() && tower.run().phase() == initialPhase,
+        "closing either collection page must restore the original run phase");
 }
 
 bool contactDefeatEndsTheTowerFlow()
@@ -188,6 +237,59 @@ bool specialFloorsAdvanceWithoutCombat()
     return expect(merchantTower.run().context().floorIndex == 1U, "completed merchant must advance");
 }
 
+bool purchasedMerchantSpellCanBeEquippedAndCast()
+{
+    arcane::app::TowerSessionConfig config;
+    config.npcBounds = {150.0F, 550.0F, 100.0F, 90.0F};
+    config.initialPlayer.gold = 100;
+
+    std::optional<arcane::game::run::Seed> merchantSeed;
+    std::size_t spellStockIndex = 0U;
+    for (arcane::game::run::Seed seed = 1U; seed < 1000U && !merchantSeed; ++seed)
+    {
+        arcane::app::TowerSession candidate(seed, config);
+        if (candidate.currentFloorType() != arcane::game::run::FloorType::Merchant) continue;
+        const auto& stock = candidate.merchantStock();
+        for (std::size_t index = 0U; index < stock.size(); ++index)
+        {
+            if (stock[index].kind == arcane::game::economy::ItemKind::Spell)
+            {
+                merchantSeed = seed;
+                spellStockIndex = index;
+                break;
+            }
+        }
+    }
+    if (!expect(merchantSeed.has_value(), "a deterministic merchant stock with a spell must exist")) return false;
+
+    arcane::app::TowerSession tower(*merchantSeed, config);
+    interact(tower);
+    const auto purchasedSpell = tower.merchantStock()[spellStockIndex].id;
+    arcane::game::PlayerIntent purchase;
+    purchase.spellPressed[spellStockIndex] = true;
+    tower.update(purchase, 0.01F);
+    if (!expect(tower.run().player().learnedSpells.size() == 1U
+            && tower.run().player().learnedSpells[0] == purchasedSpell,
+            "purchased merchant spell must enter the learned list")
+        || !expect(arcane::game::spells::findDefinition(purchasedSpell) != nullptr,
+            "purchased merchant spell must have a combat definition")) return false;
+
+    arcane::game::PlayerIntent toggleLoadout;
+    toggleLoadout.toggleLoadoutPressed = true;
+    tower.update(toggleLoadout, 0.01F);
+    arcane::game::PlayerIntent equipFirstSlot;
+    equipFirstSlot.spellPressed[0] = true;
+    tower.update(equipFirstSlot, 0.01F);
+    tower.update(toggleLoadout, 0.01F);
+
+    arcane::game::spells::SpellSystem spells(tower.run().player().equippedSpells);
+    const auto cast = spells.tryCast(0U, {160.0F, 576.0F}, 1.0F, {220.0F, 576.0F, 64.0F, 64.0F});
+    return expect(tower.run().player().equippedSpells[0] == purchasedSpell,
+            "purchased merchant spell must equip into a combat slot")
+        && expect(cast.cast && cast.hit && cast.damage > 0,
+            "equipped merchant spell must cast and deal damage");
+}
+
 bool pauseCanContinueOrRestartFloorSnapshot()
 {
     auto config = fastFlowConfig();
@@ -206,23 +308,54 @@ bool pauseCanContinueOrRestartFloorSnapshot()
     arcane::game::PlayerIntent pause;
     pause.pausePressed = true;
     app.update(pause, 0.01F);
-    arcane::game::PlayerIntent restart;
-    restart.menuSecondaryPressed = true;
-    app.update(restart, 0.01F);
+    if (!expect(app.pauseMenuItem() == arcane::app::PauseMenuItem::ReplayCurrentFloor,
+            "pause menu must initially select replay current floor")) return false;
+
+    arcane::game::PlayerIntent down;
+    down.menuDownPressed = true;
+    app.update(down, 0.01F);
+    if (!expect(app.pauseMenuItem() == arcane::app::PauseMenuItem::SaveAndExit,
+            "down input must select save and exit")) return false;
+    app.update(confirm, 0.01F);
+    if (!expect(app.screen() == arcane::app::AppScreen::Start && app.canContinue()
+            && app.tower()->run().phase() == arcane::game::run::RunPhase::LootPending,
+        "save and exit must retain the current run on a continue-capable start screen")) return false;
+    app.update(confirm, 0.01F);
     if (!expect(app.screen() == arcane::app::AppScreen::Playing
-            && app.tower()->run().phase() == arcane::game::run::RunPhase::InEncounter,
-        "restart must restore the floor-start phase")
-        || !expect(app.tower()->run().player().gold == 0 && app.tower()->run().player().learnedSpells.empty(),
-            "restart must roll back rewards earned on the current floor")) return false;
+            && app.tower()->run().phase() == arcane::game::run::RunPhase::LootPending,
+        "continue must resume the retained run instead of creating another one")) return false;
 
     app.update(pause, 0.01F);
-    app.update(confirm, 0.01F);
-    if (!expect(app.screen() == arcane::app::AppScreen::Start && app.canContinue(),
-        "temporary exit must return to a continue-capable start screen")) return false;
+    if (!expect(app.pauseMenuItem() == arcane::app::PauseMenuItem::ReplayCurrentFloor,
+            "reopening pause must reset selection to replay")) return false;
     app.update(confirm, 0.01F);
     return expect(app.screen() == arcane::app::AppScreen::Playing
-            && app.tower()->run().context().floorIndex == 0U,
-        "continue must resume the retained run instead of creating another one");
+            && app.tower()->run().phase() == arcane::game::run::RunPhase::InEncounter,
+            "confirming replay must restore the floor-start phase")
+        && expect(app.tower()->run().player().gold == 0 && app.tower()->run().player().learnedSpells.empty(),
+            "replay must roll back rewards earned on the current floor");
+}
+
+bool startMenuEventPreviewOpensAnInteractiveEventFloor()
+{
+    arcane::app::TowerSessionConfig config;
+    config.npcBounds = {150.0F, 550.0F, 100.0F, 90.0F};
+    config.enableSpecialFloors = false;
+    arcane::app::AppFlowController app(909U, config);
+
+    arcane::game::PlayerIntent preview;
+    preview.debugEventPreviewPressed = true;
+    app.update(preview, 0.01F);
+    if (!expect(app.screen() == arcane::app::AppScreen::Playing && app.tower()
+            && app.tower()->currentFloorType() == arcane::game::run::FloorType::Event,
+        "F2 preview must start directly on a deterministic event floor")) return false;
+
+    arcane::game::PlayerIntent interactWithNpc;
+    interactWithNpc.interactPressed = true;
+    app.update(interactWithNpc, 0.01F);
+    return expect(app.tower()->specialPanelOpen()
+            && app.tower()->eventFloorState() == arcane::app::EventFloorState::Choosing,
+        "event preview must expose the real spatial NPC interaction page");
 }
 
 bool defeatResultCanStartANewRun()
@@ -270,10 +403,13 @@ bool heldSpellCannotBypassLootInteraction()
 int main()
 {
     const bool passed = combatRewardLoadoutAndStairsFormOneFlow()
+        && loadoutSeparatesSpellAndRelicPages()
         && contactDefeatEndsTheTowerFlow()
         && thirdBossEndsInVictory()
         && specialFloorsAdvanceWithoutCombat()
+        && purchasedMerchantSpellCanBeEquippedAndCast()
         && pauseCanContinueOrRestartFloorSnapshot()
+        && startMenuEventPreviewOpensAnInteractiveEventFloor()
         && defeatResultCanStartANewRun()
         && heldSpellCannotBypassLootInteraction();
     if (!passed) return 1;
