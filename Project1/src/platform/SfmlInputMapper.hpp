@@ -27,5 +27,6 @@ private:
     bool previousConfirm_ {false};
     bool previousSecondary_ {false};
     bool previousDebugEventPreview_ {false};
+    bool previousDebugMerchantPreview_ {false};
 };
 }

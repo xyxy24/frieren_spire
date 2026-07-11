@@ -127,7 +127,9 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
 {
     constexpr float SlotSize = 66.0F;
     constexpr float Gap = 18.0F;
-    const float startX = (static_cast<float>(WindowWidth) - (SlotSize * 3.0F + Gap * 2.0F)) * 0.5F;
+    constexpr float UltimateGap = 34.0F;
+    const float totalWidth = SlotSize * 4.0F + Gap * 2.0F + UltimateGap;
+    const float startX = (static_cast<float>(WindowWidth) - totalWidth) * 0.5F;
 
     for (std::size_t index = 0; index < player.equippedSpells.size(); ++index)
     {
@@ -149,6 +151,30 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
             target.draw(cooldown);
         }
     }
+
+    const float ultimateX = startX + SlotSize * 3.0F + Gap * 2.0F + UltimateGap;
+    sf::RectangleShape ultimateSlot({SlotSize, SlotSize});
+    ultimateSlot.setPosition({ultimateX, 630.0F});
+    ultimateSlot.setFillColor(player.equippedUltimateSpell
+        ? colorForContent(*player.equippedUltimateSpell)
+        : sf::Color {38, 41, 52});
+    ultimateSlot.setOutlineColor(player.ultimateSpellUnlocked
+        ? sf::Color {255, 205, 92}
+        : sf::Color {85, 85, 98});
+    ultimateSlot.setOutlineThickness(4.0F);
+    target.draw(ultimateSlot);
+    if (combatView && combatView->ultimateSpellSlot.cooldownDuration > 0.0F)
+    {
+        const float ratio = std::clamp(combatView->ultimateSpellSlot.cooldownRemaining
+            / combatView->ultimateSpellSlot.cooldownDuration, 0.0F, 1.0F);
+        sf::RectangleShape cooldown({SlotSize, SlotSize * ratio});
+        cooldown.setPosition({ultimateX, 630.0F});
+        cooldown.setFillColor(sf::Color {8, 10, 18, 205});
+        target.draw(cooldown);
+    }
+    drawPixelText(target, player.ultimateSpellUnlocked ? "R" : "LOCK",
+        {ultimateX + (player.ultimateSpellUnlocked ? 27.0F : 10.0F), 607.0F}, 1.0F,
+        player.ultimateSpellUnlocked ? sf::Color {255, 221, 130} : sf::Color {105, 105, 118});
 }
 
 void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
@@ -328,14 +354,20 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
         return;
     }
 
-    const auto& learned = tower.run().player().learnedSpells;
+    const auto& player = tower.run().player();
+    const auto& learned = player.learnedSpells;
+    const auto& learnedBoss = player.learnedBossSpells;
     constexpr std::size_t Columns = 8U;
     constexpr float CardWidth = 90.0F;
     constexpr float CardHeight = 95.0F;
     constexpr float HorizontalGap = 20.0F;
     constexpr float VerticalGap = 20.0F;
     constexpr float StartX = 190.0F;
-    constexpr float StartY = 90.0F;
+    constexpr float StartY = 110.0F;
+
+    drawPixelText(target, "REGULAR SPELLS", {190.0F, 78.0F}, 1.3F,
+        tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Regular
+            ? sf::Color {255, 231, 145} : sf::Color {130, 130, 150});
 
     for (std::size_t index = 0; index < learned.size(); ++index)
     {
@@ -351,6 +383,22 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
             position,
             {CardWidth, CardHeight},
             tower.selectedLearnedSpell() == learned[index]);
+    }
+
+    drawPixelText(target, player.ultimateSpellUnlocked ? "BOSS SPELLS - R EQUIP ULTIMATE"
+            : "BOSS SPELLS - DEFEAT BOSS 1 TO UNLOCK",
+        {190.0F, 330.0F}, 1.25F,
+        tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss
+            ? sf::Color {255, 205, 92} : sf::Color {130, 130, 150});
+    for (std::size_t index = 0; index < learnedBoss.size(); ++index)
+    {
+        const sf::Vector2f position {
+            StartX + static_cast<float>(index % Columns) * (CardWidth + HorizontalGap),
+            365.0F + static_cast<float>(index / Columns) * (CardHeight + VerticalGap)
+        };
+        drawCard(target, learnedBoss[index], position, {CardWidth, CardHeight},
+            tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss
+                && tower.selectedLearnedSpell() == learnedBoss[index]);
     }
 
     drawEquippedSlots(target, tower.run().player());
@@ -488,8 +536,10 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
                 ? arcane::game::spells::findDefinition(*tower.selectedLearnedSpell())->name
                 : std::to_string(*tower.selectedLearnedSpell()))
             : std::string {"None"};
-        return title + "SPELL LOADOUT - Selected " + selected
-            + " | A/D Select, U/I/O Equip Slot, Q/E Relic Page, Tab Close";
+        const bool bossSection = tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss;
+        return title + (bossSection ? "BOSS SPELL LOADOUT - Selected " : "REGULAR SPELL LOADOUT - Selected ")
+            + selected + (bossSection ? " | A/D Select, R Equip Ultimate" : " | A/D Select, U/I/O Equip Slot")
+            + ", W/S Switch Spell Group, Q/E Relic Page, Tab Close";
     }
 
     switch (run.phase())
@@ -510,7 +560,7 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
                 return title + "EVENT RESULT - E Close";
             return title + "ALDEN BALL - U Dessert(+30 MaxHP), I Grimoire(Random Spell), O Commission(+50 Gold), E Close";
         }
-        return title + "A/D Move, Space Jump, J Attack, Tab Loadout";
+        return title + "A/D Move, Space Jump, J Attack, U/I/O Spells, R Ultimate, Tab Loadout";
     case arcane::game::run::RunPhase::LootPending:
         return title + "ENEMY DROP - Move To Drop, E Inspect Reward | Tab Loadout";
     case arcane::game::run::RunPhase::Reward:
@@ -562,6 +612,7 @@ void drawStartMenu(sf::RenderTarget& target, const bool canContinue)
         canContinue ? "CONTINUE" : "START NEW RUN", true);
     drawPixelText(target, "ENTER CONFIRM", {520.0F, 380.0F}, 1.5F);
     drawPixelText(target, "F2 EVENT PREVIEW", {500.0F, 430.0F}, 1.5F, sf::Color {190, 174, 225});
+    drawPixelText(target, "F3 SHOP PREVIEW", {510.0F, 470.0F}, 1.5F, sf::Color {222, 190, 125});
 }
 
 void drawPauseMenu(sf::RenderTarget& target, const arcane::app::PauseMenuItem selection)
@@ -638,8 +689,8 @@ int main()
         app.update(inputMapper.sample(), deltaSeconds);
         if (app.screen() == arcane::app::AppScreen::Start)
             window.setTitle(app.canContinue()
-                ? "Arcane Spire | CONTINUE - Enter | F2 Event Preview"
-                : "Arcane Spire | START - Enter | F2 Event Preview");
+                ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop"
+                : "Arcane Spire | START - Enter | F2 Event | F3 Shop");
         else if (app.screen() == arcane::app::AppScreen::Pause)
             window.setTitle("Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume");
         else if (app.screen() == arcane::app::AppScreen::Result)

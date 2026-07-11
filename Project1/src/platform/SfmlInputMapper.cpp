@@ -38,6 +38,7 @@ game::PlayerIntent SfmlInputMapper::sample()
     const bool confirm = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter);
     const bool secondary = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R);
     const bool debugEventPreview = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F2);
+    const bool debugMerchantPreview = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F3);
 
     game::PlayerIntent intent;
     intent.moveAxis = static_cast<float>(moveRight) - static_cast<float>(moveLeft);
@@ -56,8 +57,11 @@ game::PlayerIntent SfmlInputMapper::sample()
     intent.menuDownPressed = pressedOnce(menuDown, previousMenuDown_);
     intent.pausePressed = pressedOnce(pause, previousPause_);
     intent.menuConfirmPressed = pressedOnce(confirm, previousConfirm_);
-    intent.menuSecondaryPressed = pressedOnce(secondary, previousSecondary_);
+    const bool secondaryPressed = pressedOnce(secondary, previousSecondary_);
+    intent.ultimateSpellPressed = secondaryPressed;
+    intent.menuSecondaryPressed = secondaryPressed;
     intent.debugEventPreviewPressed = pressedOnce(debugEventPreview, previousDebugEventPreview_);
+    intent.debugMerchantPreviewPressed = pressedOnce(debugMerchantPreview, previousDebugMerchantPreview_);
     return intent;
 }
 }

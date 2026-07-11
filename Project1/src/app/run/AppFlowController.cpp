@@ -1,5 +1,6 @@
 #include "app/run/AppFlowController.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -13,7 +14,12 @@ void AppFlowController::update(const game::PlayerIntent& intent, const float del
     switch (screen_)
     {
     case AppScreen::Start:
-        if (intent.debugEventPreviewPressed)
+        if (intent.debugMerchantPreviewPressed)
+        {
+            startMerchantPreview();
+            screen_ = AppScreen::Playing;
+        }
+        else if (intent.debugEventPreviewPressed)
         {
             startEventPreview();
             screen_ = AppScreen::Playing;
@@ -92,6 +98,15 @@ void AppFlowController::startEventPreview()
 {
     TowerSessionConfig previewConfig = config_;
     previewConfig.firstFloorTypeOverride = game::run::FloorType::Event;
+    tower_.emplace(seed_, std::move(previewConfig));
+    victory_ = false;
+}
+
+void AppFlowController::startMerchantPreview()
+{
+    TowerSessionConfig previewConfig = config_;
+    previewConfig.firstFloorTypeOverride = game::run::FloorType::Merchant;
+    previewConfig.initialPlayer.gold = std::max(previewConfig.initialPlayer.gold, 100);
     tower_.emplace(seed_, std::move(previewConfig));
     victory_ = false;
 }

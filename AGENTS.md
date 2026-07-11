@@ -24,7 +24,7 @@ When implementation and documentation disagree, determine whether the code or de
 - Application target: `Project1`.
 - Pure C++ library target: `arcane_core`.
 - Test targets: `arcane_core_tests`, `combat_session_tests`, and `run_flow_tests`, registered with CTest.
-- Implemented probe: SFML window/input adapter; player movement and facing; basic attack timing, AABB hit detection, HP, damage resolution, active enemy AI and health bars; a visible combat → spatial loot drop → reward → return-to-map → spatial staircase → next-floor loop; an independently toggled learned-spell loadout overlay; deterministic floor/reward streams; merchant/event backend transactions; three-boss victory; and a real `CombatResult` handoff between combat and run domains.
+- Implemented probe: SFML window/input adapter; player movement and facing; basic attack timing, AABB hit detection, HP, damage resolution, active enemy AI and health bars; three regular spell slots plus a Boss-only ultimate slot with a shared cooldown; a visible combat → spatial loot drop → reward → return-to-map → spatial staircase → next-floor loop; an independently toggled learned-spell loadout overlay; deterministic floor/reward streams; merchant/event backend transactions; three-boss victory; and a real `CombatResult` handoff between combat and run domains.
 - `Project1.slnx` and `Project1/Project1.vcxproj` are legacy empty-project files retained temporarily. Do not add new source or dependencies to them; CMake is the source of truth.
 
 ## Build & Verification
@@ -62,8 +62,8 @@ Prefer a playable vertical slice over broad scaffolding. Do not create every dir
 Unless the user explicitly changes the design, preserve these rules:
 
 - A run ends in victory after defeating the third boss.
-- The player exposes HP, gold, learned spells, relics, and exactly three equipped spell slots.
-- Each equipped spell has its own cooldown. No mana resource is currently specified.
+- The player exposes HP, gold, learned spells, relics, exactly three regular spell slots, and one dedicated ultimate slot for Boss spells.
+- Each regular equipped spell has its own cooldown. Boss spells share the ultimate slot's authoritative 18-second cooldown. No mana resource is currently specified.
 - A normal combat victory grants gold and a choice of one spell from three candidates.
 - A boss victory grants a choice of one stronger spell from three candidates.
 - Learned spells and equipped spell slots are separate states; choosing a spell does not automatically replace a slot.
@@ -81,7 +81,7 @@ If any invariant changes, update `docs/GAME_DESIGN.md`, affected tests, and rele
 - Keep simulation values in consistent units and use delta time or fixed-step simulation where appropriate.
 - Keep content data separate from behavior so spells, relics, enemies, encounters, and rewards can be balanced without recompiling gameplay code once a data format is selected.
 - Random decisions must receive an explicit deterministic RNG stream. Do not call ambient/global randomness inside domain systems.
-- Separate learned-spell inventory from the three-slot combat loadout.
+- Separate learned regular/Boss spell inventories from the three-slot regular loadout and the dedicated Boss-spell ultimate slot.
 - Centralize damage, healing, cooldown, reward, and relic-modifier calculations; UI must display results, not reimplement rules.
 - Do not introduce ECS, object pooling, multithreading, or a service locator merely because they are common in games. Add them only after a measured need or an approved architectural decision.
 

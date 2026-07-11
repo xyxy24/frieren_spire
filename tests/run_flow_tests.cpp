@@ -92,6 +92,34 @@ bool healsHalfMissingRoundedUp()
     return expect(run.player().currentHp == 51, "99 missing HP heals 50 with ceiling rounding");
 }
 
+bool bossRewardUnlocksOnlyTheUltimateCollection()
+{
+    constexpr std::array<arcane::game::run::ContentId, 1> encounters {77U};
+    constexpr std::array<arcane::game::run::ContentId, 3> bossSpells {2001U, 2002U, 2003U};
+    arcane::app::RunController run(88U);
+    const auto& descriptor = run.loadFloor(arcane::game::run::FloorType::Boss, encounters);
+    if (!expect(run.resolveEncounter(victoryResult(descriptor.encounterIds[0], 0), bossSpells),
+            "boss victory must create a boss reward")
+        || !expect(run.openReward(), "boss loot must open its reward")
+        || !expect(run.chooseReward(run.rewardOffer().candidates[0]),
+            "boss spell choice must apply")) return false;
+
+    const auto selected = run.player().learnedBossSpells[0];
+    return expect(run.player().ultimateSpellUnlocked,
+            "first boss spell must unlock the ultimate slot")
+        && expect(run.player().learnedSpells.empty(),
+            "boss rewards must not enter the regular learned list")
+        && expect(run.player().learnedBossSpells.size() == 1U,
+            "boss reward must enter the dedicated boss spell list")
+        && expect(!run.player().equippedUltimateSpell,
+            "boss reward must not force automatic equipment")
+        && expect(!run.equip(0U, selected),
+            "boss spell must not equip into a regular slot")
+        && expect(run.equipUltimate(selected)
+            && run.player().equippedUltimateSpell == selected,
+            "learned boss spell must equip into the unlocked ultimate slot");
+}
+
 bool failureIsTerminal()
 {
     constexpr std::array<arcane::game::run::ContentId, 1> encounters {10U};
@@ -317,7 +345,8 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 int main()
 {
     const bool passed = deterministicStreamsAreIsolated() && completesFiveFloorLoops()
-        && healsHalfMissingRoundedUp() && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
+        && healsHalfMissingRoundedUp() && bossRewardUnlocksOnlyTheUltimateCollection()
+        && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
         && merchantPurchaseIsAtomic()
         && eventChoiceIsAtomic() && thirdBossVictorySettlesOnce()
         && depletedRewardUsesGoldFallback() && merchantStockAndFloorScheduleReproduce()

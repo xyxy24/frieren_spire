@@ -32,6 +32,7 @@ public:
     [[nodiscard]] game::events::EventResult chooseEvent(game::events::EventTransaction& transaction,
         std::span<const game::events::EventChoice> choices, game::run::ContentId choiceId);
     [[nodiscard]] bool equip(std::size_t slot, game::run::ContentId spell);
+    [[nodiscard]] bool equipUltimate(game::run::ContentId spell);
     [[nodiscard]] bool useStairs();
     [[nodiscard]] game::run::FloorResult floorResult() const noexcept;
 

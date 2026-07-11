@@ -370,6 +370,31 @@ bool startMenuEventPreviewOpensAnInteractiveEventFloor()
         "event preview must expose the real spatial NPC interaction page");
 }
 
+bool startMenuMerchantPreviewOpensAnInteractiveShop()
+{
+    arcane::app::TowerSessionConfig config;
+    config.npcBounds = {150.0F, 550.0F, 100.0F, 90.0F};
+    config.enableSpecialFloors = false;
+    arcane::app::AppFlowController app(910U, config);
+
+    arcane::game::PlayerIntent preview;
+    preview.debugMerchantPreviewPressed = true;
+    app.update(preview, 0.01F);
+    if (!expect(app.screen() == arcane::app::AppScreen::Playing && app.tower()
+            && app.tower()->currentFloorType() == arcane::game::run::FloorType::Merchant,
+        "F3 preview must start directly on a deterministic merchant floor")
+        || !expect(app.tower()->run().player().gold >= 100,
+            "merchant preview must provide enough gold to test purchases")
+        || !expect(app.tower()->merchantStock().size() == 5U,
+            "merchant preview must generate the real spell and relic rows")) return false;
+
+    arcane::game::PlayerIntent interactWithNpc;
+    interactWithNpc.interactPressed = true;
+    app.update(interactWithNpc, 0.01F);
+    return expect(app.tower()->specialPanelOpen(),
+        "merchant preview must expose the real spatial shop interaction page");
+}
+
 bool defeatResultCanStartANewRun()
 {
     auto config = fastFlowConfig();
@@ -410,6 +435,37 @@ bool heldSpellCannotBypassLootInteraction()
         && expect(tower.run().player().learnedSpells.size() == 1U,
             "continued spell input must not select a reward");
 }
+
+bool loadoutEquipsAndCastsUnlockedUltimateSpell()
+{
+    auto config = fastFlowConfig();
+    config.normalEnemyHealth = 70;
+    config.enemySpawn = {300.0F, 576.0F};
+    config.initialPlayer.learnedBossSpells = {2001U};
+    config.initialPlayer.ultimateSpellUnlocked = true;
+    arcane::app::TowerSession tower(778U, config);
+
+    arcane::game::PlayerIntent open;
+    open.toggleLoadoutPressed = true;
+    tower.update(open, 0.01F);
+    arcane::game::PlayerIntent selectBossSection;
+    selectBossSection.menuDownPressed = true;
+    tower.update(selectBossSection, 0.01F);
+    if (!expect(tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss,
+            "spell page must expose a separate boss spell section")) return false;
+    arcane::game::PlayerIntent equipUltimate;
+    equipUltimate.ultimateSpellPressed = true;
+    tower.update(equipUltimate, 0.01F);
+    if (!expect(tower.run().player().equippedUltimateSpell == 2001U,
+            "R on the boss spell section must equip the ultimate slot")) return false;
+    tower.update(open, 0.01F);
+
+    arcane::game::PlayerIntent cast;
+    cast.ultimateSpellPressed = true;
+    tower.update(cast, 0.01F);
+    return expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
+        "equipped ultimate spell must cast through the tower combat flow");
+}
 }
 
 int main()
@@ -422,8 +478,10 @@ int main()
         && purchasedMerchantSpellCanBeEquippedAndCast()
         && pauseCanContinueOrRestartFloorSnapshot()
         && startMenuEventPreviewOpensAnInteractiveEventFloor()
+        && startMenuMerchantPreviewOpensAnInteractiveShop()
         && defeatResultCanStartANewRun()
-        && heldSpellCannotBypassLootInteraction();
+        && heldSpellCannotBypassLootInteraction()
+        && loadoutEquipsAndCastsUnlockedUltimateSpell();
     if (!passed) return 1;
     std::cout << "All tower session tests passed.\n";
     return 0;

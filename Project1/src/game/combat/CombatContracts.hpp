@@ -35,6 +35,7 @@ struct CombatRequest
     EnemyArchetype enemyArchetype {EnemyArchetype::HeadlessKnight};
     int goldReward {10};
     std::array<std::optional<std::uint32_t>, 3> equippedSpellIds;
+    std::optional<std::uint32_t> equippedUltimateSpellId;
     std::vector<std::uint32_t> relicIds;
 };
 
@@ -57,6 +58,7 @@ struct PlayerStateView
     bool attackActive {false};
     float attackCooldownRemaining {0.0F};
     std::array<spells::SpellSlotView, 3> spellSlots;
+    spells::SpellSlotView ultimateSpellSlot;
     bool stunned {false};
     float stunRemaining {0.0F};
     float blessingRemaining {0.0F};

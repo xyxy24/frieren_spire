@@ -1,6 +1,7 @@
 #include "app/run/RunController.hpp"
 
 #include "game/run/DeterministicRng.hpp"
+#include "game/spells/SpellSystem.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -61,8 +62,11 @@ bool RunController::resolveEncounter(const game::CombatResult& result,
     }
 
     const auto seed = game::run::deriveStreamSeed(context_.floorSeed, game::run::RandomStream::Reward);
+    const auto& ownedSpells = currentFloorType_ == game::run::FloorType::Boss
+        ? player_.learnedBossSpells
+        : player_.learnedSpells;
     const game::rewards::RewardOffer offer = game::rewards::generateOffer(
-        rewardPool, player_.learnedSpells, seed);
+        rewardPool, ownedSpells, seed);
 
     floor_.markEncounterComplete();
     if (currentFloorType_ == game::run::FloorType::Boss) ++context_.bossesDefeated;
@@ -102,7 +106,13 @@ bool RunController::openReward()
 bool RunController::chooseReward(const game::run::ContentId choice)
 {
     if (phase_ != game::run::RunPhase::Reward || rewardApplied_) return false;
-    if (!game::rewards::applySpellChoice(player_, *reward_, choice)) return false;
+    const bool bossReward = currentFloorType_ == game::run::FloorType::Boss;
+    const auto* definition = game::spells::findDefinition(choice);
+    if (definition && bossReward != (definition->tier == game::spells::SpellTier::Boss)) return false;
+    const auto rewardType = bossReward
+        ? game::rewards::SpellRewardType::Boss
+        : game::rewards::SpellRewardType::Regular;
+    if (!game::rewards::applySpellChoice(player_, *reward_, choice, rewardType)) return false;
     rewardApplied_ = true;
     phase_ = game::run::RunPhase::FloorComplete;
     return true;
@@ -138,10 +148,23 @@ game::events::EventResult RunController::chooseEvent(game::events::EventTransact
 bool RunController::equip(const std::size_t slot, const game::run::ContentId spell)
 {
     if (slot >= player_.equippedSpells.size()
+        || game::spells::isBossSpell(spell)
         || std::find(player_.learnedSpells.begin(), player_.learnedSpells.end(), spell)
             == player_.learnedSpells.end()) return false;
     for (auto& equipped : player_.equippedSpells) if (equipped == spell) equipped.reset();
     player_.equippedSpells[slot] = spell;
+    return true;
+}
+
+bool RunController::equipUltimate(const game::run::ContentId spell)
+{
+    if (!player_.ultimateSpellUnlocked || !game::spells::isBossSpell(spell)
+        || std::find(player_.learnedBossSpells.begin(), player_.learnedBossSpells.end(), spell)
+            == player_.learnedBossSpells.end())
+    {
+        return false;
+    }
+    player_.equippedUltimateSpell = spell;
     return true;
 }
 

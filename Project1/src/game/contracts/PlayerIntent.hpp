@@ -10,6 +10,7 @@ struct PlayerIntent
     bool jumpPressed {false};
     bool attackPressed {false};
     std::array<bool, 3> spellPressed {false, false, false};
+    bool ultimateSpellPressed {false};
     bool interactPressed {false};
     bool toggleLoadoutPressed {false};
     bool menuPreviousPressed {false};
@@ -22,5 +23,6 @@ struct PlayerIntent
     bool menuConfirmPressed {false};
     bool menuSecondaryPressed {false};
     bool debugEventPreviewPressed {false};
+    bool debugMerchantPreviewPressed {false};
 };
 }

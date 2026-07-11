@@ -76,6 +76,11 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
         {
             selectedLearnedSpellIndex_ = learnedCount - 1U;
         }
+        const auto bossSpellCount = run_.player().learnedBossSpells.size();
+        if (bossSpellCount > 0U && selectedBossSpellIndex_ >= bossSpellCount)
+        {
+            selectedBossSpellIndex_ = bossSpellCount - 1U;
+        }
         const auto relicCount = run_.player().relics.size();
         if (relicCount > 0U && selectedRelicIndex_ >= relicCount)
         {
@@ -156,7 +161,16 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
         {
             if (intent.spellPressed[index] && run_.chooseReward(candidates[index]))
             {
-                selectedLearnedSpellIndex_ = run_.player().learnedSpells.size() - 1U;
+                if (currentFloorType_ == game::run::FloorType::Boss)
+                {
+                    selectedBossSpellIndex_ = run_.player().learnedBossSpells.size() - 1U;
+                    spellLoadoutSection_ = SpellLoadoutSection::Boss;
+                }
+                else
+                {
+                    selectedLearnedSpellIndex_ = run_.player().learnedSpells.size() - 1U;
+                    spellLoadoutSection_ = SpellLoadoutSection::Regular;
+                }
                 break;
             }
         }
@@ -230,8 +244,20 @@ LoadoutPage TowerSession::loadoutPage() const noexcept
     return loadoutPage_;
 }
 
+SpellLoadoutSection TowerSession::spellLoadoutSection() const noexcept
+{
+    return spellLoadoutSection_;
+}
+
 std::optional<game::run::ContentId> TowerSession::selectedLearnedSpell() const noexcept
 {
+    if (spellLoadoutSection_ == SpellLoadoutSection::Boss)
+    {
+        const auto& learnedBossSpells = run_.player().learnedBossSpells;
+        if (learnedBossSpells.empty() || selectedBossSpellIndex_ >= learnedBossSpells.size())
+            return std::nullopt;
+        return learnedBossSpells[selectedBossSpellIndex_];
+    }
     const auto& learned = run_.player().learnedSpells;
     if (learned.empty() || selectedLearnedSpellIndex_ >= learned.size()) return std::nullopt;
     return learned[selectedLearnedSpellIndex_];
@@ -388,6 +414,9 @@ void TowerSession::startNextFloor()
         ? config_.bossGoldReward
         : config_.normalGoldReward;
     request.equippedSpellIds = run_.player().equippedSpells;
+    request.equippedUltimateSpellId = run_.player().ultimateSpellUnlocked
+        ? run_.player().equippedUltimateSpell
+        : std::nullopt;
     request.relicIds = run_.player().relics;
 
     combat_.emplace(request);
@@ -395,6 +424,34 @@ void TowerSession::startNextFloor()
 
 void TowerSession::updateLoadout(const game::PlayerIntent& intent)
 {
+    if (intent.menuUpPressed || intent.menuDownPressed)
+    {
+        spellLoadoutSection_ = spellLoadoutSection_ == SpellLoadoutSection::Regular
+            ? SpellLoadoutSection::Boss
+            : SpellLoadoutSection::Regular;
+        return;
+    }
+
+    if (spellLoadoutSection_ == SpellLoadoutSection::Boss)
+    {
+        const auto& learnedBossSpells = run_.player().learnedBossSpells;
+        if (learnedBossSpells.empty()) return;
+        if (intent.menuPreviousPressed)
+        {
+            selectedBossSpellIndex_ = selectedBossSpellIndex_ == 0U
+                ? learnedBossSpells.size() - 1U
+                : selectedBossSpellIndex_ - 1U;
+        }
+        if (intent.menuNextPressed)
+            selectedBossSpellIndex_ = (selectedBossSpellIndex_ + 1U) % learnedBossSpells.size();
+        if (intent.ultimateSpellPressed
+            && run_.equipUltimate(learnedBossSpells[selectedBossSpellIndex_]) && combat_)
+        {
+            static_cast<void>(combat_->equipUltimateSpell(run_.player().equippedUltimateSpell));
+        }
+        return;
+    }
+
     const auto& learned = run_.player().learnedSpells;
     if (learned.empty()) return;
 
@@ -413,7 +470,8 @@ void TowerSession::updateLoadout(const game::PlayerIntent& intent)
     {
         if (intent.spellPressed[slot])
         {
-            static_cast<void>(run_.equip(slot, learned[selectedLearnedSpellIndex_]));
+            if (run_.equip(slot, learned[selectedLearnedSpellIndex_]) && combat_)
+                static_cast<void>(combat_->equipSpell(slot, run_.player().equippedSpells[slot]));
         }
     }
 }

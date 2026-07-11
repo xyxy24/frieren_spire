@@ -35,16 +35,20 @@ RewardOffer generateOffer(const std::span<const run::ContentId> pool,
     return {{{eligible[0], eligible[1], eligible[2]}}, seed, RewardKind::SpellChoice, 0};
 }
 
-bool applySpellChoice(run::PlayerProgress& player, const RewardOffer& offer, const run::ContentId choice)
+bool applySpellChoice(run::PlayerProgress& player, const RewardOffer& offer,
+    const run::ContentId choice, const SpellRewardType type)
 {
     if (offer.kind != RewardKind::SpellChoice) return false;
+    auto& learned = type == SpellRewardType::Boss
+        ? player.learnedBossSpells
+        : player.learnedSpells;
     if (std::find(offer.candidates.begin(), offer.candidates.end(), choice) == offer.candidates.end()
-        || std::find(player.learnedSpells.begin(), player.learnedSpells.end(), choice)
-            != player.learnedSpells.end())
+        || std::find(learned.begin(), learned.end(), choice) != learned.end())
     {
         return false;
     }
-    player.learnedSpells.push_back(choice);
+    learned.push_back(choice);
+    if (type == SpellRewardType::Boss) player.ultimateSpellUnlocked = true;
     return true;
 }
 }

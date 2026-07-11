@@ -35,7 +35,7 @@ CombatSession::CombatSession(CombatRequest request)
       playerHealth_(request_.playerMaximumHealth, request_.playerCurrentHealth),
       enemy_(request_.enemySpawn, enemyConfigFor(request_.enemyArchetype)),
       enemyHealth_(request_.enemyMaximumHealth, request_.enemyMaximumHealth),
-      spells_(request_.equippedSpellIds),
+      spells_(request_.equippedSpellIds, request_.equippedUltimateSpellId),
       relics_(request_.relicIds)
 {
     if (relics_.castsFlowerFieldOnCombatStart())
@@ -94,11 +94,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         attack_.tryStart();
     }
 
-    for (std::size_t slot = 0U; slot < intent.spellPressed.size(); ++slot)
+    const auto applySpellCast = [this, playerCenter](const spells::SpellCastResult& cast,
+        const DamageSource damageSource)
     {
-        if (!intent.spellPressed[slot] || player_.isStunned()) continue;
-        const auto cast = spells_.tryCast(slot, player_.position(), player_.facingDirection(), enemyBounds());
-        if (!cast.cast) continue;
+        if (!cast.cast) return;
         const float outgoingMultiplier = relics_.outgoingDamageMultiplier()
             * (blessingRemaining_ > 0.0F ? 1.2F : 1.0F);
         if (cast.effect == spells::SpellEffect::FlowerField)
@@ -118,13 +117,24 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 {DamageSource::Event, ++selfDamageSequence_, healthCost}));
             if (cast.hit)
                 static_cast<void>(enemyDamageResolver_.resolve(enemyHealth_,
-                    {SpellDamageSources[slot], cast.sequence, playerHealth_.current() / 2,
+                    {damageSource, cast.sequence, playerHealth_.current() / 2,
                         outgoingMultiplier}));
         }
         else if (cast.hit)
             static_cast<void>(enemyDamageResolver_.resolve(enemyHealth_,
-                {SpellDamageSources[slot], cast.sequence, cast.damage, outgoingMultiplier}));
+                {damageSource, cast.sequence, cast.damage, outgoingMultiplier}));
+    };
+
+    for (std::size_t slot = 0U; slot < intent.spellPressed.size(); ++slot)
+    {
+        if (!intent.spellPressed[slot] || player_.isStunned()) continue;
+        const auto cast = spells_.tryCast(slot, player_.position(), player_.facingDirection(), enemyBounds());
+        applySpellCast(cast, SpellDamageSources[slot]);
     }
+
+    if (intent.ultimateSpellPressed && !player_.isStunned())
+        applySpellCast(spells_.tryCastUltimate(player_.position(), player_.facingDirection(), enemyBounds()),
+            DamageSource::PlayerUltimateSpell);
 
     if (attack_.isActive()
         && intersects(attackBounds(), enemyBounds()))
@@ -177,6 +187,7 @@ PlayerStateView CombatSession::playerState() const noexcept
         attack_.isActive(),
         attack_.cooldownRemaining(),
         spells_.view(),
+        spells_.ultimateView(),
         player_.isStunned(),
         player_.stunRemaining(),
         blessingRemaining_,
@@ -211,6 +222,16 @@ Aabb CombatSession::attackBounds() const noexcept
 const std::optional<CombatResult>& CombatSession::result() const noexcept
 {
     return result_;
+}
+
+bool CombatSession::equipSpell(const std::size_t slot, const std::optional<std::uint32_t> id) noexcept
+{
+    return spells_.equip(slot, id);
+}
+
+bool CombatSession::equipUltimateSpell(const std::optional<std::uint32_t> id) noexcept
+{
+    return spells_.equipUltimate(id);
 }
 
 Aabb CombatSession::playerBounds() const noexcept

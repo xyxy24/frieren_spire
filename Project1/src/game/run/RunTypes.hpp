@@ -36,6 +36,9 @@ struct PlayerProgress
     int gold {};
     std::vector<ContentId> learnedSpells;
     std::array<std::optional<ContentId>, 3> equippedSpells;
+    std::vector<ContentId> learnedBossSpells;
+    std::optional<ContentId> equippedUltimateSpell;
+    bool ultimateSpellUnlocked {false};
     std::vector<ContentId> relics;
 };
 

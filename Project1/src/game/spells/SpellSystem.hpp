@@ -11,6 +11,7 @@
 namespace arcane::game::spells
 {
 enum class SpellEffect : std::uint8_t { DirectDamage, FlowerField, GoddessBlessing, BloodMagic };
+enum class SpellTier : std::uint8_t { Regular, Boss };
 
 struct SpellDefinition
 {
@@ -22,6 +23,7 @@ struct SpellDefinition
     float cooldownSeconds {};
     float range {};
     float height {48.0F};
+    SpellTier tier {SpellTier::Regular};
 };
 
 struct SpellSlotView
@@ -41,15 +43,24 @@ struct SpellCastResult
 };
 
 [[nodiscard]] const SpellDefinition* findDefinition(std::uint32_t id) noexcept;
+[[nodiscard]] bool isBossSpell(std::uint32_t id) noexcept;
 
 class SpellSystem
 {
 public:
-    explicit SpellSystem(const std::array<std::optional<std::uint32_t>, 3>& equippedIds = {});
+    static constexpr float UltimateCooldownSeconds = 18.0F;
+
+    explicit SpellSystem(const std::array<std::optional<std::uint32_t>, 3>& equippedIds = {},
+        std::optional<std::uint32_t> equippedUltimateId = std::nullopt);
     void update(float deltaSeconds) noexcept;
     [[nodiscard]] SpellCastResult tryCast(std::size_t slot, Vec2 casterPosition,
         float facingDirection, const Aabb& targetBounds) noexcept;
+    [[nodiscard]] SpellCastResult tryCastUltimate(Vec2 casterPosition,
+        float facingDirection, const Aabb& targetBounds) noexcept;
     [[nodiscard]] std::array<SpellSlotView, 3> view() const noexcept;
+    [[nodiscard]] SpellSlotView ultimateView() const noexcept;
+    [[nodiscard]] bool equip(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
+    [[nodiscard]] bool equipUltimate(std::optional<std::uint32_t> id) noexcept;
 
 private:
     struct SlotState
@@ -58,6 +69,9 @@ private:
         float cooldownRemaining {};
         std::uint64_t castSequence {};
     };
+    [[nodiscard]] static SpellCastResult tryCastState(SlotState& state, float cooldownSeconds,
+        Vec2 casterPosition, float facingDirection, const Aabb& targetBounds) noexcept;
     std::array<SlotState, 3> slots_;
+    SlotState ultimate_;
 };
 }

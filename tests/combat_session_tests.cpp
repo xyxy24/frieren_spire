@@ -330,6 +330,50 @@ bool combatSessionAppliesEquippedSpellDamage()
             && combat.result()->outcome == arcane::game::CombatOutcome::Victory,
         "spell damage must use combat health and produce victory");
 }
+
+bool ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
+{
+    arcane::game::spells::SpellSystem spells({}, 2001U);
+    const arcane::game::Aabb target {260.0F, 576.0F, 48.0F, 64.0F};
+    const auto first = spells.tryCastUltimate({160.0F, 576.0F}, 1.0F, target);
+    if (!expect(first.cast && first.hit && first.damage == 70,
+            "equipped boss spell must cast from the ultimate slot")
+        || !expect(spells.ultimateView().cooldownRemaining
+                == arcane::game::spells::SpellSystem::UltimateCooldownSeconds,
+            "ultimate cast must start the shared eighteen-second cooldown")
+        || !expect(spells.equipUltimate(2002U),
+            "another boss spell must be equipable during cooldown")
+        || !expect(!spells.tryCastUltimate({160.0F, 576.0F}, 1.0F, target).cast,
+            "switching boss spells must not refresh the shared cooldown")
+        || !expect(!spells.equipUltimate(1004U),
+            "regular spells must be rejected by the ultimate slot")
+        || !expect(!spells.equip(0U, 2001U),
+            "boss spells must be rejected by regular slots")) return false;
+
+    spells.update(18.0F);
+    return expect(spells.tryCastUltimate({160.0F, 576.0F}, 1.0F, target).cast,
+        "ultimate slot must become available after the shared cooldown");
+}
+
+bool combatSessionCastsUltimateWithDedicatedInput()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemySpawn = {300.0F, 576.0F};
+    request.enemyMaximumHealth = 100;
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    request.equippedUltimateSpellId = 2001U;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent cast;
+    cast.ultimateSpellPressed = true;
+    combat.update(cast, 0.01F);
+    const auto afterFirst = combat.playerState();
+    combat.update(cast, 0.01F);
+    return expect(combat.enemyState().currentHealth == 30,
+            "ultimate input must apply boss spell damage exactly once during cooldown")
+        && expect(afterFirst.ultimateSpellSlot.cooldownRemaining == 18.0F,
+            "combat view must expose the authoritative ultimate cooldown");
+}
 }
 
 int main()
@@ -346,6 +390,8 @@ int main()
         && hitStunSuppressesInputAndAppliesKnockback()
         && spellSlotsHaveIndependentCooldowns()
         && spellCooldownIsDeltaTimeStable()
+        && ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
+        && combatSessionCastsUltimateWithDedicatedInput()
         && combatSessionAppliesEquippedSpellDamage()
         && bloodMagicUsesCurrentHealth()
         && flowerFieldHealsAndMoonFlowerAutoCasts()

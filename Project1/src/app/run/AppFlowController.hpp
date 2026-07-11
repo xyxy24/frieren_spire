@@ -23,6 +23,7 @@ public:
 private:
     void startNewRun();
     void startEventPreview();
+    void startMerchantPreview();
     game::run::Seed seed_;
     TowerSessionConfig config_;
     std::optional<TowerSession> tower_;
