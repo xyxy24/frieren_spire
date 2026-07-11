@@ -91,19 +91,27 @@ bool dashIsAnInnateBoundedCooldownAbility()
     arcane::game::PlayerIntent dash;
     dash.dashPressed = true;
     player.update(dash, 0.01F, TestBounds);
-    if (!expect(nearlyEqual(player.position().x,
-            160.0F + arcane::game::PlayerController::DashDistance),
-            "dash must move the player 150 pixels in the facing direction")
+    if (!expect(player.position().x > 160.0F
+            && player.position().x < 160.0F + arcane::game::PlayerController::DashDistance,
+            "dash must travel over time instead of teleporting")
         || !expect(player.isDashing(), "dash must provide a short active invulnerability window")
         || !expect(nearlyEqual(player.dashCooldownRemaining(),
             arcane::game::PlayerController::DashCooldownSeconds),
             "dash must start its innate cooldown")) return false;
 
-    player.update(dash, 0.20F, TestBounds);
-    return expect(nearlyEqual(player.position().x,
+    arcane::game::PlayerIntent steerAgainstDash;
+    steerAgainstDash.moveAxis = -1.0F;
+    player.update(steerAgainstDash, 0.17F, TestBounds);
+    const float completedDashX = player.position().x;
+    player.update(dash, 0.01F, TestBounds);
+    return expect(nearlyEqual(completedDashX,
             160.0F + arcane::game::PlayerController::DashDistance),
+            "dash must cover exactly 150 pixels over 0.18 seconds")
+        && expect(nearlyEqual(player.facingDirection(), 1.0F),
+            "dash direction must remain locked until the dash ends")
+        && expect(nearlyEqual(player.position().x, completedDashX),
             "dash input must not work again while cooling down")
-        && expect(!player.isDashing(), "dash invulnerability must expire independently of cooldown");
+        && expect(!player.isDashing(), "dash invulnerability must end with dash movement");
 }
 }
 

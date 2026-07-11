@@ -508,11 +508,13 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const arcane::game::PlayerStateView player = combat->playerState();
     sf::RectangleShape playerShape({arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
     playerShape.setPosition({player.position.x, player.position.y});
-    playerShape.setFillColor(player.dashRemaining > 0.0F ? sf::Color {100, 230, 250}
+    playerShape.setFillColor(player.dashRemaining > 0.0F ? sf::Color {28, 22, 42}
         : (player.guarding ? sf::Color {115, 155, 245}
             : (player.stunned ? sf::Color {112, 180, 235}
                 : (player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242}))));
-    playerShape.setOutlineColor(sf::Color {142, 115, 200});
+    playerShape.setOutlineColor(player.dashRemaining > 0.0F
+        ? sf::Color {186, 145, 245}
+        : sf::Color {142, 115, 200});
     playerShape.setOutlineThickness(3.0F);
     target.draw(playerShape);
 

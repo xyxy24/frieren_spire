@@ -18,7 +18,7 @@ public:
     static constexpr float Width = 42.0F;
     static constexpr float Height = 64.0F;
     static constexpr float DashDistance = 150.0F;
-    static constexpr float DashInvulnerabilitySeconds = 0.20F;
+    static constexpr float DashDurationSeconds = 0.18F;
     static constexpr float DashCooldownSeconds = 1.20F;
 
     explicit PlayerController(Vec2 spawnPosition = {160.0F, 576.0F});
@@ -50,5 +50,7 @@ private:
     float stunRemaining_ {};
     float dashRemaining_ {};
     float dashCooldownRemaining_ {};
+    float dashDirection_ {1.0F};
+    float preDashVerticalVelocity_ {};
 };
 }

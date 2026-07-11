@@ -31,32 +31,50 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     }
 
     stunRemaining_ = std::max(0.0F, stunRemaining_ - deltaSeconds);
-    dashRemaining_ = std::max(0.0F, dashRemaining_ - deltaSeconds);
     dashCooldownRemaining_ = std::max(0.0F, dashCooldownRemaining_ - deltaSeconds);
     const float moveAxis = stunRemaining_ > 0.0F ? 0.0F : std::clamp(intent.moveAxis, -1.0F, 1.0F);
 
-    if (moveAxis > 0.0F)
+    if (dashRemaining_ <= 0.0F && moveAxis > 0.0F)
     {
         facingDirection_ = 1.0F;
     }
-    else if (moveAxis < 0.0F)
+    else if (dashRemaining_ <= 0.0F && moveAxis < 0.0F)
     {
         facingDirection_ = -1.0F;
     }
 
-    if (intent.dashPressed && stunRemaining_ <= 0.0F && dashCooldownRemaining_ <= 0.0F)
+    bool consumedByDash = dashRemaining_ > 0.0F;
+    if (intent.dashPressed && stunRemaining_ <= 0.0F && dashRemaining_ <= 0.0F
+        && dashCooldownRemaining_ <= 0.0F)
     {
-        position_.x = std::clamp(position_.x + facingDirection_ * DashDistance,
-            bounds.left, bounds.right - Width);
-        velocity_.x = 0.0F;
-        dashRemaining_ = DashInvulnerabilitySeconds;
+        dashRemaining_ = DashDurationSeconds;
         dashCooldownRemaining_ = DashCooldownSeconds;
-        return;
+        dashDirection_ = facingDirection_;
+        preDashVerticalVelocity_ = velocity_.y;
+        consumedByDash = true;
     }
 
-    if (stunRemaining_ <= 0.0F) velocity_.x = moveAxis * MoveSpeed;
+    float simulationSeconds = deltaSeconds;
+    if (dashRemaining_ > 0.0F)
+    {
+        const float dashSeconds = std::min(simulationSeconds, dashRemaining_);
+        const float dashSpeed = DashDistance / DashDurationSeconds;
+        const float unclampedX = position_.x + dashDirection_ * dashSpeed * dashSeconds;
+        position_.x = std::clamp(unclampedX, bounds.left, bounds.right - Width);
+        dashRemaining_ = std::max(0.0F, dashRemaining_ - dashSeconds);
+        simulationSeconds -= dashSeconds;
+        velocity_.x = dashDirection_ * dashSpeed;
+        velocity_.y = 0.0F;
+        if (position_.x != unclampedX) dashRemaining_ = 0.0F;
+        if (dashRemaining_ > 0.0F) return;
+        velocity_.x = 0.0F;
+        velocity_.y = preDashVerticalVelocity_;
+        if (simulationSeconds <= 0.0F) return;
+    }
 
-    if (intent.jumpPressed && grounded_ && stunRemaining_ <= 0.0F)
+    if (stunRemaining_ <= 0.0F) velocity_.x = (consumedByDash ? 0.0F : moveAxis) * MoveSpeed;
+
+    if (intent.jumpPressed && !consumedByDash && grounded_ && stunRemaining_ <= 0.0F)
     {
         velocity_.y = -JumpSpeed;
         grounded_ = false;
@@ -64,11 +82,11 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
 
     if (!grounded_)
     {
-        velocity_.y += Gravity * deltaSeconds;
+        velocity_.y += Gravity * simulationSeconds;
     }
 
-    position_.x += velocity_.x * deltaSeconds;
-    position_.y += velocity_.y * deltaSeconds;
+    position_.x += velocity_.x * simulationSeconds;
+    position_.y += velocity_.y * simulationSeconds;
 
     position_.x = std::clamp(position_.x, bounds.left, bounds.right - Width);
 
