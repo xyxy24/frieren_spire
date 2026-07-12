@@ -452,9 +452,9 @@ bool spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
     cast.spellPressed[0] = true;
     combat.update(cast, 0.01F);
     const auto enemies = combat.enemyStates();
-    return expect(enemies.size() == 2U && enemies[0].currentHealth == 60,
+    return expect(enemies.size() == 2U && enemies[0].currentHealth == 75,
             "an out-of-range first enemy must remain undamaged")
-        && expect(enemies[1].currentHealth == 38,
+        && expect(enemies[1].currentHealth == 53,
             "an in-range later enemy must receive spell damage even when the first enemy is missed");
 }
 
@@ -688,7 +688,7 @@ bool multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
     return expect(initial.size() == 3U, "normal encounter must own three enemy instances")
         && expect(initial[0].currentHealth == 75 && initial[0].width == 42.0F && initial[0].height == 42.0F,
             "chest mimic content values must be authoritative")
-        && expect(initial[1].currentHealth == 60 && initial[1].width == 42.0F && initial[1].height == 58.0F,
+        && expect(initial[1].currentHealth == 75 && initial[1].width == 42.0F && initial[1].height == 58.0F,
             "headless knight content values must be authoritative")
         && expect(initial[2].currentHealth == 45 && initial[2].position.y == 476.0F,
             "bird demon must start 132 pixels above ground using its own height")
@@ -758,7 +758,7 @@ bool linieUsesGroundedMediumImpactArea()
     request.playerSpawn = {160.0F, 576.0F};
     request.enemies = {{arcane::game::EnemyArchetype::Linie, {223.0F, 0.0F}}};
     arcane::game::CombatSession combat(request);
-    if (!expect(combat.enemyState().currentHealth == 100, "Linie must have one hundred HP")) return false;
+    if (!expect(combat.enemyState().currentHealth == 120, "Linie must have one hundred twenty HP")) return false;
     combat.update({}, 2.51F);
     combat.update({}, 0.50F);
     combat.update({}, 0.80F);

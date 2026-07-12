@@ -21,7 +21,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
     switch (archetype)
     {
     case EnemyArchetype::ChestMimic:
-        return EnemyConfig {0.0F, 64.0F, 64.0F, 0.5F, 64.0F / 520.0F, 0.0F, 64.0F,
+        return EnemyConfig {0.0F, 72.0F, 72.0F, 0.5F, 72.0F / 520.0F, 0.0F, 72.0F,
             42.0F, 42.0F, 5.0F, true, false, EnemySkill::Thrust};
     case EnemyArchetype::HeadlessKnight:
         return EnemyConfig {240.0F, 42.0F, 42.0F, 0.5F, 1.0F, 0.0F, 0.0F,
@@ -30,13 +30,13 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {180.0F, 480.0F, 480.0F, 0.5F, 480.0F / 320.0F, 0.0F, 0.0F,
             42.0F, 32.0F, 6.0F, false, true, EnemySkill::Dive};
     case EnemyArchetype::Lugner:
-        return EnemyConfig {160.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
-            42.0F, 72.0F, 7.0F, false, false, EnemySkill::Blood};
+        return EnemyConfig {160.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 72.0F, 6.0F, false, false, EnemySkill::Blood};
     case EnemyArchetype::Linie:
         return EnemyConfig {180.0F, 72.0F, 72.0F, 0.5F, 0.9F, 0.0F, 0.0F,
-            42.0F, 64.0F, 5.0F, true, false, EnemySkill::LeapingCleave};
+            42.0F, 64.0F, 4.0F, true, false, EnemySkill::LeapingCleave};
     case EnemyArchetype::Draht:
-        return EnemyConfig {160.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {160.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 8.0F, false, false, EnemySkill::Thread};
     case EnemyArchetype::Aura:
         return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
@@ -71,10 +71,10 @@ CombatSession::CombatSession(CombatRequest request)
             switch (spawn.archetype)
             {
             case EnemyArchetype::ChestMimic: return 75;
-            case EnemyArchetype::HeadlessKnight: return 60;
+            case EnemyArchetype::HeadlessKnight: return 75;
             case EnemyArchetype::BirdDemon: return 45;
             case EnemyArchetype::Lugner: return 100;
-            case EnemyArchetype::Linie: return 100;
+            case EnemyArchetype::Linie: return 120;
             case EnemyArchetype::Draht: return 80;
             case EnemyArchetype::Aura: return 225;
             case EnemyArchetype::RedMirrorDragon: return 300;
@@ -99,7 +99,7 @@ CombatSession::CombatSession(CombatRequest request)
             const Vec2 position {std::clamp(auraX + offset, request_.worldBounds.left,
                 request_.worldBounds.right - config.width), request_.worldBounds.groundTop - config.height};
             enemies_.push_back({EnemyArchetype::HeadlessKnight, ai::EnemyController(position, config),
-                Health(60, 60)});
+                Health(75, 75)});
         }
     }
     if (relics_.castsFlowerFieldOnCombatStart())
@@ -340,7 +340,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             request_.worldBounds.right - config.width);
         position.y = request_.worldBounds.groundTop - config.height;
         enemies_.push_back({EnemyArchetype::HeadlessKnight, ai::EnemyController(position, config),
-            Health(60, 60)});
+            Health(75, 75)});
     }
 
     if (flowerFieldRemaining_ > 0.0F && std::abs(playerCenter - flowerFieldCenterX_) <= 360.0F)
