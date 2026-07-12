@@ -146,5 +146,12 @@ float PlayerController::dashRemaining() const noexcept { return dashRemaining_; 
 float PlayerController::dashCooldownRemaining() const noexcept { return dashCooldownRemaining_; }
 void PlayerController::grantFlight(const float seconds) noexcept
 { flightRemaining_ = std::max(flightRemaining_, std::max(0.0F, seconds)); }
+void PlayerController::translateHorizontal(const float distance, const WorldBounds& bounds) noexcept
+{ position_.x = std::clamp(position_.x + distance, bounds.left, bounds.right - Width); }
+void PlayerController::setHorizontalPosition(const float position, const WorldBounds& bounds) noexcept
+{
+    position_.x = std::clamp(position, bounds.left, bounds.right - Width);
+    velocity_.x = 0.0F;
+}
 float PlayerController::flightRemaining() const noexcept { return flightRemaining_; }
 }

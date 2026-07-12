@@ -465,10 +465,29 @@ void TowerSession::startNextFloor()
             game::EnemyArchetype::ChaosFlower, game::EnemyArchetype::FrostWolf,
             game::EnemyArchetype::Qual
         };
+        constexpr std::array secondActLateGroup {
+            game::EnemyArchetype::Laufen, game::EnemyArchetype::Richter,
+            game::EnemyArchetype::Denken
+        };
         std::array<game::EnemyArchetype, 3> encounter;
         const std::uint32_t floorInAct = run_.context().floorIndex % config_.floorsPerBoss;
         if (run_.context().bossesDefeated == 1U && floorInAct == 0U)
             encounter = secondActOpeningGroup;
+        else if (run_.context().bossesDefeated == 1U && floorInAct == 3U)
+            encounter = secondActLateGroup;
+        else if (run_.context().bossesDefeated == 1U
+            && (floorInAct == 1U || floorInAct == 2U))
+        {
+            game::run::DeterministicRng rng(game::run::deriveStreamSeed(
+                floor.seed, game::run::RandomStream::Encounter));
+            const std::size_t first = rng.index(
+                static_cast<std::uint32_t>(secondActOpeningGroup.size()));
+            const std::size_t second = (first + 1U + rng.index(2U))
+                % secondActOpeningGroup.size();
+            encounter = {secondActOpeningGroup[first], secondActOpeningGroup[second],
+                secondActLateGroup[rng.index(
+                    static_cast<std::uint32_t>(secondActLateGroup.size()))]};
+        }
         else if (floorInAct == 0U)
             encounter = firstGroup;
         else if (floorInAct == 3U)

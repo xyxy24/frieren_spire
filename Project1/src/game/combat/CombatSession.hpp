@@ -82,6 +82,7 @@ private:
         float specialActive {};
         float specialElapsed {};
         float specialDirection {-1.0F};
+        Aabb specialTargetBounds;
     };
     struct ActiveSpellEffect
     {
@@ -99,6 +100,16 @@ private:
         std::uint64_t sequence {};
         DamageSource source {DamageSource::PlayerUltimateSpell};
         float multiplier {1.0F};
+    };
+    struct ActivePillar { Aabb bounds; float remaining {}; };
+    struct ActiveTornado
+    {
+        Aabb bounds;
+        float remaining {7.0F};
+        float evolutionRemaining {3.0F};
+        float tickAccumulator {};
+        std::uint64_t sequence {};
+        bool launched {};
     };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
@@ -160,6 +171,9 @@ private:
     std::uint64_t selfDamageSequence_ {};
     std::vector<ActiveSpellEffect> activeSpellEffects_;
     std::vector<PendingSpellImpact> pendingSpellImpacts_;
+    std::vector<ActivePillar> activePillars_;
+    std::vector<ActiveTornado> activeTornadoes_;
+    std::uint64_t environmentalSequence_ {};
     std::optional<CombatResult> result_;
 };
 }

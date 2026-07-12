@@ -32,6 +32,8 @@ public:
     void applyHitReaction(float horizontalVelocity, float stunSeconds) noexcept;
     void applyLaunch(float upwardSpeed, float stunSeconds) noexcept;
     void grantFlight(float seconds) noexcept;
+    void translateHorizontal(float distance, const WorldBounds& bounds) noexcept;
+    void setHorizontalPosition(float position, const WorldBounds& bounds) noexcept;
     [[nodiscard]] bool isStunned() const noexcept;
     [[nodiscard]] float stunRemaining() const noexcept;
     [[nodiscard]] bool isDashing() const noexcept;

@@ -959,6 +959,44 @@ bool chaosFlowerSleepAppliesStackBasedStun()
         "first sleep stack must stun for half a second");
 }
 
+bool lateSecondActEnemiesExposeConfiguredContent()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {300.0F, 576.0F};
+    request.enemies = {
+        {arcane::game::EnemyArchetype::Laufen, {700.0F, 0.0F}},
+        {arcane::game::EnemyArchetype::Richter, {900.0F, 0.0F}},
+        {arcane::game::EnemyArchetype::Denken, {1100.0F, 0.0F}}
+    };
+    arcane::game::CombatSession combat(request);
+    const auto enemies = combat.enemyStates();
+    return expect(enemies.size() == 3U, "late second-act encounter must contain three enemies")
+        && expect(enemies[0].currentHealth == 160 && enemies[0].width == 42.0F
+                && enemies[0].height == 64.0F,
+            "Laufen content values must be authoritative")
+        && expect(enemies[1].currentHealth == 150 && enemies[1].width == 42.0F
+                && enemies[1].height == 72.0F,
+            "Richter content values must be authoritative")
+        && expect(enemies[2].currentHealth == 135 && enemies[2].width == 42.0F
+                && enemies[2].height == 64.0F,
+            "Denken content values must be authoritative");
+}
+
+bool laufenTeleportsBehindAndImmediatelySideKicks()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {300.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Laufen, {800.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.51F);
+    combat.update({}, 0.50F);
+    const auto enemy = combat.enemyState();
+    return expect(std::abs(enemy.position.x - 234.0F) < 0.01F,
+            "Laufen must prefer the position twenty-four pixels behind the player")
+        && expect(combat.playerState().currentHealth == 85,
+            "speed magic must force an immediate side kick");
+}
+
 bool swordRelicsModifyCollisionDamage()
 {
     arcane::game::CombatRequest reductionRequest;
@@ -1019,6 +1057,8 @@ int main()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
         && chaosFlowerSleepAppliesStackBasedStun()
+        && lateSecondActEnemiesExposeConfiguredContent()
+        && laufenTeleportsBehindAndImmediatelySideKicks()
         && swordRelicsModifyCollisionDamage()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()

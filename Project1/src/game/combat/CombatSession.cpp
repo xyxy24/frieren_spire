@@ -46,7 +46,16 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
             64.0F, 42.0F, 4.0F, true, false, EnemySkill::WolfClaw};
     case EnemyArchetype::Qual:
         return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
-            64.0F, 96.0F, 4.0F, false, false, EnemySkill::KillingMagic};
+            64.0F, 96.0F, 3.0F, true, false, EnemySkill::KillingMagic};
+    case EnemyArchetype::Laufen:
+        return EnemyConfig {180.0F, 64.0F, 64.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 64.0F, 3.0F, false, false, EnemySkill::SideKick};
+    case EnemyArchetype::Richter:
+        return EnemyConfig {120.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 72.0F, 7.0F, false, false, EnemySkill::EarthMagic};
+    case EnemyArchetype::Denken:
+        return EnemyConfig {100.0F, 120.0F, 120.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 64.0F, 9.0F, false, false, EnemySkill::TornadoMagic};
     case EnemyArchetype::Aura:
         return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 10.0F, false, false, EnemySkill::Domination};
@@ -88,6 +97,9 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::ChaosFlower: return 125;
             case EnemyArchetype::FrostWolf: return 120;
             case EnemyArchetype::Qual: return 150;
+            case EnemyArchetype::Laufen: return 160;
+            case EnemyArchetype::Richter: return 150;
+            case EnemyArchetype::Denken: return 135;
             case EnemyArchetype::Aura: return 225;
             case EnemyArchetype::RedMirrorDragon: return 300;
             case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
@@ -102,6 +114,12 @@ CombatSession::CombatSession(CombatRequest request)
             enemies_.back().specialCooldown = 3.5F;
         if (spawn.archetype == EnemyArchetype::FrostWolf)
             enemies_.back().specialCooldown = 3.0F;
+        if (spawn.archetype == EnemyArchetype::Laufen)
+            enemies_.back().specialCooldown = 2.5F;
+        if (spawn.archetype == EnemyArchetype::Richter)
+            enemies_.back().specialCooldown = 3.5F;
+        if (spawn.archetype == EnemyArchetype::Denken)
+            enemies_.back().specialCooldown = 4.5F;
     }
     const auto aura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Aura;
@@ -209,6 +227,47 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         playerIntent.dashPressed = false;
     }
     player_.update(playerIntent, deltaSeconds, request_.worldBounds);
+    for (auto& pillar : activePillars_)
+    {
+        pillar.remaining = std::max(0.0F, pillar.remaining - deltaSeconds);
+        if (pillar.remaining > 0.0F && intersects(playerBounds(), pillar.bounds))
+            player_.setHorizontalPosition(beforePlayerUpdate.x, request_.worldBounds);
+    }
+    std::erase_if(activePillars_, [](const auto& pillar) { return pillar.remaining <= 0.0F; });
+    for (auto& tornado : activeTornadoes_)
+    {
+        const float activeDelta = std::min(deltaSeconds, tornado.remaining);
+        tornado.remaining -= activeDelta;
+        tornado.evolutionRemaining -= activeDelta;
+        const float tornadoCenter = tornado.bounds.left + tornado.bounds.width * 0.5F;
+        const float currentPlayerCenter = player_.position().x + PlayerController::Width * 0.5F;
+        tornado.bounds.left += std::clamp(currentPlayerCenter - tornadoCenter,
+            -160.0F * activeDelta, 160.0F * activeDelta);
+        const float movedCenter = tornado.bounds.left + tornado.bounds.width * 0.5F;
+        player_.translateHorizontal((movedCenter > currentPlayerCenter ? 1.0F : -1.0F)
+            * 60.0F * activeDelta, request_.worldBounds);
+        if (intersects(playerBounds(), tornado.bounds))
+        {
+            if (!tornado.launched)
+            {
+                player_.applyLaunch(600.0F, 0.28F);
+                tornado.launched = true;
+            }
+            tornado.tickAccumulator += activeDelta;
+            while (tornado.tickAccumulator >= 0.5F)
+            {
+                tornado.tickAccumulator -= 0.5F;
+                static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
+                    {DamageSource::EnemyAttack, ++tornado.sequence,
+                        tornado.evolutionRemaining > 0.0F ? 10 : 20, 1.0F,
+                        relics_.incomingDamageMultiplier(), 0,
+                        player_.isDashing() || guardRemaining_ > 0.0F
+                            || spellInvulnerableRemaining_ > 0.0F}));
+            }
+        }
+        else tornado.tickAccumulator = 0.0F;
+    }
+    std::erase_if(activeTornadoes_, [](const auto& tornado) { return tornado.remaining <= 0.0F; });
     if (player_.flightRemaining() <= 0.0F) flightBoostAvailable_ = false;
     if (wasDashing && !player_.isDashing()) postDashComboRemaining_ = 0.4F;
     if (intent.dashPressed && !wasDashing && player_.isDashing())
@@ -351,6 +410,104 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 continue;
             }
         }
+        if (enemy.archetype == EnemyArchetype::Laufen)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto playerArea = playerBounds();
+                    const float playerFacing = player_.facingDirection();
+                    const float behindX = playerFacing > 0.0F
+                        ? playerArea.left - 24.0F - bounds.width
+                        : playerArea.left + playerArea.width + 24.0F;
+                    const bool behindFits = behindX >= request_.worldBounds.left
+                        && behindX + bounds.width <= request_.worldBounds.right;
+                    const float frontX = playerFacing > 0.0F
+                        ? playerArea.left + playerArea.width + 48.0F
+                        : playerArea.left - 48.0F - bounds.width;
+                    enemy.controller.setPosition({behindFits ? behindX : frontX,
+                        request_.worldBounds.groundTop - bounds.height}, request_.worldBounds);
+                    enemy.controller.forceAttackToward(
+                        playerArea.left + playerArea.width * 0.5F);
+                    enemy.specialCooldown = 5.0F;
+                }
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F
+                && enemy.controller.action() == ai::EnemyAction::Chase)
+            {
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::Richter)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const bool occupied = std::any_of(enemies_.begin(), enemies_.end(),
+                        [&](const auto& other) {
+                            return &other != &enemy && other.health.isAlive()
+                                && intersects(other.controller.bounds(), enemy.specialTargetBounds);
+                        });
+                    if (occupied) enemy.specialCooldown = 2.0F;
+                    else
+                    {
+                        activePillars_.push_back({enemy.specialTargetBounds, 4.0F});
+                        if (intersects(playerBounds(), enemy.specialTargetBounds))
+                        {
+                            static_cast<void>(playerDamageResolver_.resolve(playerHealth_,
+                                {DamageSource::EnemyAttack, ++environmentalSequence_, 25, 1.0F,
+                                    relics_.incomingDamageMultiplier()}));
+                            player_.applyLaunch(650.0F, 0.28F);
+                        }
+                        enemy.specialCooldown = 7.0F;
+                    }
+                }
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F
+                && enemy.controller.action() == ai::EnemyAction::Chase)
+            {
+                const float center = player_.position().x + PlayerController::Width * 0.5F;
+                enemy.specialTargetBounds = {center - 32.0F,
+                    request_.worldBounds.groundTop - 108.0F, 64.0F, 108.0F};
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::Denken)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto caster = enemy.controller.bounds();
+                    const float left = enemy.specialDirection > 0.0F
+                        ? caster.left + caster.width : caster.left - 72.0F;
+                    activeTornadoes_.push_back({{left,
+                        request_.worldBounds.groundTop - 128.0F, 72.0F, 128.0F},
+                        7.0F, 3.0F, 0.0F, (++environmentalSequence_) << 32U, false});
+                    enemy.specialCooldown = 9.0F;
+                }
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F
+                && enemy.controller.action() == ai::EnemyAction::Chase)
+            {
+                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
         if (enemy.archetype == EnemyArchetype::RedMirrorDragon)
         {
             enemy.breathCooldown = std::max(0.0F, enemy.breathCooldown - deltaSeconds);
@@ -407,8 +564,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 : (golemRemaining_ > 0.0F ? golemBounds_ : playerBounds());
             const float speedMultiplier = flowerSlowed ? 0.65F
                 : (enemy.frostSlowRemaining > 0.0F ? 0.65F : 1.0F);
+            const bool manualSkill = enemy.archetype == EnemyArchetype::Richter
+                || enemy.archetype == EnemyArchetype::Denken;
             enemy.controller.update(target, deltaSeconds, request_.worldBounds, speedMultiplier,
-                enemy.skillSealRemaining <= 0.0F);
+                enemy.skillSealRemaining <= 0.0F && !manualSkill);
         }
         if (phantomRemaining_ > 0.0F && enemy.controller.action() == ai::EnemyAction::Active
             && intersects(phantomBounds_, enemy.controller.attackBounds()))
@@ -1048,7 +1207,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             if (config.skill == ai::EnemySkill::DragonClaw) damage = 25;
             if (config.skill == ai::EnemySkill::LeafBlade
                 || config.skill == ai::EnemySkill::WolfClaw
-                || config.skill == ai::EnemySkill::KillingMagic) damage = 15;
+                || config.skill == ai::EnemySkill::KillingMagic
+                || config.skill == ai::EnemySkill::SideKick) damage = 15;
             if (config.skill == ai::EnemySkill::Blood)
                 damage = (enemy.health.maximum() - enemy.health.current()) / 2;
             if (request_.enemies.empty() && enemy.archetype != EnemyArchetype::Aura
@@ -1149,13 +1309,15 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
                 ? bounds.left + bounds.width : bounds.left - 160.0F;
             skillBounds = Aabb {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
         }
+        if (enemy.archetype == EnemyArchetype::Richter && enemy.specialWindup > 0.0F)
+            skillBounds = enemy.specialTargetBounds;
         if (enemy.markedRemaining > 0.0F)
         {
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
         }
         const bool windingUp = enemy.controller.action() == ai::EnemyAction::Windup
-            || enemy.breathWindup > 0.0F;
+            || enemy.breathWindup > 0.0F || enemy.specialWindup > 0.0F;
         const bool active = enemy.controller.action() == ai::EnemyAction::Active
             || enemy.breathRemaining > 0.0F;
         views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
@@ -1169,9 +1331,14 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
 std::vector<SpellEffectView> CombatSession::spellEffects() const
 {
     std::vector<SpellEffectView> views;
-    views.reserve(activeSpellEffects_.size());
+    views.reserve(activeSpellEffects_.size() + activePillars_.size() + activeTornadoes_.size());
     for (const auto& effect : activeSpellEffects_)
         views.push_back({effect.spellId, effect.bounds, effect.remaining, effect.duration});
+    for (const auto& pillar : activePillars_)
+        views.push_back({9001U, pillar.bounds, pillar.remaining, 4.0F});
+    for (const auto& tornado : activeTornadoes_)
+        views.push_back({tornado.evolutionRemaining > 0.0F ? 9002U : 9003U,
+            tornado.bounds, tornado.remaining, 7.0F});
     return views;
 }
 

@@ -109,6 +109,16 @@ void EnemyController::setPosition(const Vec2 position, const WorldBounds& worldB
     position_.x = std::clamp(position_.x, worldBounds.left, worldBounds.right - config_.width);
     position_.y = std::min(position_.y, worldBounds.groundTop - config_.height);
 }
+void EnemyController::forceAttackToward(const float targetCenterX) noexcept
+{
+    if (action_ == EnemyAction::Dead) return;
+    const float center = position_.x + config_.width * 0.5F;
+    if (targetCenterX != center) facingDirection_ = targetCenterX > center ? 1.0F : -1.0F;
+    action_ = EnemyAction::Active;
+    stateRemaining_ = config_.activeSeconds;
+    activeElapsed_ = 0.0F;
+    ++attackSequence_;
+}
 Vec2 EnemyController::position() const noexcept { return position_; }
 EnemyAction EnemyController::action() const noexcept { return action_; }
 float EnemyController::facingDirection() const noexcept { return facingDirection_; }
