@@ -33,7 +33,7 @@ arcane::game::run::Seed makeRuntimeSeed()
     return entropy ^ clock;
 }
 
-struct HeadlessKnightTextures
+struct EnemyStateTextures
 {
     std::optional<sf::Texture> idle;
     std::optional<sf::Texture> windup;
@@ -48,13 +48,12 @@ std::optional<sf::Texture> loadTexture(const std::string& path)
     return texture;
 }
 
-HeadlessKnightTextures loadHeadlessKnightTextures()
+EnemyStateTextures loadEnemyStateTextures(const std::string_view base)
 {
-    constexpr std::string_view Base = "assets/enemies/headless_knight/";
-    HeadlessKnightTextures textures;
-    textures.idle = loadTexture(std::string {Base} + "idle.png");
-    textures.windup = loadTexture(std::string {Base} + "windup.png");
-    textures.attack = loadTexture(std::string {Base} + "attack.png");
+    EnemyStateTextures textures;
+    textures.idle = loadTexture(std::string {base} + "idle.png");
+    textures.windup = loadTexture(std::string {base} + "windup.png");
+    textures.attack = loadTexture(std::string {base} + "attack.png");
     return textures;
 }
 
@@ -648,7 +647,7 @@ void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
 }
 
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
-    const HeadlessKnightTextures& headlessTextures)
+    const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures)
 {
     const arcane::game::CombatSession* combat = tower.combat();
     if (!combat) return;
@@ -721,18 +720,24 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
             || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
             || enemy.archetype == arcane::game::EnemyArchetype::Boss;
-        const bool headless = enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight;
+        const EnemyStateTextures* stateTextures = nullptr;
+        if (enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight)
+            stateTextures = &headlessTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::ChestMimic)
+            stateTextures = &mimicTextures;
         const sf::Texture* texture = nullptr;
-        if (headless)
+        if (stateTextures)
         {
-            if (enemy.attackActive && headlessTextures.attack) texture = &*headlessTextures.attack;
-            else if (enemy.windingUp && headlessTextures.windup) texture = &*headlessTextures.windup;
-            else if (headlessTextures.idle) texture = &*headlessTextures.idle;
+            if (enemy.attackActive && stateTextures->attack) texture = &*stateTextures->attack;
+            else if (enemy.windingUp && stateTextures->windup) texture = &*stateTextures->windup;
+            else if (stateTextures->idle) texture = &*stateTextures->idle;
         }
         if (texture)
         {
             sf::Sprite sprite(*texture);
-            sprite.setOrigin({32.0F, 64.0F});
+            const auto textureSize = texture->getSize();
+            sprite.setOrigin({static_cast<float>(textureSize.x) * 0.5F,
+                static_cast<float>(textureSize.y)});
             sprite.setPosition({enemy.position.x + enemy.width * 0.5F,
                 enemy.position.y + enemy.height});
             sprite.setScale({enemy.facingDirection > 0.0F ? -1.0F : 1.0F, 1.0F});
@@ -953,7 +958,10 @@ int main()
     arcane::app::TowerSessionConfig config;
     config.worldBounds = {0.0F, static_cast<float>(WindowWidth), GroundTop};
     arcane::app::AppFlowController app(makeRuntimeSeed(), config);
-    const HeadlessKnightTextures headlessKnightTextures = loadHeadlessKnightTextures();
+    const EnemyStateTextures headlessKnightTextures = loadEnemyStateTextures(
+        "assets/enemies/headless_knight/");
+    const EnemyStateTextures chestMimicTextures = loadEnemyStateTextures(
+        "assets/enemies/chest_mimic/");
     sf::Clock frameClock;
 
     while (window.isOpen())
@@ -995,7 +1003,7 @@ int main()
             {
                 if (tower->combat())
                 {
-                    drawCombat(window, *tower, headlessKnightTextures);
+                    drawCombat(window, *tower, headlessKnightTextures, chestMimicTextures);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }
