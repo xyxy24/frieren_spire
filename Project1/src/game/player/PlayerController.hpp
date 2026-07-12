@@ -19,7 +19,7 @@ public:
     static constexpr float Height = 64.0F;
     static constexpr float DashDistance = 150.0F;
     static constexpr float DashDurationSeconds = 0.18F;
-    static constexpr float DashCooldownSeconds = 1.20F;
+    static constexpr float DashCooldownSeconds = 1.60F;
 
     explicit PlayerController(Vec2 spawnPosition = {160.0F, 576.0F});
 
@@ -31,11 +31,13 @@ public:
     [[nodiscard]] float facingDirection() const noexcept;
     void applyHitReaction(float horizontalVelocity, float stunSeconds) noexcept;
     void applyLaunch(float upwardSpeed, float stunSeconds) noexcept;
+    void grantFlight(float seconds) noexcept;
     [[nodiscard]] bool isStunned() const noexcept;
     [[nodiscard]] float stunRemaining() const noexcept;
     [[nodiscard]] bool isDashing() const noexcept;
     [[nodiscard]] float dashRemaining() const noexcept;
     [[nodiscard]] float dashCooldownRemaining() const noexcept;
+    [[nodiscard]] float flightRemaining() const noexcept;
 
 private:
     static constexpr float MoveSpeed = 260.0F;
@@ -52,5 +54,6 @@ private:
     float dashCooldownRemaining_ {};
     float dashDirection_ {1.0F};
     float preDashVerticalVelocity_ {};
+    float flightRemaining_ {};
 };
 }

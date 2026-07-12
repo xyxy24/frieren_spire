@@ -550,12 +550,12 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
     const auto& player = tower.run().player();
     const auto& learned = player.learnedSpells;
     const auto& learnedBoss = player.learnedBossSpells;
-    constexpr std::size_t Columns = 8U;
+    constexpr std::size_t Columns = 10U;
     constexpr float CardWidth = 90.0F;
     constexpr float CardHeight = 95.0F;
-    constexpr float HorizontalGap = 20.0F;
+    constexpr float HorizontalGap = 15.0F;
     constexpr float VerticalGap = 20.0F;
-    constexpr float StartX = 190.0F;
+    constexpr float StartX = 120.0F;
     constexpr float StartY = 110.0F;
 
     drawPixelText(target, "REGULAR SPELLS", {190.0F, 78.0F}, 1.3F,
@@ -580,7 +580,7 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
 
     drawPixelText(target, player.ultimateSpellUnlocked ? "BOSS SPELLS - R EQUIP ULTIMATE"
             : "BOSS SPELLS - DEFEAT BOSS 1 TO UNLOCK",
-        {190.0F, 330.0F}, 1.25F,
+        {120.0F, 330.0F}, 1.25F,
         tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss
             ? sf::Color {255, 205, 92} : sf::Color {130, 130, 150});
     for (std::size_t index = 0; index < learnedBoss.size(); ++index)
@@ -598,8 +598,14 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
     if (tower.selectedLearnedSpell())
         if (const auto* definition = arcane::game::spells::findDefinition(*tower.selectedLearnedSpell()))
         {
-            drawPixelText(target, definition->name, {190.0F, 520.0F}, 1.8F, sf::Color {255, 231, 145});
-            drawPixelText(target, definition->description, {190.0F, 548.0F}, 1.15F);
+            drawPixelText(target, definition->name, {120.0F, 500.0F}, 1.5F,
+                sf::Color {255, 231, 145});
+            drawPixelText(target, wrapPixelText(definition->description, 105U),
+                {120.0F, 528.0F}, 0.85F);
+            drawPixelText(target, "CD " + formatTenths(definition->cooldownSeconds) + " SEC",
+                {120.0F, 590.0F}, 0.95F, sf::Color {145, 218, 255});
+            drawPixelText(target, spellRangeText(*definition),
+                {420.0F, 590.0F}, 0.90F, sf::Color {174, 242, 184});
         }
 }
 
@@ -689,11 +695,17 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         case 1009U: color = sf::Color {170, 154, 132}; break;
         case 1010U: color = sf::Color {92, 61, 135}; break;
         case 1011U: color = sf::Color {172, 114, 237}; break;
-        case 1012U: color = sf::Color {158, 220, 68}; break;
-        case 1013U: color = sf::Color {238, 248, 255}; break;
-        case 1014U: color = sf::Color {222, 171, 105}; break;
-        case 1015U: color = sf::Color {248, 151, 205}; break;
         case 1016U: color = sf::Color {83, 214, 218}; break;
+        case 1017U: color = sf::Color {102, 225, 255}; break;
+        case 1018U: color = sf::Color {255, 209, 92}; break;
+        case 1019U: color = sf::Color {166, 96, 255}; break;
+        case 1020U: color = sf::Color {255, 220, 104}; break;
+        case 1021U: color = sf::Color {125, 190, 255}; break;
+        case 1022U: color = sf::Color {164, 139, 110}; break;
+        case 1023U: color = sf::Color {132, 232, 244}; break;
+        case 1024U: color = sf::Color {232, 121, 255}; break;
+        case 1025U: color = sf::Color {220, 205, 255}; break;
+        case 1026U: color = sf::Color {255, 238, 92}; break;
         case 2001U: color = sf::Color {108, 228, 255}; break;
         case 2002U: color = sf::Color {255, 232, 139}; break;
         case 2003U: color = sf::Color {238, 238, 255}; break;

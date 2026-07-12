@@ -7,6 +7,7 @@ namespace arcane::game
 struct PlayerIntent
 {
     float moveAxis {0.0F};
+    float verticalMoveAxis {0.0F};
     bool jumpPressed {false};
     bool attackPressed {false};
     bool dashPressed {false};

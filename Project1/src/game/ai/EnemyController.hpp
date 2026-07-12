@@ -38,8 +38,9 @@ public:
 
     explicit EnemyController(Vec2 spawnPosition, EnemyConfig config = {});
     void update(const Aabb& playerBounds, float deltaSeconds, const WorldBounds& worldBounds,
-        float speedMultiplier = 1.0F) noexcept;
+        float speedMultiplier = 1.0F, bool canAttack = true) noexcept;
     void markDead() noexcept;
+    void interrupt() noexcept;
     void translateHorizontal(float distance, const WorldBounds& worldBounds) noexcept;
     [[nodiscard]] Vec2 position() const noexcept;
     [[nodiscard]] EnemyAction action() const noexcept;

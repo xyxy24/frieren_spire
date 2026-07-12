@@ -20,6 +20,9 @@ struct RewardOffer
 
 [[nodiscard]] RewardOffer generateOffer(std::span<const run::ContentId> pool,
     std::span<const run::ContentId> owned, run::Seed seed, int fallbackGold = 15);
+[[nodiscard]] RewardOffer generateCategorizedOffer(std::span<const run::ContentId> damagePool,
+    std::span<const run::ContentId> controlPool, std::span<const run::ContentId> fullPool,
+    std::span<const run::ContentId> owned, run::Seed seed, int fallbackGold = 15);
 [[nodiscard]] bool applySpellChoice(run::PlayerProgress& player, const RewardOffer& offer,
     run::ContentId choice, SpellRewardType type = SpellRewardType::Regular);
 }

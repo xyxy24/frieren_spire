@@ -11,9 +11,15 @@ namespace arcane::app
 {
 namespace
 {
-constexpr std::array<game::run::ContentId, 14> NormalRewardPool {
-    1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1008U,
-    1009U, 1011U, 1012U, 1013U, 1014U, 1015U, 1016U
+constexpr std::array<game::run::ContentId, 20> NormalRewardPool {
+    1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1008U, 1009U, 1011U, 1016U,
+    1017U, 1018U, 1019U, 1020U, 1021U, 1022U, 1023U, 1024U, 1025U, 1026U
+};
+constexpr std::array<game::run::ContentId, 10> DamageRewardPool {
+    1003U, 1004U, 1005U, 1006U, 1009U, 1017U, 1019U, 1021U, 1024U, 1026U
+};
+constexpr std::array<game::run::ContentId, 6> ControlRewardPool {
+    1008U, 1011U, 1016U, 1018U, 1020U, 1025U
 };
 constexpr std::array<game::run::ContentId, 9> BossRewardPool {
     2001U, 2002U, 2003U, 2006U, 2007U, 2009U, 2010U, 2011U, 2012U
@@ -28,11 +34,17 @@ constexpr std::array SpellMerchantCatalog {
     game::economy::CatalogItem {1008U, game::economy::ItemKind::Spell, 15},
     game::economy::CatalogItem {1009U, game::economy::ItemKind::Spell, 20},
     game::economy::CatalogItem {1011U, game::economy::ItemKind::Spell, 15},
-    game::economy::CatalogItem {1012U, game::economy::ItemKind::Spell, 15},
-    game::economy::CatalogItem {1013U, game::economy::ItemKind::Spell, 10},
-    game::economy::CatalogItem {1014U, game::economy::ItemKind::Spell, 10},
-    game::economy::CatalogItem {1015U, game::economy::ItemKind::Spell, 20},
-    game::economy::CatalogItem {1016U, game::economy::ItemKind::Spell, 15}
+    game::economy::CatalogItem {1016U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1017U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1018U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1019U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1020U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1021U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1022U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1023U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1024U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1025U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1026U, game::economy::ItemKind::Spell, 20}
 };
 constexpr std::array RelicMerchantCatalog {
     game::economy::CatalogItem {4001U, game::economy::ItemKind::Relic, 15},
@@ -136,7 +148,8 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
                 }
                 const bool resolved = currentFloorType_ == game::run::FloorType::Boss
                     ? run_.resolveEncounter(result, BossRewardPool)
-                    : run_.resolveEncounter(result, NormalRewardPool);
+                    : run_.resolveEncounter(result, NormalRewardPool,
+                        DamageRewardPool, ControlRewardPool);
                 if (!resolved) throw std::logic_error("combat result was rejected by the run controller");
             }
         }

@@ -10,31 +10,37 @@ namespace arcane::game::spells
 namespace
 {
 constexpr std::array Definitions {
-    SpellDefinition {1001U, "Blooming Field", "Large field: enemies -50% speed; heal 5 HP/s for 4s.", SpellEffect::FlowerField, SpellShape::SelfArea, 0, 7.0F, 360.0F, 180.0F},
-    SpellDefinition {1002U, "Goddess Blessing", "6s control immunity and +20% damage.", SpellEffect::GoddessBlessing, SpellShape::Self, 0, 14.0F, 0.0F, 0.0F},
-    SpellDefinition {1003U, "Blood Magic", "Lose 10% current HP; deal 50% current HP ahead.", SpellEffect::BloodMagic, SpellShape::ForwardBox, 0, 4.0F, 210.0F, 72.0F},
-    SpellDefinition {1004U, "Zoltraak", "Fast medium-range piercing bolt.", SpellEffect::DirectDamage, SpellShape::ForwardBox, 22, 1.5F, 150.0F, 48.0F},
-    SpellDefinition {1005U, "Frost Lance", "28 damage and 40% slow for 2.5s.", SpellEffect::FrostLance, SpellShape::ForwardBox, 28, 4.0F, 220.0F, 54.0F},
-    SpellDefinition {1006U, "Flame Burst", "32 damage and 12 burning damage over 3s.", SpellEffect::FlameBurst, SpellShape::ForwardBox, 32, 6.0F, 130.0F, 80.0F},
-    SpellDefinition {1007U, "Defensive Magic", "Innate guard action bound to L.", SpellEffect::InnateGuard, SpellShape::Self, 0, 2.0F, 0.0F, 0.0F, SpellTier::Innate},
-    SpellDefinition {1008U, "Magic Thread", "Line hit: 10 damage, pull and bind.", SpellEffect::MagicThread, SpellShape::ForwardBox, 10, 6.0F, 280.0F, 12.0F},
-    SpellDefinition {1009U, "Stone Shot", "Heavy projectile with strong knockback.", SpellEffect::StoneShot, SpellShape::ForwardBox, 42, 7.0F, 250.0F, 30.0F},
-    SpellDefinition {1010U, "High-speed Movement", "Innate shadow dash action bound to K.", SpellEffect::InnateDash, SpellShape::Self, 0, 1.2F, 150.0F, 64.0F, SpellTier::Innate},
-    SpellDefinition {1011U, "Phantom", "Summon a phantom decoy for 3s.", SpellEffect::Phantom, SpellShape::Summon, 0, 9.0F, 340.0F, 64.0F},
-    SpellDefinition {1012U, "Sour Grape", "Create a 5s acid field that exposes enemies.", SpellEffect::SourGrape, SpellShape::TargetArea, 0, 8.0F, 210.0F, 168.0F},
-    SpellDefinition {1013U, "Cleaning Magic", "Heal 10 HP and gain brief protection.", SpellEffect::Cleaning, SpellShape::Self, 0, 8.0F, 0.0F, 0.0F},
-    SpellDefinition {1014U, "Hot Tea", "Channel for 1s, then heal 18 HP.", SpellEffect::HotTea, SpellShape::Self, 0, 12.0F, 0.0F, 0.0F},
-    SpellDefinition {1015U, "Bird Capture", "Lock a target: 8 damage and bind.", SpellEffect::BirdCapture, SpellShape::SelfArea, 8, 9.0F, 340.0F, 180.0F},
-    SpellDefinition {1016U, "Mana Trace", "Scan 500px and mark the nearest enemy for 6s.", SpellEffect::ManaTrace, SpellShape::SelfArea, 0, 7.0F, 500.0F, 300.0F},
-    SpellDefinition {2001U, "Demon Killing Zoltraak", "Pierce all targets for 70 damage. Demons take 30 percent more.", SpellEffect::BossZoltraak, SpellShape::ForwardBox, 70, SpellSystem::UltimateCooldownSeconds, 420.0F, 64.0F, SpellTier::Boss},
-    SpellDefinition {2002U, "Goddess Three Spears", "Three spears deal 28 damage each. Full hit heals 12 HP.", SpellEffect::GoddessSpears, SpellShape::TargetArea, 28, SpellSystem::UltimateCooldownSeconds, 340.0F, 96.0F, SpellTier::Boss},
-    SpellDefinition {2003U, "Severing Magic", "Short slash deals 78 damage and 30 percent more below 20 percent HP.", SpellEffect::SeveringSlash, SpellShape::ForwardBox, 78, SpellSystem::UltimateCooldownSeconds, 105.0F, 96.0F, SpellTier::Boss},
-    SpellDefinition {2006U, "Mimic Magic", "Copy a nearby enemy attack at 120 percent power.", SpellEffect::Mimic, SpellShape::ForwardBox, 0, SpellSystem::UltimateCooldownSeconds, 260.0F, 96.0F, SpellTier::Boss},
-    SpellDefinition {2007U, "Destruction Lightning", "After 0.8 seconds strike for 90 damage. Marked targets enlarge the area.", SpellEffect::DestructionLightning, SpellShape::TargetArea, 90, SpellSystem::UltimateCooldownSeconds, 340.0F, 144.0F, SpellTier::Boss},
-    SpellDefinition {2009U, "Hellfire Storm", "Pull enemies and deal 88 damage over 3 seconds.", SpellEffect::HellfireStorm, SpellShape::ForwardBox, 0, SpellSystem::UltimateCooldownSeconds, 360.0F, 140.0F, SpellTier::Boss},
-    SpellDefinition {2010U, "Judgment Beam", "Channel a beam for 2 seconds dealing up to 120 damage.", SpellEffect::JudgmentBeam, SpellShape::ForwardBox, 0, SpellSystem::UltimateCooldownSeconds, 420.0F, 72.0F, SpellTier::Boss},
-    SpellDefinition {2011U, "Earth Dominion", "Raise three pillars for 35 damage each. Repeat hits deal less.", SpellEffect::EarthPillars, SpellShape::TargetArea, 35, SpellSystem::UltimateCooldownSeconds, 320.0F, 144.0F, SpellTier::Boss},
-    SpellDefinition {2012U, "Mirror Array", "Two mirrors repeat the next regular damage spell at 35 percent each.", SpellEffect::MirrorArray, SpellShape::Summon, 0, SpellSystem::UltimateCooldownSeconds, 0.0F, 64.0F, SpellTier::Boss}
+    SpellDefinition {1001U, "Blooming Field", "Create a 4 second field. Enemies move 35 percent slower and the player heals 3 HP each second. Flame turns it into 2 seconds of 8 damage per second.", SpellEffect::FlowerField, SpellShape::SelfArea, 0, 10.0F, 300.0F, 150.0F},
+    SpellDefinition {1002U, "Goddess Blessing", "For 5 seconds prevent new control effects and deal 15 percent more damage.", SpellEffect::GoddessBlessing, SpellShape::Self, 0, 15.0F, 0.0F, 0.0F},
+    SpellDefinition {1003U, "Blood Magic", "Pay 12 percent current HP then deal 55 percent of the remaining HP as damage in front.", SpellEffect::BloodMagic, SpellShape::ForwardBox, 0, 6.0F, 210.0F, 72.0F},
+    SpellDefinition {1004U, "Zoltraak", "Fire a fast piercing line that deals 20 damage to every enemy it crosses.", SpellEffect::DirectDamage, SpellShape::ForwardBox, 20, 1.8F, 180.0F, 48.0F},
+    SpellDefinition {1005U, "Frost Lance", "Deal 24 damage and slow by 35 percent for 2 seconds. An already slowed target freezes for 0.65 seconds.", SpellEffect::FrostLance, SpellShape::ForwardBox, 24, 4.5F, 220.0F, 54.0F},
+    SpellDefinition {1006U, "Flame Burst", "Deal 26 damage plus 12 burning damage over 3 seconds. A slowed or frozen target takes 10 extra thermal damage.", SpellEffect::FlameBurst, SpellShape::ForwardBox, 26, 6.5F, 150.0F, 80.0F},
+    SpellDefinition {1007U, "Defensive Magic", "Press L to guard for 0.45 seconds. A guard during the first 0.12 seconds reduces the longest spell cooldown by 1 second.", SpellEffect::InnateGuard, SpellShape::Self, 0, 2.4F, 0.0F, 0.0F, SpellTier::Innate},
+    SpellDefinition {1008U, "Magic Thread", "Deal 8 damage, pull the target up to 110 pixels and bind normal enemies for 0.9 seconds.", SpellEffect::MagicThread, SpellShape::ForwardBox, 8, 6.5F, 280.0F, 12.0F},
+    SpellDefinition {1009U, "Stone Shot", "Deal 36 damage with strong knockback. Hitting a world edge deals 14 additional damage.", SpellEffect::StoneShot, SpellShape::ForwardBox, 36, 7.5F, 250.0F, 30.0F},
+    SpellDefinition {1010U, "High-speed Movement", "Press K to dash 150 pixels with invulnerability. Enemies crossed by the dash are analyzed for 2 seconds.", SpellEffect::InnateDash, SpellShape::Self, 0, 1.6F, 150.0F, 64.0F, SpellTier::Innate},
+    SpellDefinition {1011U, "Phantom", "Create a decoy for 4 seconds. When struck it analyzes the attacker for 3 seconds and reduces the longest cooldown by 1 second.", SpellEffect::Phantom, SpellShape::Summon, 0, 11.0F, 320.0F, 64.0F},
+    SpellDefinition {1016U, "Mana Trace", "Scan 500 pixels and analyze the nearest enemy for 4 seconds. It takes 12 percent more damage and reveals attack areas.", SpellEffect::ManaTrace, SpellShape::SelfArea, 0, 9.0F, 500.0F, 300.0F},
+    SpellDefinition {1017U, "Multi Zoltraak", "Fire three piercing beams through every enemy in the line. Each beam deals 10 damage; the third deals 10 extra damage to enemies currently marked by Mana Trace, Phantom or Dash.", SpellEffect::MultiZoltraak, SpellShape::ForwardBox, 10, 4.0F, 260.0F, 54.0F},
+    SpellDefinition {1018U, "Dispelling Magic", "Cancel one enemy attack that is winding up or currently active inside the area. On success, mark that enemy for 4 seconds and reduce your regular spell with the longest remaining cooldown by 1.5 seconds.", SpellEffect::Dispel, SpellShape::ForwardBox, 0, 9.0F, 180.0F, 120.0F},
+    SpellDefinition {1019U, "Mana Strike", "Strike nearby enemies for 34 damage with strong knockback. Cast within 0.4 seconds after Dash for 10 extra damage; knocking the target into a world edge adds another 12 damage.", SpellEffect::ManaStrike, SpellShape::ForwardBox, 34, 5.5F, 90.0F, 80.0F},
+    SpellDefinition {1020U, "Golden Binding", "Deal 6 damage and bind normal enemies for 1.4 seconds; bosses are controlled for 0.4 seconds. Stone Shot or Severing Magic consumes the binding to deal 16 extra damage.", SpellEffect::GoldenBinding, SpellShape::ForwardBox, 6, 8.0F, 260.0F, 18.0F},
+    SpellDefinition {1021U, "Float and Slam", "Suspend normal enemies for 1 second, then slam every enemy in the target area for 24 damage. A frozen enemy takes 12 additional damage from the slam.", SpellEffect::FloatSlam, SpellShape::TargetArea, 24, 8.0F, 220.0F, 120.0F},
+    SpellDefinition {1022U, "Stone Golem", "Summon a golem for 5 seconds that draws enemy attacks. It blocks one attack and shatters for 24 area damage; if it survives until time expires, it attacks one enemy for 20 damage.", SpellEffect::StoneGolem, SpellShape::Summon, 0, 12.0F, 260.0F, 64.0F},
+    SpellDefinition {1023U, "Flight Magic", "Fly with W and S for 2.5 seconds, ignore gravity and avoid leaping ground attacks. The first damaging spell cast while flying deals 15 percent more damage; Guard cannot be used in flight.", SpellEffect::Flight, SpellShape::Self, 0, 12.0F, 0.0F, 0.0F},
+    SpellDefinition {1024U, "Spatial Shatter", "Damage every enemy around you for 26. If the blast interrupts at least one active enemy attack, it deals 38 instead and makes you invulnerable for 0.35 seconds.", SpellEffect::SpatialShatter, SpellShape::SelfArea, 26, 9.0F, 115.0F, 96.0F},
+    SpellDefinition {1025U, "Sealing Magic", "Deal 16 damage, interrupt the target's current attack and disable special attacks for 4 seconds on normal enemies or 1.5 seconds on bosses. A marked target is sealed 1 second longer.", SpellEffect::Seal, SpellShape::ForwardBox, 16, 10.0F, 200.0F, 72.0F},
+    SpellDefinition {1026U, "Lightning Staff", "For 4 seconds, each of your next three basic attacks deals 7 additional lightning damage. The third charged attack also releases a 12 damage blast around you.", SpellEffect::LightningStaff, SpellShape::Self, 0, 9.0F, 0.0F, 0.0F},
+    SpellDefinition {2001U, "Demon Killing Zoltraak", "Fire a long beam that pierces every enemy in its path for 70 damage. Demon enemies take 30 percent additional damage; each enemy can be hit only once per cast.", SpellEffect::BossZoltraak, SpellShape::ForwardBox, 70, SpellSystem::UltimateCooldownSeconds, 420.0F, 64.0F, SpellTier::Boss},
+    SpellDefinition {2002U, "Goddess Three Spears", "Drop three divine spears into the target area, each dealing 28 damage. If all three hit, restore 12 HP to the player.", SpellEffect::GoddessSpears, SpellShape::TargetArea, 28, SpellSystem::UltimateCooldownSeconds, 340.0F, 96.0F, SpellTier::Boss},
+    SpellDefinition {2003U, "Severing Magic", "Slash a short area in front for 78 damage. Targets below 20 percent HP take 30 percent more; hitting Golden Binding consumes it for 16 additional damage.", SpellEffect::SeveringSlash, SpellShape::ForwardBox, 78, SpellSystem::UltimateCooldownSeconds, 105.0F, 96.0F, SpellTier::Boss},
+    SpellDefinition {2006U, "Mimic Magic", "Copy the attack template of a nearby living enemy, including its direction and area. The copied attack deals at least 60 damage even when the original attack is weaker.", SpellEffect::Mimic, SpellShape::ForwardBox, 0, SpellSystem::UltimateCooldownSeconds, 260.0F, 96.0F, SpellTier::Boss},
+    SpellDefinition {2007U, "Destruction Lightning", "Mark the target area, then strike it after 0.8 seconds for 90 damage. If the selected enemy is marked, the lightning's damage area becomes 40 percent larger.", SpellEffect::DestructionLightning, SpellShape::TargetArea, 90, SpellSystem::UltimateCooldownSeconds, 340.0F, 144.0F, SpellTier::Boss},
+    SpellDefinition {2009U, "Hellfire Storm", "Create a forward firestorm for 3 seconds. It continually pulls enemies toward its center and deals 88 total damage to enemies that remain inside.", SpellEffect::HellfireStorm, SpellShape::ForwardBox, 0, SpellSystem::UltimateCooldownSeconds, 360.0F, 140.0F, SpellTier::Boss},
+    SpellDefinition {2010U, "Judgment Beam", "Channel a long forward beam for up to 2 seconds. It damages enemies every 0.25 seconds and deals at most 120 total damage to each enemy.", SpellEffect::JudgmentBeam, SpellShape::ForwardBox, 0, SpellSystem::UltimateCooldownSeconds, 420.0F, 72.0F, SpellTier::Boss},
+    SpellDefinition {2011U, "Earth Dominion", "Erupt the center of the target area for 45 damage, then raise three stone pillars that deal 25 each. A target near the center is normally hit by the eruption and one pillar for about 70 damage.", SpellEffect::EarthPillars, SpellShape::TargetArea, 45, SpellSystem::UltimateCooldownSeconds, 320.0F, 144.0F, SpellTier::Boss},
+    SpellDefinition {2012U, "Mirror Array", "Summon two mirrors. The next regular damaging spell is repeated once by each mirror at 45 percent damage, adding 90 percent copied damage in total; Boss spells are not copied.", SpellEffect::MirrorArray, SpellShape::Summon, 0, SpellSystem::UltimateCooldownSeconds, 0.0F, 64.0F, SpellTier::Boss}
 };
 }
 
@@ -158,5 +164,15 @@ SpellSlotView SpellSystem::ultimateView() const noexcept
             : std::nullopt,
         ultimate_.cooldownRemaining,
         ultimate_.definition ? UltimateCooldownSeconds : 0.0F};
+}
+
+void SpellSystem::reduceLongestRegularCooldown(const float seconds) noexcept
+{
+    if (seconds <= 0.0F) return;
+    auto found = std::max_element(slots_.begin(), slots_.end(), [](const auto& left, const auto& right) {
+        return left.cooldownRemaining < right.cooldownRemaining;
+    });
+    if (found != slots_.end())
+        found->cooldownRemaining = std::max(0.0F, found->cooldownRemaining - seconds);
 }
 }

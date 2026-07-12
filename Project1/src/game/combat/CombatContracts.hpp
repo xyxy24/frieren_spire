@@ -79,6 +79,7 @@ struct PlayerStateView
     float blessingRemaining {0.0F};
     float vulnerableRemaining {0.0F};
     float flowerFieldRemaining {0.0F};
+    float flightRemaining {0.0F};
 };
 
 struct EnemyStateView
@@ -95,6 +96,7 @@ struct EnemyStateView
     bool slowed {false};
     std::optional<Aabb> skillEffectBounds;
     float facingDirection {-1.0F};
+    bool marked {false};
 };
 
 struct SpellEffectView

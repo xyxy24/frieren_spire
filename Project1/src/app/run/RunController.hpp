@@ -21,7 +21,9 @@ public:
     [[nodiscard]] const game::run::FloorDescriptor& loadFloor(game::run::FloorType type,
         std::span<const game::run::ContentId> encounterPool);
     [[nodiscard]] bool resolveEncounter(const game::CombatResult& result,
-        std::span<const game::run::ContentId> rewardPool);
+        std::span<const game::run::ContentId> rewardPool,
+        std::span<const game::run::ContentId> damageRewardPool = {},
+        std::span<const game::run::ContentId> controlRewardPool = {});
     [[nodiscard]] bool completeNonCombatFloor();
     [[nodiscard]] const game::rewards::RewardOffer& rewardOffer() const;
     [[nodiscard]] bool openReward();

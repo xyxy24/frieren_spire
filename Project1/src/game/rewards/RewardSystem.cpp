@@ -35,6 +35,32 @@ RewardOffer generateOffer(const std::span<const run::ContentId> pool,
     return {{{eligible[0], eligible[1], eligible[2]}}, seed, RewardKind::SpellChoice, 0};
 }
 
+RewardOffer generateCategorizedOffer(const std::span<const run::ContentId> damagePool,
+    const std::span<const run::ContentId> controlPool, const std::span<const run::ContentId> fullPool,
+    const std::span<const run::ContentId> owned, const run::Seed seed, const int fallbackGold)
+{
+    if (fallbackGold < 0) throw std::invalid_argument("fallback gold cannot be negative");
+    run::DeterministicRng rng(seed);
+    std::array<run::ContentId, 3> selected {};
+    const auto choose = [&](const std::span<const run::ContentId> pool, const std::size_t count) {
+        std::vector<run::ContentId> eligible;
+        for (const auto id : pool)
+            if (std::find(owned.begin(), owned.end(), id) == owned.end()
+                && std::find(selected.begin(), selected.begin() + static_cast<std::ptrdiff_t>(count), id)
+                    == selected.begin() + static_cast<std::ptrdiff_t>(count)
+                && std::find(eligible.begin(), eligible.end(), id) == eligible.end())
+                eligible.push_back(id);
+        return eligible.empty() ? run::ContentId {} : eligible[rng.index(
+            static_cast<std::uint32_t>(eligible.size()))];
+    };
+    selected[0] = choose(damagePool, 0U);
+    selected[1] = choose(controlPool, 1U);
+    selected[2] = choose(fullPool, 2U);
+    if (selected[0] == 0U || selected[1] == 0U || selected[2] == 0U)
+        return generateOffer(fullPool, owned, seed, fallbackGold);
+    return {selected, seed, RewardKind::SpellChoice, 0};
+}
+
 bool applySpellChoice(run::PlayerProgress& player, const RewardOffer& offer,
     const run::ContentId choice, const SpellRewardType type)
 {

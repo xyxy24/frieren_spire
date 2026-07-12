@@ -32,6 +32,7 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
 
     stunRemaining_ = std::max(0.0F, stunRemaining_ - deltaSeconds);
     dashCooldownRemaining_ = std::max(0.0F, dashCooldownRemaining_ - deltaSeconds);
+    flightRemaining_ = std::max(0.0F, flightRemaining_ - deltaSeconds);
     const float moveAxis = stunRemaining_ > 0.0F ? 0.0F : std::clamp(intent.moveAxis, -1.0F, 1.0F);
 
     if (dashRemaining_ <= 0.0F && moveAxis > 0.0F)
@@ -74,13 +75,18 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
 
     if (stunRemaining_ <= 0.0F) velocity_.x = (consumedByDash ? 0.0F : moveAxis) * MoveSpeed;
 
-    if (intent.jumpPressed && !consumedByDash && grounded_ && stunRemaining_ <= 0.0F)
+    if (flightRemaining_ > 0.0F && stunRemaining_ <= 0.0F)
+    {
+        velocity_.y = std::clamp(intent.verticalMoveAxis, -1.0F, 1.0F) * MoveSpeed;
+        grounded_ = false;
+    }
+    else if (intent.jumpPressed && !consumedByDash && grounded_ && stunRemaining_ <= 0.0F)
     {
         velocity_.y = -JumpSpeed;
         grounded_ = false;
     }
 
-    if (!grounded_)
+    if (!grounded_ && flightRemaining_ <= 0.0F)
     {
         velocity_.y += Gravity * simulationSeconds;
     }
@@ -89,6 +95,8 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     position_.y += velocity_.y * simulationSeconds;
 
     position_.x = std::clamp(position_.x, bounds.left, bounds.right - Width);
+    if (flightRemaining_ > 0.0F)
+        position_.y = std::clamp(position_.y, 48.0F, groundPosition);
 
     if (position_.y >= groundPosition && velocity_.y >= 0.0F)
     {
@@ -136,4 +144,7 @@ float PlayerController::stunRemaining() const noexcept { return stunRemaining_; 
 bool PlayerController::isDashing() const noexcept { return dashRemaining_ > 0.0F; }
 float PlayerController::dashRemaining() const noexcept { return dashRemaining_; }
 float PlayerController::dashCooldownRemaining() const noexcept { return dashCooldownRemaining_; }
+void PlayerController::grantFlight(const float seconds) noexcept
+{ flightRemaining_ = std::max(flightRemaining_, std::max(0.0F, seconds)); }
+float PlayerController::flightRemaining() const noexcept { return flightRemaining_; }
 }

@@ -15,7 +15,8 @@ enum class SpellEffect : std::uint8_t {
     InnateGuard, MagicThread, StoneShot, InnateDash, Phantom, SourGrape,
     Cleaning, HotTea, BirdCapture, ManaTrace, BossZoltraak, GoddessSpears,
     SeveringSlash, Mimic, DestructionLightning, HellfireStorm, JudgmentBeam,
-    EarthPillars, MirrorArray
+    EarthPillars, MirrorArray, MultiZoltraak, Dispel, ManaStrike, GoldenBinding,
+    FloatSlam, StoneGolem, Flight, SpatialShatter, Seal, LightningStaff
 };
 enum class SpellShape : std::uint8_t { Self, ForwardBox, SelfArea, TargetArea, Summon };
 enum class SpellTier : std::uint8_t { Regular, Innate, Boss };
@@ -73,6 +74,7 @@ public:
     [[nodiscard]] SpellSlotView ultimateView() const noexcept;
     [[nodiscard]] bool equip(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
     [[nodiscard]] bool equipUltimate(std::optional<std::uint32_t> id) noexcept;
+    void reduceLongestRegularCooldown(float seconds) noexcept;
 
 private:
     struct SlotState

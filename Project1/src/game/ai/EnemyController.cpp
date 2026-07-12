@@ -9,7 +9,7 @@ EnemyController::EnemyController(const Vec2 spawnPosition, const EnemyConfig con
     : config_(config), position_(spawnPosition), cooldownRemaining_(config.cooldownSeconds * 0.5F) {}
 
 void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
-    const WorldBounds& worldBounds, const float speedMultiplier) noexcept
+    const WorldBounds& worldBounds, const float speedMultiplier, const bool canAttack) noexcept
 {
     if (deltaSeconds <= 0.0F || action_ == EnemyAction::Dead) return;
     groundTop_ = worldBounds.groundTop;
@@ -25,7 +25,7 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
     case EnemyAction::Chase:
     {
         const float triggerDistance = config_.width * 0.5F + config_.attackRange;
-        if (cooldownRemaining_ <= 0.0F && std::abs(horizontalDelta) <= triggerDistance)
+        if (canAttack && cooldownRemaining_ <= 0.0F && std::abs(horizontalDelta) <= triggerDistance)
         {
             beginWindup();
         }
@@ -90,6 +90,14 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
 }
 
 void EnemyController::markDead() noexcept { action_ = EnemyAction::Dead; }
+void EnemyController::interrupt() noexcept
+{
+    if (action_ == EnemyAction::Dead) return;
+    action_ = EnemyAction::Chase;
+    stateRemaining_ = 0.0F;
+    activeElapsed_ = 0.0F;
+    cooldownRemaining_ = config_.cooldownSeconds;
+}
 void EnemyController::translateHorizontal(const float distance, const WorldBounds& worldBounds) noexcept
 {
     position_.x = std::clamp(position_.x + distance,

@@ -22,8 +22,9 @@ class CombatSession
 public:
     static constexpr float EnemyWidth = ai::EnemyController::Width;
     static constexpr float EnemyHeight = ai::EnemyController::Height;
-    static constexpr float GuardDurationSeconds = 0.60F;
-    static constexpr float GuardCooldownSeconds = 2.0F;
+    static constexpr float GuardDurationSeconds = 0.45F;
+    static constexpr float PerfectGuardSeconds = 0.12F;
+    static constexpr float GuardCooldownSeconds = 2.4F;
 
     explicit CombatSession(CombatRequest request);
 
@@ -73,6 +74,9 @@ private:
         DamageSource burnSource {DamageSource::PlayerSpell0};
         float exposedRemaining {};
         float markedRemaining {};
+        float frozenRemaining {};
+        float goldenBindRemaining {};
+        float skillSealRemaining {};
     };
     struct ActiveSpellEffect
     {
@@ -107,6 +111,12 @@ private:
     float flowerFieldRemaining_ {};
     float flowerFieldCenterX_ {};
     float flowerHealingAccumulator_ {};
+    float burningFlowerRemaining_ {};
+    float burningFlowerAccumulator_ {};
+    std::uint64_t burningFlowerSequenceBase_ {};
+    std::uint32_t burningFlowerTick_ {};
+    DamageSource burningFlowerSource_ {DamageSource::PlayerSpell0};
+    float burningFlowerMultiplier_ {1.0F};
     float acidFieldRemaining_ {};
     Aabb acidFieldBounds_;
     float phantomRemaining_ {};
@@ -114,6 +124,18 @@ private:
     float teaChannelRemaining_ {};
     float teaStartX_ {};
     float cleanseProtectionRemaining_ {};
+    float postDashComboRemaining_ {};
+    float spellInvulnerableRemaining_ {};
+    bool perfectGuardConsumed_ {};
+    bool flightBoostAvailable_ {};
+    float lightningStaffRemaining_ {};
+    std::uint32_t lightningStaffCharges_ {};
+    std::uint64_t handledLightningAttackSequence_ {};
+    float golemRemaining_ {};
+    Aabb golemBounds_;
+    DamageSource golemSource_ {DamageSource::PlayerSpell0};
+    float golemMultiplier_ {1.0F};
+    std::uint64_t golemSequence_ {};
     float hellfireRemaining_ {};
     float hellfireTickAccumulator_ {};
     Aabb hellfireBounds_;

@@ -44,6 +44,7 @@ game::PlayerIntent SfmlInputMapper::sample()
 
     game::PlayerIntent intent;
     intent.moveAxis = static_cast<float>(moveRight) - static_cast<float>(moveLeft);
+    intent.verticalMoveAxis = static_cast<float>(menuDown) - static_cast<float>(menuUp);
     intent.jumpPressed = pressedOnce(jump, previousJump_);
     intent.attackPressed = pressedOnce(attack, previousAttack_);
     intent.dashPressed = pressedOnce(dash, previousDash_);

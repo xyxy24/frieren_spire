@@ -35,7 +35,9 @@ const game::run::FloorDescriptor& RunController::loadFloor(const game::run::Floo
 }
 
 bool RunController::resolveEncounter(const game::CombatResult& result,
-    const std::span<const game::run::ContentId> rewardPool)
+    const std::span<const game::run::ContentId> rewardPool,
+    const std::span<const game::run::ContentId> damageRewardPool,
+    const std::span<const game::run::ContentId> controlRewardPool)
 {
     const bool isCombatFloor = currentFloorType_ == game::run::FloorType::Combat
         || currentFloorType_ == game::run::FloorType::Boss;
@@ -65,8 +67,10 @@ bool RunController::resolveEncounter(const game::CombatResult& result,
     const auto& ownedSpells = currentFloorType_ == game::run::FloorType::Boss
         ? player_.learnedBossSpells
         : player_.learnedSpells;
-    const game::rewards::RewardOffer offer = game::rewards::generateOffer(
-        rewardPool, ownedSpells, seed);
+    const game::rewards::RewardOffer offer = damageRewardPool.empty() || controlRewardPool.empty()
+        ? game::rewards::generateOffer(rewardPool, ownedSpells, seed)
+        : game::rewards::generateCategorizedOffer(damageRewardPool, controlRewardPool,
+            rewardPool, ownedSpells, seed);
 
     floor_.markEncounterComplete();
     if (currentFloorType_ == game::run::FloorType::Boss) ++context_.bossesDefeated;

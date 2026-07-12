@@ -6,6 +6,7 @@
 #include "game/run/DeterministicRng.hpp"
 
 #include <array>
+#include <algorithm>
 #include <iostream>
 #include <string_view>
 #include <vector>
@@ -269,6 +270,25 @@ bool merchantStockAndFloorScheduleReproduce()
     return true;
 }
 
+bool categorizedRewardsGuaranteeCombatRoles()
+{
+    constexpr std::array<arcane::game::run::ContentId, 3> damage {1003U, 1004U, 1005U};
+    constexpr std::array<arcane::game::run::ContentId, 3> control {1008U, 1016U, 1018U};
+    constexpr std::array<arcane::game::run::ContentId, 7> full {
+        1001U, 1003U, 1004U, 1005U, 1008U, 1016U, 1018U
+    };
+    const auto offer = arcane::game::rewards::generateCategorizedOffer(
+        damage, control, full, {}, 42U);
+    return expect(std::find(damage.begin(), damage.end(), offer.candidates[0]) != damage.end(),
+            "categorized rewards must put a damage spell first")
+        && expect(std::find(control.begin(), control.end(), offer.candidates[1]) != control.end(),
+            "categorized rewards must put a control or counter spell second")
+        && expect(offer.candidates[0] != offer.candidates[1]
+                && offer.candidates[0] != offer.candidates[2]
+                && offer.candidates[1] != offer.candidates[2],
+            "categorized rewards must not contain duplicates");
+}
+
 bool defaultScheduleBuildsThreeFiveFloorActs()
 {
     using namespace arcane::game;
@@ -397,7 +417,8 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 
 int main()
 {
-    const bool passed = deterministicStreamsAreIsolated() && completesFiveFloorLoops()
+    const bool passed = deterministicStreamsAreIsolated() && categorizedRewardsGuaranteeCombatRoles()
+        && completesFiveFloorLoops()
         && healsHalfMissingRoundedUp() && bossRewardUnlocksOnlyTheUltimateCollection()
         && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
         && merchantPurchaseIsAtomic()
