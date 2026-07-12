@@ -188,7 +188,14 @@ bool specialFloorsAdvanceWithoutCombat()
     config.initialPlayer.gold = 30;
     config.firstFloorTypeOverride = arcane::game::run::FloorType::Event;
 
-    arcane::app::TowerSession eventTower(1U, config);
+    std::optional<arcane::game::run::Seed> aldenSeed;
+    for (arcane::game::run::Seed seed = 1U; seed < 1000U && !aldenSeed; ++seed)
+    {
+        arcane::app::TowerSession candidate(seed, config);
+        if (candidate.eventKind() == arcane::app::EventKind::AldenBall) aldenSeed = seed;
+    }
+    if (!expect(aldenSeed.has_value(), "a deterministic Alden Ball event seed must exist")) return false;
+    arcane::app::TowerSession eventTower(*aldenSeed, config);
     interact(eventTower);
     if (!expect(eventTower.specialPanelOpen()
             && eventTower.eventFloorState() == arcane::app::EventFloorState::Choosing,

@@ -415,26 +415,33 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     panel.setOutlineThickness(4.0F);
     target.draw(panel);
     const bool meteor = tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower;
-    drawPixelText(target, meteor ? "HALF CENTURY METEOR SHOWER" : "LORD ORDEN'S BALL",
-        {meteor ? 315.0F : 430.0F, 70.0F}, 2.1F, sf::Color {255, 231, 145});
-    drawPixelText(target, meteor
-        ? "A METEOR SHOWER SEEN ONCE IN FIFTY YEARS PASSES ABOVE."
-        : "LORD ORDEN ASKS STARK TO POSE AS HIS SON AT A SOCIAL BALL.",
+    const bool swordVillage = tower.eventKind() == arcane::app::EventKind::SwordVillage;
+    const std::string_view title = swordVillage ? "VILLAGE OF THE SWORD"
+        : (meteor ? "HALF CENTURY METEOR SHOWER" : "LORD ORDEN'S BALL");
+    drawPixelText(target, title, {swordVillage ? 405.0F : (meteor ? 315.0F : 430.0F), 70.0F},
+        2.1F, sf::Color {255, 231, 145});
+    drawPixelText(target, swordVillage
+        ? "A HERO'S SWORD LIES SEALED HERE. ONLY A TRUE HERO MAY DRAW IT."
+        : (meteor ? "A METEOR SHOWER SEEN ONCE IN FIFTY YEARS PASSES ABOVE."
+            : "LORD ORDEN ASKS STARK TO POSE AS HIS SON AT A SOCIAL BALL."),
         {175.0F, 115.0F}, 1.15F);
-    drawPixelText(target, meteor
-        ? "TO YOU IT IS NOT SO RARE. HOW WILL YOU SPEND THE NIGHT?"
-        : "HE PROMISES YOU A REWARD. YOUR CHOICE IS:",
+    drawPixelText(target, swordVillage
+        ? "HIMMEL COULD NOT DRAW IT. WHAT DO YOU THINK?"
+        : (meteor ? "TO YOU IT IS NOT SO RARE. HOW WILL YOU SPEND THE NIGHT?"
+            : "HE PROMISES YOU A REWARD. YOUR CHOICE IS:"),
         {245.0F, 145.0F}, 1.15F);
 
-    const std::array<std::string_view, 3> effects = meteor
-        ? std::array<std::string_view, 3> {"GAIN A RANDOM SPELLBOOK", "RESTORE HP TO MAX", "50 PERCENT CHANCE OF 99 GOLD"}
-        : std::array<std::string_view, 3> {"+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"};
+    const std::array<std::string_view, 3> effects = swordVillage
+        ? std::array<std::string_view, 3> {"GAIN HERO SWORD", "GAIN TRUE HERO SWORD", "+50 GOLD"}
+        : (meteor
+            ? std::array<std::string_view, 3> {"GAIN A RANDOM SPELLBOOK", "RESTORE HP TO MAX", "50 PERCENT CHANCE OF 99 GOLD"}
+            : std::array<std::string_view, 3> {"+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"});
     if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
     {
         if (tower.eventResultChoice())
         {
             drawCard(target, *tower.eventResultChoice(), {535.0F, 205.0F}, {210.0F, 280.0F}, true);
-            const auto base = meteor ? 5101U : 5001U;
+            const auto base = swordVillage ? 5201U : (meteor ? 5101U : 5001U);
             const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - base);
             if (choiceIndex < effects.size())
             {
@@ -855,7 +862,7 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
                     : "EVENT ROOM - Meet NPC, E Interact");
             if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
                 return title + "EVENT RESULT - E Close";
-            return title + "ALDEN BALL - U Dessert(+30 MaxHP), I Grimoire(Random Spell), O Commission(+50 Gold), E Close";
+            return title + "EVENT CHOICE - U I O Select | E Close";
         }
         return title + "A/D Move, Space Jump, J Attack, K Dash, L Guard, U/I/O Spells, R Ultimate, Tab Loadout";
     case arcane::game::run::RunPhase::LootPending:

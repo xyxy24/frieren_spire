@@ -402,19 +402,26 @@ void TowerSession::startNextFloor()
             ? spellOffer.candidates[0] : 0U;
         game::run::DeterministicRng eventRng(game::run::deriveStreamSeed(
             run_.context().floorSeed, game::run::RandomStream::Event));
-        eventKind_ = eventRng.index(2U) == 0U
-            ? EventKind::AldenBall : EventKind::HalfCenturyMeteorShower;
+        const auto eventIndex = eventRng.index(3U);
+        eventKind_ = eventIndex == 0U ? EventKind::AldenBall
+            : (eventIndex == 1U ? EventKind::HalfCenturyMeteorShower : EventKind::SwordVillage);
         if (eventKind_ == EventKind::AldenBall)
             eventChoices_ = {{
                 game::events::EventChoice {5001U, 0, 0, 0U, 30, 0U, false},
                 game::events::EventChoice {5002U, 0, randomSpell == 0U ? 15 : 0, 0U, 0, randomSpell, false},
                 game::events::EventChoice {5003U, 0, 50, 0U, 0, 0U, false}
             }};
-        else
+        else if (eventKind_ == EventKind::HalfCenturyMeteorShower)
             eventChoices_ = {{
                 game::events::EventChoice {5101U, 0, randomSpell == 0U ? 15 : 0, 0U, 0, randomSpell, false},
                 game::events::EventChoice {5102U, 0, 0, 0U, 0, 0U, true},
                 game::events::EventChoice {5103U, 0, eventRng.index(2U) == 0U ? 99 : 0, 0U, 0, 0U, false}
+            }};
+        else
+            eventChoices_ = {{
+                game::events::EventChoice {5201U, 0, 0, game::relics::HeroSwordId, 0, 0U, false},
+                game::events::EventChoice {5202U, 0, 0, game::relics::TrueHeroSwordId, 0, 0U, false},
+                game::events::EventChoice {5203U, 0, 50, 0U, 0, 0U, false}
             }};
         explorationPlayer_.emplace(config_.playerSpawn);
         return;
@@ -454,9 +461,15 @@ void TowerSession::startNextFloor()
         constexpr std::array fourthGroup {
             game::EnemyArchetype::Lugner, game::EnemyArchetype::Linie, game::EnemyArchetype::Draht
         };
+        constexpr std::array secondActOpeningGroup {
+            game::EnemyArchetype::ChaosFlower, game::EnemyArchetype::FrostWolf,
+            game::EnemyArchetype::Qual
+        };
         std::array<game::EnemyArchetype, 3> encounter;
         const std::uint32_t floorInAct = run_.context().floorIndex % config_.floorsPerBoss;
-        if (floorInAct == 0U)
+        if (run_.context().bossesDefeated == 1U && floorInAct == 0U)
+            encounter = secondActOpeningGroup;
+        else if (floorInAct == 0U)
             encounter = firstGroup;
         else if (floorInAct == 3U)
             encounter = fourthGroup;

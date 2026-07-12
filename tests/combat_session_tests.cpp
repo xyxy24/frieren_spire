@@ -924,6 +924,59 @@ bool enemyDirectionLocksWhenWindupBegins()
             && enemy.facingDirection() < 0.0F,
         "enemy must not turn around after the player crosses during windup");
 }
+
+bool secondActEnemiesExposeConfiguredContent()
+{
+    arcane::game::CombatRequest request;
+    request.enemies = {
+        {arcane::game::EnemyArchetype::ChaosFlower, {500.0F, 0.0F}},
+        {arcane::game::EnemyArchetype::FrostWolf, {700.0F, 0.0F}},
+        {arcane::game::EnemyArchetype::Qual, {900.0F, 0.0F}}
+    };
+    arcane::game::CombatSession combat(request);
+    const auto enemies = combat.enemyStates();
+    return expect(enemies.size() == 3U, "second-act opening encounter must contain three enemies")
+        && expect(enemies[0].currentHealth == 125 && enemies[0].width == 64.0F
+                && enemies[0].height == 84.0F,
+            "chaos flower content values must be authoritative")
+        && expect(enemies[1].currentHealth == 120 && enemies[1].width == 64.0F
+                && enemies[1].height == 42.0F,
+            "frost wolf content values must be authoritative")
+        && expect(enemies[2].currentHealth == 150 && enemies[2].width == 64.0F
+                && enemies[2].height == 96.0F,
+            "Qual content values must be authoritative");
+}
+
+bool chaosFlowerSleepAppliesStackBasedStun()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::ChaosFlower, {223.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 3.51F);
+    combat.update({}, 0.50F);
+    return expect(combat.playerState().stunRemaining > 0.49F,
+        "first sleep stack must stun for half a second");
+}
+
+bool swordRelicsModifyCollisionDamage()
+{
+    arcane::game::CombatRequest reductionRequest;
+    reductionRequest.playerSpawn = {160.0F, 576.0F};
+    reductionRequest.enemies = {{arcane::game::EnemyArchetype::ChestMimic, {160.0F, 0.0F}}};
+    reductionRequest.relicIds = {arcane::game::relics::HeroSwordId};
+    arcane::game::CombatSession reduction(reductionRequest);
+    reduction.update({}, 0.01F);
+    if (!expect(reduction.playerState().currentHealth == 95,
+        "Hero Sword must reduce fifteen collision damage to five")) return false;
+
+    auto retaliationRequest = reductionRequest;
+    retaliationRequest.relicIds = {arcane::game::relics::TrueHeroSwordId};
+    arcane::game::CombatSession retaliation(retaliationRequest);
+    retaliation.update({}, 0.01F);
+    return expect(retaliation.enemyState().currentHealth == 45,
+        "True Hero Sword must retaliate for thirty nearby damage");
+}
 }
 
 int main()
@@ -964,6 +1017,9 @@ int main()
         && auraDominationUsesNinetySixPixelRange()
         && redMirrorDragonBreathTicksThreeTimes()
         && enemyDirectionLocksWhenWindupBegins()
+        && secondActEnemiesExposeConfiguredContent()
+        && chaosFlowerSleepAppliesStackBasedStun()
+        && swordRelicsModifyCollisionDamage()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()

@@ -7,6 +7,8 @@ namespace arcane::game::relics
 {
 inline constexpr std::uint32_t DarkDragonHornId = 4001U;
 inline constexpr std::uint32_t MoonGrassFlowerId = 4002U;
+inline constexpr std::uint32_t HeroSwordId = 4101U;
+inline constexpr std::uint32_t TrueHeroSwordId = 4102U;
 
 struct RelicDefinition
 {
@@ -26,10 +28,14 @@ public:
     [[nodiscard]] float incomingDamageMultiplier() const noexcept;
     [[nodiscard]] bool castsFlowerFieldOnCombatStart() const noexcept;
     [[nodiscard]] float vulnerableRemaining() const noexcept;
+    [[nodiscard]] int collisionFlatReduction() const noexcept;
+    [[nodiscard]] bool retaliatesOnCollision() const noexcept;
 
 private:
     bool darkDragonHorn_ {};
     bool moonGrassFlower_ {};
+    bool heroSword_ {};
+    bool trueHeroSword_ {};
     float vulnerableRemaining_ {};
 };
 }

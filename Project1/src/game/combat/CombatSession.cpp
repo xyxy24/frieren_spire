@@ -38,6 +38,15 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
     case EnemyArchetype::Draht:
         return EnemyConfig {160.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 8.0F, false, false, EnemySkill::Thread};
+    case EnemyArchetype::ChaosFlower:
+        return EnemyConfig {0.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            64.0F, 84.0F, 5.0F, true, false, EnemySkill::LeafBlade};
+    case EnemyArchetype::FrostWolf:
+        return EnemyConfig {240.0F, 64.0F, 64.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            64.0F, 42.0F, 4.0F, true, false, EnemySkill::WolfClaw};
+    case EnemyArchetype::Qual:
+        return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            64.0F, 96.0F, 4.0F, false, false, EnemySkill::KillingMagic};
     case EnemyArchetype::Aura:
         return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 10.0F, false, false, EnemySkill::Domination};
@@ -76,6 +85,9 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::Lugner: return 100;
             case EnemyArchetype::Linie: return 120;
             case EnemyArchetype::Draht: return 80;
+            case EnemyArchetype::ChaosFlower: return 125;
+            case EnemyArchetype::FrostWolf: return 120;
+            case EnemyArchetype::Qual: return 150;
             case EnemyArchetype::Aura: return 225;
             case EnemyArchetype::RedMirrorDragon: return 300;
             case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
@@ -86,6 +98,10 @@ CombatSession::CombatSession(CombatRequest request)
             {}, 0.0F, 0U, 0U, false, spawn.archetype == EnemyArchetype::Aura ? 12.0F : 0.0F, 0U});
         if (spawn.archetype == EnemyArchetype::RedMirrorDragon)
             enemies_.back().breathCooldown = 6.0F;
+        if (spawn.archetype == EnemyArchetype::ChaosFlower)
+            enemies_.back().specialCooldown = 3.5F;
+        if (spawn.archetype == EnemyArchetype::FrostWolf)
+            enemies_.back().specialCooldown = 3.0F;
     }
     const auto aura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Aura;
@@ -271,6 +287,70 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         const bool flowerSlowed = flowerFieldRemaining_ > 0.0F
             && std::abs(bounds.left + bounds.width * 0.5F - flowerFieldCenterX_) <= 300.0F;
         enemy.slowed = flowerSlowed || enemy.frostSlowRemaining > 0.0F;
+        if (enemy.archetype == EnemyArchetype::ChaosFlower)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto flower = enemy.controller.bounds();
+                    const Aabb curse {flower.left + flower.width * 0.5F - 160.0F,
+                        flower.top + flower.height * 0.5F - 160.0F, 320.0F, 320.0F};
+                    if (intersects(playerBounds(), curse) && blessingRemaining_ <= 0.0F
+                        && !player_.isDashing() && guardRemaining_ <= 0.0F
+                        && spellInvulnerableRemaining_ <= 0.0F)
+                    {
+                        sleepStacks_ = std::min<std::uint32_t>(5U, sleepStacks_ + 1U);
+                        player_.applyHitReaction(0.0F, static_cast<float>(sleepStacks_) * 0.5F);
+                    }
+                    enemy.specialCooldown = 7.0F;
+                }
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F
+                && enemy.controller.action() == ai::EnemyAction::Chase)
+            {
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::FrostWolf)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    enemy.specialActive = 0.4F;
+                    enemy.specialElapsed = 0.0F;
+                    enemy.specialDirection = enemy.controller.facingDirection();
+                }
+                continue;
+            }
+            if (enemy.specialActive > 0.0F)
+            {
+                const float activeDelta = std::min(deltaSeconds, enemy.specialActive);
+                enemy.specialActive -= activeDelta;
+                enemy.specialElapsed += activeDelta;
+                auto position = enemy.controller.position();
+                position.x += enemy.specialDirection * 240.0F * activeDelta;
+                const float progress = std::clamp(enemy.specialElapsed / 0.4F, 0.0F, 1.0F);
+                position.y = request_.worldBounds.groundTop - bounds.height
+                    - 32.0F * 4.0F * progress * (1.0F - progress);
+                enemy.controller.setPosition(position, request_.worldBounds);
+                if (enemy.specialActive <= 0.0F) enemy.specialCooldown = 6.0F;
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F
+                && enemy.controller.action() == ai::EnemyAction::Chase)
+            {
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
         if (enemy.archetype == EnemyArchetype::RedMirrorDragon)
         {
             enemy.breathCooldown = std::max(0.0F, enemy.breathCooldown - deltaSeconds);
@@ -966,6 +1046,9 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             if (config.skill == ai::EnemySkill::Thread) damage = 10;
             if (config.skill == ai::EnemySkill::Domination) damage = 0;
             if (config.skill == ai::EnemySkill::DragonClaw) damage = 25;
+            if (config.skill == ai::EnemySkill::LeafBlade
+                || config.skill == ai::EnemySkill::WolfClaw
+                || config.skill == ai::EnemySkill::KillingMagic) damage = 15;
             if (config.skill == ai::EnemySkill::Blood)
                 damage = (enemy.health.maximum() - enemy.health.current()) / 2;
             if (request_.enemies.empty() && enemy.archetype != EnemyArchetype::Aura
@@ -1009,10 +1092,21 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const auto contactResult = playerDamageResolver_.resolve(playerHealth_,
                 {DamageSource::EnemyContact, contactSequence, contactDamage,
                     1.0F, relics_.incomingDamageMultiplier()
-                        * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F), 0,
+                        * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F),
+                    relics_.collisionFlatReduction(),
                     player_.isDashing() || guardRemaining_ > 0.0F
                         || spellInvulnerableRemaining_ > 0.0F});
             if (contactResult.appliedDamage > 0) beamRemaining_ = 0.0F;
+            if (contactResult.appliedDamage > 0 && relics_.retaliatesOnCollision())
+            {
+                const auto player = playerBounds();
+                const Aabb retaliation {player.left - 54.0F, player.top - 54.0F,
+                    player.width + 108.0F, player.height + 108.0F};
+                for (auto& target : enemies_)
+                    if (target.health.isAlive() && intersects(retaliation, target.controller.bounds()))
+                        static_cast<void>(target.damageResolver.resolve(target.health,
+                            {DamageSource::Event, contactSequence, 30}));
+            }
             enemy.contactCooldown = 1.0F;
         }
     }

@@ -77,6 +77,11 @@ private:
         float frozenRemaining {};
         float goldenBindRemaining {};
         float skillSealRemaining {};
+        float specialCooldown {};
+        float specialWindup {};
+        float specialActive {};
+        float specialElapsed {};
+        float specialDirection {-1.0F};
     };
     struct ActiveSpellEffect
     {
@@ -126,6 +131,7 @@ private:
     float cleanseProtectionRemaining_ {};
     float postDashComboRemaining_ {};
     float spellInvulnerableRemaining_ {};
+    std::uint32_t sleepStacks_ {};
     bool perfectGuardConsumed_ {};
     bool flightBoostAvailable_ {};
     float lightningStaffRemaining_ {};

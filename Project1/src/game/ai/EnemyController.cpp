@@ -103,6 +103,12 @@ void EnemyController::translateHorizontal(const float distance, const WorldBound
     position_.x = std::clamp(position_.x + distance,
         worldBounds.left, worldBounds.right - config_.width);
 }
+void EnemyController::setPosition(const Vec2 position, const WorldBounds& worldBounds) noexcept
+{
+    position_ = position;
+    position_.x = std::clamp(position_.x, worldBounds.left, worldBounds.right - config_.width);
+    position_.y = std::min(position_.y, worldBounds.groundTop - config_.height);
+}
 Vec2 EnemyController::position() const noexcept { return position_; }
 EnemyAction EnemyController::action() const noexcept { return action_; }
 float EnemyController::facingDirection() const noexcept { return facingDirection_; }

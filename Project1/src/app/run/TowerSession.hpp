@@ -32,7 +32,7 @@ struct TowerSessionConfig
 };
 
 enum class EventFloorState : std::uint8_t { Untriggered, Choosing, Result };
-enum class EventKind : std::uint8_t { AldenBall, HalfCenturyMeteorShower };
+enum class EventKind : std::uint8_t { AldenBall, HalfCenturyMeteorShower, SwordVillage };
 enum class LoadoutPage : std::uint8_t { Spells, Relics };
 enum class SpellLoadoutSection : std::uint8_t { Regular, Boss };
 

@@ -10,7 +10,8 @@ namespace arcane::game::ai
 {
 enum class EnemyAction : std::uint8_t { Chase, Windup, Active, Recovery, Dead };
 enum class EnemySkill : std::uint8_t {
-    Thrust, Slash, Dive, Blood, LeapingCleave, Thread, Domination, DragonClaw, BossAttack
+    Thrust, Slash, Dive, Blood, LeapingCleave, Thread, LeafBlade, WolfClaw,
+    KillingMagic, Domination, DragonClaw, BossAttack
 };
 
 struct EnemyConfig
@@ -42,6 +43,7 @@ public:
     void markDead() noexcept;
     void interrupt() noexcept;
     void translateHorizontal(float distance, const WorldBounds& worldBounds) noexcept;
+    void setPosition(Vec2 position, const WorldBounds& worldBounds) noexcept;
     [[nodiscard]] Vec2 position() const noexcept;
     [[nodiscard]] EnemyAction action() const noexcept;
     [[nodiscard]] float facingDirection() const noexcept;

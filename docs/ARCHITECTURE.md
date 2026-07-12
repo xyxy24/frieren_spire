@@ -131,6 +131,10 @@ stateDiagram-v2
 
 当前原型由 `EnemyController` 产出带递增序列号的攻击有效帧。技能冷却是与 `Chase` 并行推进的独立计时器，开场初始化为定义 CD 的一半；进入 `Windup` 时锁定朝向，只有回到 `Chase` 后才能重新面向玩家；`Windup/Active` 结束后立即回到追击并启动完整 CD。追击停止点按双方 AABB 水平边缘间距计算，有碰撞伤害者为 20 px，无碰撞伤害者为 42 px；技能触发距离另按“玩家宽度至少一半进入技能区域”计算，二者不得共用一个中心距离。`CombatSession` 负责多敌人序列隔离、扣除 HP 并调用玩家受击反应。非位移技能可通过 `EnemyStateView::skillEffectBounds` 向表现层提供只读矩形区域，表现层不自行推导射程；支配是明确不公开范围框的例外。
 
+拥有两个技能的普通敌人继续使用一个 `EnemyController` 管理基础追击与主要攻击，并由该敌人的 `EnemyRuntime` 保存第二技能的独立冷却、前摇和有效状态；第二技能执行期间暂停 Controller，避免两个技能重叠。混沌花的昏睡层数属于玩家本场战斗状态并集中封顶为 5；冰原狼猛扑保存前摇时锁定的方向并通过 Controller 的受控位置接口更新抛物线。
+
+剑之乡专属遗物仍以稳定内容 ID 存入本局遗物集合，但不加入 `RelicMerchantCatalog`。勇者之剑通过 `DamageRequest::flatReduction` 修正 `EnemyContact`；真-勇者之剑只在 `DamageResult::appliedDamage > 0` 后产生一次范围反击，避免防御成功仍触发或递归响应自身伤害。
+
 阿乌拉的“不死大军”是 `CombatSession` 拥有的 Boss 召唤计时器，而不是表现层生成对象：开场和每次 12 秒触发均创建两个拥有独立 AI、HP、伤害序列与血条的无头骑士 `EnemyRuntime`。支配继续通过敌人攻击序列结算，但基础伤害为 0，命中后提交 1.5 秒控制；闪避、防御和负面状态免疫在应用控制前统一判断。
 
 红镜龙的爪击由 `EnemyController` 的普通技能状态机负责；吐焰使用 `EnemyRuntime` 中独立的冷却、1 秒前摇、1.5 秒持续时间和伤害跳数状态。两种技能只有在另一技能不处于执行阶段时才能开始。吐焰每满 0.5 秒生成一个唯一伤害序列并调用 `DamageResolver`，UI 只读取当前 `160×64 px` 火焰 AABB。Boss UI 根据 `EnemyArchetype` 判断主 Boss，不能仅凭楼层类型把召唤物也画成固定 Boss 血条。
