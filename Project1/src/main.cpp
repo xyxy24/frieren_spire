@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <random>
+#include <optional>
 
 namespace
 {
@@ -30,6 +31,31 @@ arcane::game::run::Seed makeRuntimeSeed()
     const auto clock = static_cast<std::uint64_t>(
         std::chrono::high_resolution_clock::now().time_since_epoch().count());
     return entropy ^ clock;
+}
+
+struct HeadlessKnightTextures
+{
+    std::optional<sf::Texture> idle;
+    std::optional<sf::Texture> windup;
+    std::optional<sf::Texture> attack;
+};
+
+std::optional<sf::Texture> loadTexture(const std::string& path)
+{
+    sf::Texture texture;
+    if (!texture.loadFromFile(path)) return std::nullopt;
+    texture.setSmooth(false);
+    return texture;
+}
+
+HeadlessKnightTextures loadHeadlessKnightTextures()
+{
+    constexpr std::string_view Base = "assets/enemies/headless_knight/";
+    HeadlessKnightTextures textures;
+    textures.idle = loadTexture(std::string {Base} + "idle.png");
+    textures.windup = loadTexture(std::string {Base} + "windup.png");
+    textures.attack = loadTexture(std::string {Base} + "attack.png");
+    return textures;
 }
 
 void drawHealthBar(
@@ -621,7 +647,8 @@ void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
     target.draw(drop);
 }
 
-void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
+    const HeadlessKnightTextures& headlessTextures)
 {
     const arcane::game::CombatSession* combat = tower.combat();
     if (!combat) return;
@@ -694,8 +721,27 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
             || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
             || enemy.archetype == arcane::game::EnemyArchetype::Boss;
-        sf::RectangleShape enemyShape({enemy.width, enemy.height});
-        enemyShape.setPosition({enemy.position.x, enemy.position.y});
+        const bool headless = enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight;
+        const sf::Texture* texture = nullptr;
+        if (headless)
+        {
+            if (enemy.attackActive && headlessTextures.attack) texture = &*headlessTextures.attack;
+            else if (enemy.windingUp && headlessTextures.windup) texture = &*headlessTextures.windup;
+            else if (headlessTextures.idle) texture = &*headlessTextures.idle;
+        }
+        if (texture)
+        {
+            sf::Sprite sprite(*texture);
+            sprite.setOrigin({32.0F, 64.0F});
+            sprite.setPosition({enemy.position.x + enemy.width * 0.5F,
+                enemy.position.y + enemy.height});
+            sprite.setScale({enemy.facingDirection > 0.0F ? -1.0F : 1.0F, 1.0F});
+            target.draw(sprite);
+        }
+        else
+        {
+            sf::RectangleShape enemyShape({enemy.width, enemy.height});
+            enemyShape.setPosition({enemy.position.x, enemy.position.y});
         sf::Color enemyColor = primaryBoss
             ? sf::Color {129, 68, 172} : sf::Color {176, 70, 78};
         if (enemy.windingUp) enemyColor = sf::Color {242, 154, 69};
@@ -704,6 +750,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         enemyShape.setOutlineColor(sf::Color {245, 176, 129});
         enemyShape.setOutlineThickness(primaryBoss ? 6.0F : 3.0F);
         target.draw(enemyShape);
+        }
 
         if (enemy.skillEffectBounds)
         {
@@ -906,6 +953,7 @@ int main()
     arcane::app::TowerSessionConfig config;
     config.worldBounds = {0.0F, static_cast<float>(WindowWidth), GroundTop};
     arcane::app::AppFlowController app(makeRuntimeSeed(), config);
+    const HeadlessKnightTextures headlessKnightTextures = loadHeadlessKnightTextures();
     sf::Clock frameClock;
 
     while (window.isOpen())
@@ -947,7 +995,7 @@ int main()
             {
                 if (tower->combat())
                 {
-                    drawCombat(window, *tower);
+                    drawCombat(window, *tower, headlessKnightTextures);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }

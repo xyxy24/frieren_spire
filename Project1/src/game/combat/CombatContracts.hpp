@@ -94,6 +94,7 @@ struct EnemyStateView
     bool attackActive {false};
     bool slowed {false};
     std::optional<Aabb> skillEffectBounds;
+    float facingDirection {-1.0F};
 };
 
 struct SpellEffectView

@@ -774,7 +774,7 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             || enemy.breathRemaining > 0.0F;
         views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
-            windingUp, active, enemy.slowed, skillBounds});
+            windingUp, active, enemy.slowed, skillBounds, enemy.controller.facingDirection()});
     }
     return views;
 }
@@ -814,7 +814,7 @@ EnemyStateView CombatSession::enemyState() const noexcept
         enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
         enemy.controller.action() == ai::EnemyAction::Windup || enemy.breathWindup > 0.0F,
         enemy.controller.action() == ai::EnemyAction::Active || enemy.breathRemaining > 0.0F,
-        enemy.slowed, skillBounds};
+        enemy.slowed, skillBounds, enemy.controller.facingDirection()};
 }
 
 Aabb CombatSession::attackBounds() const noexcept

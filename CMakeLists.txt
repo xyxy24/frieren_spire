@@ -58,6 +58,13 @@ target_link_libraries(Project1
         SFML::System
 )
 
+add_custom_command(TARGET Project1 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:Project1>/assets
+    COMMENT "Copying runtime assets"
+)
+
 if(MSVC)
     target_compile_options(arcane_core PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
     target_compile_options(Project1 PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
