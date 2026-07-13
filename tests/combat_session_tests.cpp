@@ -863,13 +863,28 @@ bool linieUsesGroundedMediumImpactArea()
     if (!expect(combat.enemyState().currentHealth == 120, "Linie must have one hundred twenty HP")) return false;
     combat.update({}, 2.51F);
     combat.update({}, 0.50F);
-    combat.update({}, 0.80F);
+    combat.update({}, 0.91F);
     const auto area = combat.enemyState().skillEffectBounds;
-    return expect(area.has_value(), "Linie landing must expose its impact rectangle")
+    if (!(expect(area.has_value(), "Linie landing must expose its impact rectangle")
         && expect(area->top == 616.0F && area->height == 24.0F,
             "Linie impact rectangle must sit on the ground and be twenty-four pixels high")
-        && expect(area->width == 186.0F,
-            "Linie impact must extend seventy-two pixels on both sides");
+        && expect(area->width == 210.0F,
+            "Linie impact must extend eighty-four pixels on both sides"))) return false;
+    combat.update({}, 0.80F);
+    return expect(combat.enemyState().attackActive
+            && combat.enemyState().skillEffectBounds.has_value(),
+        "Linie landing pose and effect must remain active for one full second");
+}
+
+bool displacementSkillTriggersWhenPlayerEdgeEntersExtendedRange()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Linie, {430.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.01F);
+    return expect(combat.enemyState().windingUp,
+        "a displacement skill must wind up as soon as the player's edge enters its extended range");
 }
 
 bool auraOpensWithTwoHeadlessKnights()
@@ -889,7 +904,7 @@ bool auraOpensWithTwoHeadlessKnights()
             "Aura opening army must contain two headless knights");
 }
 
-bool auraDominationUsesNinetySixPixelRange()
+bool auraDominationUsesUpdatedCooldownAndStun()
 {
     arcane::game::CombatRequest request;
     request.playerSpawn = {160.0F, 576.0F};
@@ -897,14 +912,15 @@ bool auraDominationUsesNinetySixPixelRange()
     request.enemySpawn = {257.0F, 576.0F};
     request.enemyMaximumHealth = 225;
     arcane::game::CombatSession combat(request);
-    combat.update({}, 5.01F);
+    combat.update({}, 3.51F);
     const auto winding = combat.enemyState();
     if (!expect(winding.windingUp && !winding.skillEffectBounds.has_value(),
         "Aura domination must show windup without drawing a range rectangle")) return false;
     combat.update({}, 0.50F);
     combat.update({}, 0.01F);
-    return expect(combat.playerState().stunRemaining > 1.4F,
-        "domination must reach and stun a target inside ninety-six pixels");
+    return expect(combat.playerState().stunRemaining > 0.9F
+            && combat.playerState().stunRemaining <= 1.0F,
+        "domination must use its seven-second cooldown and one-second stun");
 }
 
 bool redMirrorDragonBreathTicksThreeTimes()
@@ -980,6 +996,8 @@ bool lugnerBloodMagicUsesRaisedSpriteHeightArea()
             "Lugner blood magic must expose its windup area")
         && expect(enemy.skillEffectBounds->height == 54.0F,
             "blood magic height must match the effect image")
+        && expect(enemy.skillEffectBounds->width == 88.0F,
+            "blood magic must use its updated eighty-eight pixel range")
         && expect(enemy.skillEffectBounds->top == enemy.position.y - 18.0F,
             "blood magic must be raised above Lugner's body origin");
 }
@@ -1197,8 +1215,9 @@ int main()
         && enemyChasePreservesConfiguredBodyGap()
         && chestMimicBiteStunsWithoutKnockback()
         && linieUsesGroundedMediumImpactArea()
+        && displacementSkillTriggersWhenPlayerEdgeEntersExtendedRange()
         && auraOpensWithTwoHeadlessKnights()
-        && auraDominationUsesNinetySixPixelRange()
+        && auraDominationUsesUpdatedCooldownAndStun()
         && redMirrorDragonBreathTicksThreeTimes()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()

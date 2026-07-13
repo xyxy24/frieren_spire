@@ -30,17 +30,17 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {180.0F, 480.0F, 480.0F, 0.5F, 480.0F / 320.0F, 0.0F, 0.0F,
             42.0F, 32.0F, 6.0F, false, true, EnemySkill::Dive};
     case EnemyArchetype::Lugner:
-        return EnemyConfig {160.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
-            42.0F, 72.0F, 6.0F, false, false, EnemySkill::Blood};
+        return EnemyConfig {160.0F, 88.0F, 88.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+            42.0F, 72.0F, 5.0F, false, false, EnemySkill::Blood};
     case EnemyArchetype::Linie:
-        return EnemyConfig {180.0F, 72.0F, 72.0F, 0.5F, 0.9F, 0.0F, 0.0F,
+        return EnemyConfig {180.0F, 84.0F, 84.0F, 0.5F, 1.9F, 0.0F, 144.0F,
             42.0F, 64.0F, 4.0F, true, false, EnemySkill::LeapingCleave};
     case EnemyArchetype::Draht:
         return EnemyConfig {160.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 8.0F, false, false, EnemySkill::Thread};
     case EnemyArchetype::ChaosFlower:
         return EnemyConfig {0.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
-            64.0F, 84.0F, 5.0F, true, false, EnemySkill::LeafBlade};
+            64.0F, 84.0F, 4.0F, true, false, EnemySkill::LeafBlade};
     case EnemyArchetype::FrostWolf:
         return EnemyConfig {240.0F, 64.0F, 64.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             64.0F, 42.0F, 4.0F, true, false, EnemySkill::WolfClaw};
@@ -58,7 +58,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
             42.0F, 64.0F, 9.0F, false, false, EnemySkill::TornadoMagic};
     case EnemyArchetype::Aura:
         return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
-            42.0F, 64.0F, 10.0F, false, false, EnemySkill::Domination};
+            42.0F, 64.0F, 7.0F, false, false, EnemySkill::Domination};
     case EnemyArchetype::RedMirrorDragon:
         return EnemyConfig {96.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             128.0F, 84.0F, 7.0F, true, false, EnemySkill::DragonClaw};
@@ -354,10 +354,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         const float tornadoCenter = tornado.bounds.left + tornado.bounds.width * 0.5F;
         const float currentPlayerCenter = player_.position().x + PlayerController::Width * 0.5F;
         tornado.bounds.left += std::clamp(currentPlayerCenter - tornadoCenter,
-            -160.0F * activeDelta, 160.0F * activeDelta);
+            -120.0F * activeDelta, 120.0F * activeDelta);
         const float movedCenter = tornado.bounds.left + tornado.bounds.width * 0.5F;
         player_.translateHorizontal((movedCenter > currentPlayerCenter ? 1.0F : -1.0F)
-            * 60.0F * activeDelta, request_.worldBounds);
+            * 80.0F * activeDelta, request_.worldBounds);
         if (intersects(playerBounds(), tornado.bounds))
         {
             if (!tornado.launched)
@@ -1504,7 +1504,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 || config.skill == ai::EnemySkill::KillingMagic
                 || config.skill == ai::EnemySkill::SideKick) damage = 15;
             if (config.skill == ai::EnemySkill::Blood)
-                damage = (enemy.health.maximum() - enemy.health.current()) / 2;
+                damage = (enemy.health.maximum() - enemy.health.current()) * 2 / 5;
             if (request_.enemies.empty() && enemy.archetype != EnemyArchetype::Aura
                 && enemy.archetype != EnemyArchetype::RedMirrorDragon)
                 damage = request_.enemyAttackDamage;
@@ -1525,7 +1525,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (config.skill == ai::EnemySkill::Thread)
                     player_.applyLaunch(540.0F, playerControlDuration(0.28F));
                 else if (config.skill == ai::EnemySkill::Domination)
-                    player_.applyHitReaction(0.0F, playerControlDuration(1.5F));
+                    player_.applyHitReaction(0.0F, playerControlDuration(1.0F));
                 else if (config.skill == ai::EnemySkill::Thrust)
                     player_.applyHitReaction(0.0F, playerControlDuration(1.0F));
                 else player_.applyHitReaction(enemy.controller.facingDirection() * KnockbackSpeed,

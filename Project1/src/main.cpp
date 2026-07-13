@@ -39,6 +39,7 @@ struct EnemyStateTextures
 {
     std::optional<sf::Texture> idle;
     std::optional<sf::Texture> windup;
+    std::optional<sf::Texture> jump;
     std::optional<sf::Texture> attack;
 };
 
@@ -50,11 +51,12 @@ std::optional<sf::Texture> loadTexture(const std::string& path)
     return texture;
 }
 
-EnemyStateTextures loadEnemyStateTextures(const std::string_view base)
+EnemyStateTextures loadEnemyStateTextures(const std::string_view base, const bool loadJump = false)
 {
     EnemyStateTextures textures;
     textures.idle = loadTexture(std::string {base} + "idle.png");
     textures.windup = loadTexture(std::string {base} + "windup.png");
+    if (loadJump) textures.jump = loadTexture(std::string {base} + "jump.png");
     textures.attack = loadTexture(std::string {base} + "attack.png");
     return textures;
 }
@@ -705,6 +707,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
+    const EnemyStateTextures& linieTextures,
+    const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator)
 {
@@ -794,10 +798,15 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &birdTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
             stateTextures = &lugnerTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Linie)
+            stateTextures = &linieTextures;
         const sf::Texture* texture = nullptr;
         if (stateTextures)
         {
-            if (enemy.attackActive && stateTextures->attack) texture = &*stateTextures->attack;
+            if (enemy.archetype == arcane::game::EnemyArchetype::Linie
+                && enemy.attackActive && !enemy.skillEffectBounds
+                && stateTextures->jump) texture = &*stateTextures->jump;
+            else if (enemy.attackActive && stateTextures->attack) texture = &*stateTextures->attack;
             else if (enemy.windingUp && stateTextures->windup) texture = &*stateTextures->windup;
             else if (stateTextures->idle) texture = &*stateTextures->idle;
         }
@@ -831,6 +840,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             const auto area = *enemy.skillEffectBounds;
             const bool lugnerBlood = enemy.archetype == arcane::game::EnemyArchetype::Lugner
                 && enemy.attackActive;
+            const bool linieCleave = enemy.archetype == arcane::game::EnemyArchetype::Linie
+                && enemy.attackActive;
             const sf::Texture* bloodTexture = nullptr;
             if (lugnerBlood)
             {
@@ -838,7 +849,30 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                     static_cast<std::size_t>(enemy.skillEffectProgress * 3.0F));
                 if (lugnerSkillTextures[frame]) bloodTexture = &*lugnerSkillTextures[frame];
             }
-            if (bloodTexture)
+            const sf::Texture* cleaveTexture = nullptr;
+            std::size_t cleaveFrame = 0U;
+            if (linieCleave)
+            {
+                constexpr float LandingStartProgress = 0.9F / 1.9F;
+                const float landingProgress = std::clamp(
+                    (enemy.skillEffectProgress - LandingStartProgress)
+                        / (1.0F - LandingStartProgress), 0.0F, 1.0F);
+                cleaveFrame = landingProgress < 0.5F ? 0U : 1U;
+                if (linieSkillTextures[cleaveFrame])
+                    cleaveTexture = &*linieSkillTextures[cleaveFrame];
+            }
+            if (cleaveTexture)
+            {
+                sf::Sprite effect(*cleaveTexture);
+                const auto size = cleaveTexture->getSize();
+                effect.setOrigin({static_cast<float>(size.x) * 0.5F,
+                    static_cast<float>(size.y)});
+                effect.setPosition({area.left + area.width * 0.5F,
+                    area.top + area.height + 8.0F + (cleaveFrame == 0U ? 10.0F : 0.0F)});
+                effect.setScale({area.width / static_cast<float>(size.x), 1.0F});
+                target.draw(effect);
+            }
+            else if (bloodTexture)
             {
                 sf::Sprite effect(*bloodTexture);
                 const auto size = bloodTexture->getSize();
@@ -1065,6 +1099,12 @@ int main()
         loadTexture("assets/enemies/lugner/skill2.png"),
         loadTexture("assets/enemies/lugner/skill3.png")
     };
+    const EnemyStateTextures linieTextures = loadEnemyStateTextures(
+        "assets/enemies/linie/", true);
+    const std::array<std::optional<sf::Texture>, 2> linieSkillTextures {
+        loadTexture("assets/enemies/linie/skill1.png"),
+        loadTexture("assets/enemies/linie/skill2.png")
+    };
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
@@ -1131,7 +1171,7 @@ int main()
                 {
                     drawCombat(window, *tower, headlessKnightTextures, chestMimicTextures,
                         birdDemonTextures, lugnerTextures, lugnerSkillTextures,
-                        playerAnimator, spellEffectAnimator);
+                        linieTextures, linieSkillTextures, playerAnimator, spellEffectAnimator);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }

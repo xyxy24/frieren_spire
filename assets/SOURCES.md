@@ -28,6 +28,13 @@
 - Original source/license: not yet recorded; classroom prototype use only until the team fills this in.
 - Purpose: placeholder character states and a three-frame blood-magic effect for Lugner.
 
+## Linie and leaping-cleave placeholders
+
+- Files: `enemies/linie/idle.png`, `windup.png`, `jump.png`, `attack.png`, `skill1.png`, `skill2.png`
+- Added by: project team member, 2026-07-13
+- Original source/license: not yet recorded; classroom prototype use only until the team fills this in.
+- Purpose: placeholder character states, airborne pose, and two-frame grounded cleave effect for Linie.
+
 ## Player pixel-animation placeholders
 
 - Files: `../Project1/assets/player/generated/*.png` and derived
