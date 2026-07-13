@@ -947,6 +947,22 @@ bool secondActEnemiesExposeConfiguredContent()
             "Qual content values must be authoritative");
 }
 
+bool lugnerBloodMagicUsesRaisedSpriteHeightArea()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Lugner, {230.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 3.01F);
+    const auto enemy = combat.enemyState();
+    return expect(enemy.skillEffectBounds.has_value(),
+            "Lugner blood magic must expose its windup area")
+        && expect(enemy.skillEffectBounds->height == 54.0F,
+            "blood magic height must match the effect image")
+        && expect(enemy.skillEffectBounds->top == enemy.position.y - 18.0F,
+            "blood magic must be raised above Lugner's body origin");
+}
+
 bool chaosFlowerSleepAppliesStackBasedStun()
 {
     arcane::game::CombatRequest request;
@@ -1164,6 +1180,7 @@ int main()
         && redMirrorDragonBreathTicksThreeTimes()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
+        && lugnerBloodMagicUsesRaisedSpriteHeightArea()
         && chaosFlowerSleepAppliesStackBasedStun()
         && lateSecondActEnemiesExposeConfiguredContent()
         && laufenTeleportsBehindAndImmediatelySideKicks()

@@ -123,6 +123,11 @@ Vec2 EnemyController::position() const noexcept { return position_; }
 EnemyAction EnemyController::action() const noexcept { return action_; }
 float EnemyController::facingDirection() const noexcept { return facingDirection_; }
 std::uint64_t EnemyController::attackSequence() const noexcept { return attackSequence_; }
+float EnemyController::activeProgress() const noexcept
+{
+    return config_.activeSeconds > 0.0F
+        ? std::clamp(activeElapsed_ / config_.activeSeconds, 0.0F, 1.0F) : 0.0F;
+}
 
 Aabb EnemyController::attackBounds() const noexcept
 {
@@ -133,6 +138,12 @@ Aabb EnemyController::attackBounds() const noexcept
         if (activeElapsed_ < config_.activeSeconds * 0.85F) return {};
         return {position_.x - config_.attackRange, groundTop_ - 24.0F,
             config_.width + config_.attackRange * 2.0F, 24.0F};
+    }
+    if (config_.skill == EnemySkill::Blood)
+    {
+        const float left = facingDirection_ > 0.0F
+            ? position_.x + config_.width : position_.x - config_.attackRange;
+        return {left, position_.y - 18.0F, config_.attackRange, 54.0F};
     }
     const float left = facingDirection_ > 0.0F
         ? position_.x + config_.width : position_.x - config_.attackRange;

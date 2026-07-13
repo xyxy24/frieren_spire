@@ -1702,7 +1702,7 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
         views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
             windingUp, active, enemy.slowed, skillBounds, enemy.controller.facingDirection(),
-            enemy.markedRemaining > 0.0F});
+            enemy.markedRemaining > 0.0F, enemy.controller.activeProgress()});
     }
     return views;
 }
@@ -1753,7 +1753,7 @@ EnemyStateView CombatSession::enemyState() const noexcept
         enemy.controller.action() == ai::EnemyAction::Windup || enemy.breathWindup > 0.0F,
         enemy.controller.action() == ai::EnemyAction::Active || enemy.breathRemaining > 0.0F,
         enemy.slowed, skillBounds, enemy.controller.facingDirection(),
-        enemy.markedRemaining > 0.0F};
+        enemy.markedRemaining > 0.0F, enemy.controller.activeProgress()};
 }
 
 Aabb CombatSession::attackBounds() const noexcept

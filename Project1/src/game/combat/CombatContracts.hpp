@@ -99,6 +99,7 @@ struct EnemyStateView
     std::optional<Aabb> skillEffectBounds;
     float facingDirection {-1.0F};
     bool marked {false};
+    float skillEffectProgress {};
 };
 
 struct SpellEffectView
