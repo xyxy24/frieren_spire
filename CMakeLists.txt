@@ -48,6 +48,7 @@ target_include_directories(arcane_core
 add_executable(Project1
     Project1/src/main.cpp
     Project1/src/platform/SfmlInputMapper.cpp
+    Project1/src/presentation/PlayerAnimator.cpp
 )
 
 target_link_libraries(Project1
@@ -62,6 +63,9 @@ add_custom_command(TARGET Project1 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/assets
         $<TARGET_FILE_DIR:Project1>/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/player/processed
+        $<TARGET_FILE_DIR:Project1>/assets/player
     COMMENT "Copying runtime assets"
 )
 

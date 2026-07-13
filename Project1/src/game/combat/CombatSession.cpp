@@ -853,6 +853,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         const spells::SpellDefinition* definition)
     {
         if (!cast.cast || !definition) return;
+        ++playerCastSequence_;
         const auto visualDuration = [](const spells::SpellEffect effect) {
             switch (effect)
             {
@@ -1568,8 +1569,9 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
 
 PlayerStateView CombatSession::playerState() const noexcept
 {
-    return {player_.position(), playerHealth_.current(), playerHealth_.maximum(), player_.isGrounded(),
-        player_.facingDirection(), attack_.isActive(), attack_.cooldownRemaining(), spells_.view(),
+    return {player_.position(), player_.velocity(), playerHealth_.current(), playerHealth_.maximum(),
+        player_.isGrounded(), player_.facingDirection(), attack_.isActive(),
+        attack_.cooldownRemaining(), attack_.sequence(), playerCastSequence_, spells_.view(),
         spells_.ultimateView(), player_.dashRemaining(), player_.dashCooldownRemaining(),
         player_.isShadowDashing(), player_.shadowDashChargeRemaining(),
         player_.isStunned(), player_.stunRemaining(), blessingRemaining_,

@@ -129,6 +129,7 @@ private:
     Health playerHealth_;
     std::vector<EnemyRuntime> enemies_;
     AttackState attack_;
+    std::uint64_t playerCastSequence_ {};
     spells::SpellSystem spells_;
     relics::RelicRuntime relics_;
     DamageResolver playerDamageResolver_;
