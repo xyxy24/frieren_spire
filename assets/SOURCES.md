@@ -42,6 +42,13 @@
 - Original source/license: not yet recorded; classroom prototype use only until the team fills this in.
 - Purpose: placeholder idle, thread-magic windup, and attack-active presentation for Draht. Thread magic intentionally has no separate effect texture.
 
+## Aura character and dialogue portraits
+
+- Files: `enemies/aura/initial.png`, `idle.png`, `windup.png`, `die.png`, `portraits/aura/*.png`, and `portraits/frieren/idle.png`
+- Added by: project team member, 2026-07-13
+- Original source/license: not yet recorded; classroom prototype use only until the team fills this in.
+- Purpose: Aura's intro, idle, domination-windup and defeated presentation, plus dialogue portraits for Aura and Frieren.
+
 ## Player pixel-animation placeholders
 
 - Files: `../Project1/assets/player/generated/*.png` and derived

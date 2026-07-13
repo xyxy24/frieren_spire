@@ -33,6 +33,8 @@ public:
     [[nodiscard]] std::vector<SpellEffectView> spellEffects() const;
     [[nodiscard]] Aabb attackBounds() const noexcept;
     [[nodiscard]] const std::optional<CombatResult>& result() const noexcept;
+    [[nodiscard]] std::optional<CombatDialogueLineView> dialogueLine() const noexcept;
+    [[nodiscard]] std::optional<BossIntroView> bossIntro() const noexcept;
     [[nodiscard]] bool equipSpell(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
     [[nodiscard]] bool equipUltimateSpell(std::optional<std::uint32_t> id) noexcept;
 
@@ -123,6 +125,9 @@ private:
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
     void finish(CombatOutcome outcome) noexcept;
+    enum class DialogueScript : std::uint8_t { None, AuraPreBattle, AuraFirstDomination, AuraDefeat };
+    void beginDialogue(DialogueScript script) noexcept;
+    void advanceDialogue() noexcept;
 
     CombatRequest request_;
     PlayerController player_;
@@ -201,5 +206,12 @@ private:
     std::vector<ActiveTornado> activeTornadoes_;
     std::uint64_t environmentalSequence_ {};
     std::optional<CombatResult> result_;
+    DialogueScript dialogueScript_ {DialogueScript::None};
+    std::uint8_t dialogueLineIndex_ {};
+    bool auraFirstDominationDialogueShown_ {};
+    bool auraGuaranteedDominationAvailable_ {true};
+    bool auraDefeatDialogueShown_ {};
+    std::optional<CombatOutcome> outcomeAfterDialogue_;
+    float bossIntroRemaining_ {};
 };
 }

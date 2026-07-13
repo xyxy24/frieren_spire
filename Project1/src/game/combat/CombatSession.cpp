@@ -12,6 +12,20 @@ namespace
 constexpr std::array SpellDamageSources {
     DamageSource::PlayerSpell0, DamageSource::PlayerSpell1, DamageSource::PlayerSpell2
 };
+constexpr std::array AuraPreBattleDialogue {
+    CombatDialogueLineView {"AURA", "LUGNER'S PRESENCE IS GONE. IT SEEMS HE WAS KILLED.", "aura-initial"},
+    CombatDialogueLineView {"FRIEREN", "NOT ONLY LUGNER. I DEFEATED ALL OF YOUR EXECUTIONERS.", "frieren-pre"},
+    CombatDialogueLineView {"AURA", "IF I DEFEAT YOU HERE, THE RESULT WILL STILL BE ENOUGH.", "aura-idle"}
+};
+constexpr std::array AuraFirstDominationDialogue {
+    CombatDialogueLineView {"AURA", "DOMINATION MAGIC!", "aura-windup"},
+    CombatDialogueLineView {"AURA", "YOUR MANA HAS BARELY GROWN SINCE EIGHTY YEARS AGO.", "aura-windup"},
+    CombatDialogueLineView {"FRIEREN", "...", "frieren"}
+};
+constexpr std::array AuraDefeatDialogue {
+    CombatDialogueLineView {"FRIEREN", "KILL YOURSELF, AURA.", "frieren"},
+    CombatDialogueLineView {"AURA", "IMPOSSIBLE... HOW COULD I...", "aura-die"}
+};
 }
 
 ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
@@ -57,7 +71,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {100.0F, 120.0F, 120.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 9.0F, false, false, EnemySkill::TornadoMagic};
     case EnemyArchetype::Aura:
-        return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {120.0F, 100000.0F, 100000.0F, 0.5F, 1.0F, 0.0F, 0.0F,
             42.0F, 64.0F, 7.0F, false, false, EnemySkill::Domination};
     case EnemyArchetype::RedMirrorDragon:
         return EnemyConfig {96.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
@@ -144,6 +158,9 @@ CombatSession::CombatSession(CombatRequest request)
         flowerFieldCenterX_ = player_.position().x + PlayerController::Width * 0.5F;
     }
     if (!playerHealth_.isAlive()) finish(CombatOutcome::Defeat);
+    if (std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.archetype == EnemyArchetype::Aura;
+    })) bossIntroRemaining_ = 2.4F;
 }
 
 DamageResult CombatSession::resolvePlayerDamage(DamageRequest request) noexcept
@@ -233,6 +250,17 @@ void CombatSession::onBlessingPreventedControl() noexcept
 void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
 {
     if (deltaSeconds <= 0.0F) return;
+    if (bossIntroRemaining_ > 0.0F)
+    {
+        bossIntroRemaining_ = std::max(0.0F, bossIntroRemaining_ - deltaSeconds);
+        if (bossIntroRemaining_ <= 0.0F) beginDialogue(DialogueScript::AuraPreBattle);
+        return;
+    }
+    if (dialogueScript_ != DialogueScript::None)
+    {
+        if (intent.menuConfirmPressed) advanceDialogue();
+        return;
+    }
     if (result_)
     {
         if (result_->outcome == CombatOutcome::Victory)
@@ -672,6 +700,14 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 || enemy.archetype == EnemyArchetype::Denken;
             enemy.controller.update(target, deltaSeconds, request_.worldBounds, speedMultiplier,
                 enemy.skillSealRemaining <= 0.0F && !manualSkill);
+            if (enemy.archetype == EnemyArchetype::Aura
+                && enemy.controller.action() == ai::EnemyAction::Windup
+                && !auraFirstDominationDialogueShown_)
+            {
+                auraFirstDominationDialogueShown_ = true;
+                beginDialogue(DialogueScript::AuraFirstDomination);
+                return;
+            }
         }
         if (phantomRemaining_ > 0.0F && enemy.controller.action() == ai::EnemyAction::Active
             && intersects(phantomBounds_, enemy.controller.attackBounds()))
@@ -1475,6 +1511,19 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         }
     }
 
+    const auto defeatedAura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.archetype == EnemyArchetype::Aura && !enemy.health.isAlive();
+    });
+    if (defeatedAura != enemies_.end())
+    {
+        for (auto& enemy : enemies_)
+        {
+            if (&enemy == &*defeatedAura || !enemy.health.isAlive()) continue;
+            static_cast<void>(enemy.health.damage(enemy.health.current()));
+            enemy.controller.markDead();
+        }
+    }
+
     for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
     {
         auto& enemy = enemies_[enemyIndex];
@@ -1493,7 +1542,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     {DamageSource::Event, enemy.handledSkillSequence, 10}));
         }
         if (enemy.controller.action() == ai::EnemyAction::Active
-            && intersects(playerBounds(), enemy.controller.attackBounds()))
+            && (config.skill == ai::EnemySkill::Domination
+                || intersects(playerBounds(), enemy.controller.attackBounds())))
         {
             int damage = 20;
             if (config.skill == ai::EnemySkill::Thread) damage = 10;
@@ -1517,15 +1567,22 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                         || (player_.flightRemaining() > 0.0F
                             && config.skill == ai::EnemySkill::LeapingCleave)});
             if (result.appliedDamage > 0) beamRemaining_ = 0.0F;
+            const bool guaranteedDomination = config.skill == ai::EnemySkill::Domination
+                && auraGuaranteedDominationAvailable_;
             const bool dominationHit = config.skill == ai::EnemySkill::Domination
-                && !player_.isShadowDashing()
-                && spellInvulnerableRemaining_ <= 0.0F;
-            if ((result.appliedDamage > 0 || dominationHit) && blessingRemaining_ <= 0.0F)
+                && (guaranteedDomination || (!player_.isShadowDashing()
+                    && spellInvulnerableRemaining_ <= 0.0F));
+            if ((result.appliedDamage > 0 || dominationHit)
+                && (blessingRemaining_ <= 0.0F || guaranteedDomination))
             {
                 if (config.skill == ai::EnemySkill::Thread)
                     player_.applyLaunch(540.0F, playerControlDuration(0.28F));
                 else if (config.skill == ai::EnemySkill::Domination)
-                    player_.applyHitReaction(0.0F, playerControlDuration(1.0F));
+                {
+                    player_.applyHitReaction(0.0F,
+                        guaranteedDomination ? 1.0F : playerControlDuration(1.0F));
+                    auraGuaranteedDominationAvailable_ = false;
+                }
                 else if (config.skill == ai::EnemySkill::Thrust)
                     player_.applyHitReaction(0.0F, playerControlDuration(1.0F));
                 else player_.applyHitReaction(enemy.controller.facingDirection() * KnockbackSpeed,
@@ -1563,7 +1620,18 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         }
     }
     if (std::none_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) { return enemy.health.isAlive(); }))
-        finish(CombatOutcome::Victory);
+    {
+        const bool auraEncounter = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::Aura;
+        });
+        if (auraEncounter && !auraDefeatDialogueShown_)
+        {
+            auraDefeatDialogueShown_ = true;
+            outcomeAfterDialogue_ = CombatOutcome::Victory;
+            beginDialogue(DialogueScript::AuraDefeat);
+        }
+        else finish(CombatOutcome::Victory);
+    }
     else if (!playerHealth_.isAlive()) finish(CombatOutcome::Defeat);
 }
 
@@ -1680,6 +1748,48 @@ Aabb CombatSession::attackBounds() const noexcept
 }
 
 const std::optional<CombatResult>& CombatSession::result() const noexcept { return result_; }
+std::optional<CombatDialogueLineView> CombatSession::dialogueLine() const noexcept
+{
+    switch (dialogueScript_)
+    {
+    case DialogueScript::AuraPreBattle: return AuraPreBattleDialogue[dialogueLineIndex_];
+    case DialogueScript::AuraFirstDomination: return AuraFirstDominationDialogue[dialogueLineIndex_];
+    case DialogueScript::AuraDefeat: return AuraDefeatDialogue[dialogueLineIndex_];
+    case DialogueScript::None: return std::nullopt;
+    }
+    return std::nullopt;
+}
+std::optional<BossIntroView> CombatSession::bossIntro() const noexcept
+{
+    if (bossIntroRemaining_ <= 0.0F) return std::nullopt;
+    return BossIntroView {"GUILLOTINE AURA", bossIntroRemaining_, 2.4F};
+}
+void CombatSession::beginDialogue(const DialogueScript script) noexcept
+{
+    dialogueScript_ = script;
+    dialogueLineIndex_ = 0U;
+}
+void CombatSession::advanceDialogue() noexcept
+{
+    std::size_t lineCount = 0U;
+    switch (dialogueScript_)
+    {
+    case DialogueScript::AuraPreBattle: lineCount = AuraPreBattleDialogue.size(); break;
+    case DialogueScript::AuraFirstDomination: lineCount = AuraFirstDominationDialogue.size(); break;
+    case DialogueScript::AuraDefeat: lineCount = AuraDefeatDialogue.size(); break;
+    case DialogueScript::None: return;
+    }
+    ++dialogueLineIndex_;
+    if (dialogueLineIndex_ < lineCount) return;
+    dialogueScript_ = DialogueScript::None;
+    dialogueLineIndex_ = 0U;
+    if (outcomeAfterDialogue_)
+    {
+        const CombatOutcome outcome = *outcomeAfterDialogue_;
+        outcomeAfterDialogue_.reset();
+        finish(outcome);
+    }
+}
 bool CombatSession::equipSpell(const std::size_t slot, const std::optional<std::uint32_t> id) noexcept
 { return spells_.equip(slot, id); }
 bool CombatSession::equipUltimateSpell(const std::optional<std::uint32_t> id) noexcept
