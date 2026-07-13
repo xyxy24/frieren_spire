@@ -37,9 +37,21 @@ arcane::game::run::Seed makeRuntimeSeed()
 
 struct EnemyStateTextures
 {
+    std::optional<sf::Texture> initial;
     std::optional<sf::Texture> idle;
     std::optional<sf::Texture> windup;
+    std::optional<sf::Texture> jump;
     std::optional<sf::Texture> attack;
+    std::optional<sf::Texture> die;
+};
+
+struct DialoguePortraitTextures
+{
+    std::optional<sf::Texture> frieren;
+    std::optional<sf::Texture> auraInitial;
+    std::optional<sf::Texture> auraIdle;
+    std::optional<sf::Texture> auraWindup;
+    std::optional<sf::Texture> auraDie;
 };
 
 std::optional<sf::Texture> loadTexture(const std::string& path)
@@ -50,12 +62,16 @@ std::optional<sf::Texture> loadTexture(const std::string& path)
     return texture;
 }
 
-EnemyStateTextures loadEnemyStateTextures(const std::string_view base)
+EnemyStateTextures loadEnemyStateTextures(const std::string_view base, const bool loadJump = false,
+    const bool loadIntroAndDeath = false, const bool loadAttack = true)
 {
     EnemyStateTextures textures;
+    if (loadIntroAndDeath) textures.initial = loadTexture(std::string {base} + "initial.png");
     textures.idle = loadTexture(std::string {base} + "idle.png");
     textures.windup = loadTexture(std::string {base} + "windup.png");
-    textures.attack = loadTexture(std::string {base} + "attack.png");
+    if (loadJump) textures.jump = loadTexture(std::string {base} + "jump.png");
+    if (loadAttack) textures.attack = loadTexture(std::string {base} + "attack.png");
+    if (loadIntroAndDeath) textures.die = loadTexture(std::string {base} + "die.png");
     return textures;
 }
 
@@ -705,6 +721,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
+    const EnemyStateTextures& linieTextures,
+    const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
+    const EnemyStateTextures& drahtTextures,
+    const EnemyStateTextures& auraTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator)
 {
@@ -780,7 +800,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
 
     for (const arcane::game::EnemyStateView enemy : combat->enemyStates())
     {
-        if (!enemy.alive) continue;
+        const bool showDefeatedAura = !enemy.alive
+            && enemy.archetype == arcane::game::EnemyArchetype::Aura
+            && combat->dialogueLine().has_value();
+        if (!enemy.alive && !showDefeatedAura) continue;
         const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
             || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
             || enemy.archetype == arcane::game::EnemyArchetype::Boss;
@@ -793,10 +816,26 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &birdTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
             stateTextures = &lugnerTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Linie)
+            stateTextures = &linieTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Draht)
+            stateTextures = &drahtTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Aura)
+            stateTextures = &auraTextures;
         const sf::Texture* texture = nullptr;
         if (stateTextures)
         {
-            if (enemy.attackActive && stateTextures->attack) texture = &*stateTextures->attack;
+            const auto dialogue = combat->dialogueLine();
+            const bool auraInitial = enemy.archetype == arcane::game::EnemyArchetype::Aura
+                && (combat->bossIntro().has_value()
+                    || (dialogue && (dialogue->portrait == "aura-initial"
+                        || dialogue->portrait == "frieren-pre")));
+            if (showDefeatedAura && stateTextures->die) texture = &*stateTextures->die;
+            else if (auraInitial && stateTextures->initial) texture = &*stateTextures->initial;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Linie
+                && enemy.attackActive && !enemy.skillEffectBounds
+                && stateTextures->jump) texture = &*stateTextures->jump;
+            else if (enemy.attackActive && stateTextures->attack) texture = &*stateTextures->attack;
             else if (enemy.windingUp && stateTextures->windup) texture = &*stateTextures->windup;
             else if (stateTextures->idle) texture = &*stateTextures->idle;
         }
@@ -830,6 +869,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             const auto area = *enemy.skillEffectBounds;
             const bool lugnerBlood = enemy.archetype == arcane::game::EnemyArchetype::Lugner
                 && enemy.attackActive;
+            const bool linieCleave = enemy.archetype == arcane::game::EnemyArchetype::Linie
+                && enemy.attackActive;
             const sf::Texture* bloodTexture = nullptr;
             if (lugnerBlood)
             {
@@ -837,7 +878,30 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                     static_cast<std::size_t>(enemy.skillEffectProgress * 3.0F));
                 if (lugnerSkillTextures[frame]) bloodTexture = &*lugnerSkillTextures[frame];
             }
-            if (bloodTexture)
+            const sf::Texture* cleaveTexture = nullptr;
+            std::size_t cleaveFrame = 0U;
+            if (linieCleave)
+            {
+                constexpr float LandingStartProgress = 0.9F / 1.9F;
+                const float landingProgress = std::clamp(
+                    (enemy.skillEffectProgress - LandingStartProgress)
+                        / (1.0F - LandingStartProgress), 0.0F, 1.0F);
+                cleaveFrame = landingProgress < 0.5F ? 0U : 1U;
+                if (linieSkillTextures[cleaveFrame])
+                    cleaveTexture = &*linieSkillTextures[cleaveFrame];
+            }
+            if (cleaveTexture)
+            {
+                sf::Sprite effect(*cleaveTexture);
+                const auto size = cleaveTexture->getSize();
+                effect.setOrigin({static_cast<float>(size.x) * 0.5F,
+                    static_cast<float>(size.y)});
+                effect.setPosition({area.left + area.width * 0.5F,
+                    area.top + area.height + 8.0F + (cleaveFrame == 0U ? 10.0F : 0.0F)});
+                effect.setScale({area.width / static_cast<float>(size.x), 1.0F});
+                target.draw(effect);
+            }
+            else if (bloodTexture)
             {
                 sf::Sprite effect(*bloodTexture);
                 const auto size = bloodTexture->getSize();
@@ -882,6 +946,143 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         attackShape.setOutlineThickness(2.0F);
         target.draw(attackShape);
     }
+    if (const auto dialogue = combat->dialogueLine(); false && dialogue)
+    {
+        sf::RectangleShape shade({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});
+        shade.setFillColor(sf::Color {8, 8, 14, 48});
+        target.draw(shade);
+        const bool auraSpeaking = dialogue->speaker == "AURA";
+        sf::RectangleShape panel({1232.0F, 166.0F});
+        panel.setPosition({24.0F, 530.0F});
+        panel.setFillColor(sf::Color {30, 27, 39, 218});
+        panel.setOutlineColor(dialogue->speaker == "AURA"
+            ? sf::Color {201, 132, 235} : sf::Color {172, 213, 255});
+        panel.setOutlineThickness(4.0F);
+        target.draw(panel);
+
+        sf::RectangleShape portraitFrame({126.0F, 126.0F});
+        portraitFrame.setPosition({44.0F, 550.0F});
+        portraitFrame.setFillColor(auraSpeaking
+            ? sf::Color {73, 47, 88, 235} : sf::Color {46, 66, 82, 235});
+        portraitFrame.setOutlineColor(auraSpeaking
+            ? sf::Color {224, 164, 246} : sf::Color {188, 226, 255});
+        portraitFrame.setOutlineThickness(3.0F);
+        target.draw(portraitFrame);
+
+        sf::CircleShape hair(45.0F, 32U);
+        hair.setPosition({62.0F, 560.0F});
+        hair.setFillColor(auraSpeaking
+            ? sf::Color {198, 116, 211} : sf::Color {226, 225, 220});
+        target.draw(hair);
+        sf::CircleShape face(34.0F, 32U);
+        face.setPosition({73.0F, 578.0F});
+        face.setFillColor(sf::Color {241, 207, 181});
+        target.draw(face);
+        for (const float eyeX : std::array {87.0F, 115.0F})
+        {
+            sf::CircleShape eye(3.5F, 12U);
+            eye.setPosition({eyeX, 608.0F});
+            eye.setFillColor(auraSpeaking ? sf::Color {125, 45, 155} : sf::Color {58, 120, 151});
+            target.draw(eye);
+        }
+        sf::RectangleShape mouth({auraSpeaking ? 22.0F : 16.0F, 3.0F});
+        mouth.setPosition({auraSpeaking ? 91.0F : 94.0F, 638.0F});
+        mouth.setFillColor(auraSpeaking ? sf::Color {126, 53, 92} : sf::Color {145, 86, 82});
+        target.draw(mouth);
+        if (auraSpeaking)
+        {
+            for (const float hornX : std::array {63.0F, 133.0F})
+            {
+                sf::ConvexShape horn(3U);
+                horn.setPoint(0U, {hornX, 582.0F});
+                horn.setPoint(1U, {hornX + 18.0F, 558.0F});
+                horn.setPoint(2U, {hornX + 13.0F, 591.0F});
+                horn.setFillColor(sf::Color {105, 69, 122});
+                target.draw(horn);
+            }
+        }
+
+        drawPixelText(target, dialogue->speaker, {194.0F, 550.0F}, 1.55F,
+            auraSpeaking ? sf::Color {225, 165, 250}
+                : sf::Color {188, 225, 255});
+        drawPixelText(target, dialogue->text, {194.0F, 597.0F}, 1.18F,
+            sf::Color {240, 236, 224});
+        drawPixelText(target, "ENTER", {1146.0F, 663.0F}, 0.9F,
+            sf::Color {190, 184, 205});
+    }
+}
+
+void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSession& combat,
+    const DialoguePortraitTextures& portraits)
+{
+    if (const auto intro = combat.bossIntro())
+    {
+        const float progress = 1.0F - intro->remaining / intro->duration;
+        const float alphaFactor = std::min(1.0F, std::min(progress * 4.0F,
+            (1.0F - progress) * 4.0F));
+        sf::RectangleShape shade({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});
+        shade.setFillColor(sf::Color {8, 6, 12,
+            static_cast<std::uint8_t>(125.0F * std::max(0.0F, alphaFactor))});
+        target.draw(shade);
+        sf::RectangleShape line({760.0F, 3.0F});
+        line.setPosition({260.0F, 402.0F});
+        line.setFillColor(sf::Color {198, 126, 224,
+            static_cast<std::uint8_t>(220.0F * std::max(0.0F, alphaFactor))});
+        target.draw(line);
+        drawPixelText(target, intro->name, {430.0F, 330.0F}, 3.0F,
+            sf::Color {235, 193, 250,
+                static_cast<std::uint8_t>(255.0F * std::max(0.0F, alphaFactor))});
+        drawPixelText(target, "FIRST ACT BOSS", {520.0F, 430.0F}, 1.2F,
+            sf::Color {205, 195, 216,
+                static_cast<std::uint8_t>(230.0F * std::max(0.0F, alphaFactor))});
+        return;
+    }
+    const auto dialogue = combat.dialogueLine();
+    if (!dialogue) return;
+
+    sf::RectangleShape shade({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});
+    shade.setFillColor(sf::Color {8, 8, 14, 48});
+    target.draw(shade);
+    const bool auraSpeaking = dialogue->speaker == "AURA";
+    sf::RectangleShape panel({1232.0F, 166.0F});
+    panel.setPosition({24.0F, 530.0F});
+    panel.setFillColor(sf::Color {30, 27, 39, 218});
+    panel.setOutlineColor(auraSpeaking ? sf::Color {201, 132, 235} : sf::Color {172, 213, 255});
+    panel.setOutlineThickness(4.0F);
+    target.draw(panel);
+
+    sf::RectangleShape portraitFrame({126.0F, 126.0F});
+    portraitFrame.setPosition({44.0F, 550.0F});
+    portraitFrame.setFillColor(auraSpeaking ? sf::Color {73, 47, 88, 235} : sf::Color {46, 66, 82, 235});
+    portraitFrame.setOutlineColor(auraSpeaking ? sf::Color {224, 164, 246} : sf::Color {188, 226, 255});
+    portraitFrame.setOutlineThickness(3.0F);
+    target.draw(portraitFrame);
+
+    const sf::Texture* portrait = nullptr;
+    if (dialogue->portrait.starts_with("frieren") && portraits.frieren)
+        portrait = &*portraits.frieren;
+    else if (dialogue->portrait == "aura-initial" && portraits.auraInitial)
+        portrait = &*portraits.auraInitial;
+    else if (dialogue->portrait == "aura-idle" && portraits.auraIdle)
+        portrait = &*portraits.auraIdle;
+    else if (dialogue->portrait == "aura-windup" && portraits.auraWindup)
+        portrait = &*portraits.auraWindup;
+    else if (dialogue->portrait == "aura-die" && portraits.auraDie)
+        portrait = &*portraits.auraDie;
+    if (portrait)
+    {
+        sf::Sprite sprite(*portrait);
+        const auto size = portrait->getSize();
+        sprite.setPosition({44.0F, 550.0F});
+        sprite.setScale({126.0F / static_cast<float>(size.x),
+            126.0F / static_cast<float>(size.y)});
+        target.draw(sprite);
+    }
+
+    drawPixelText(target, dialogue->speaker, {194.0F, 550.0F}, 1.55F,
+        auraSpeaking ? sf::Color {225, 165, 250} : sf::Color {188, 225, 255});
+    drawPixelText(target, dialogue->text, {194.0F, 597.0F}, 1.18F, sf::Color {240, 236, 224});
+    drawPixelText(target, "ENTER", {1146.0F, 663.0F}, 0.9F, sf::Color {190, 184, 205});
 }
 
 std::string makeWindowTitle(const arcane::app::TowerSession& tower)
@@ -1064,6 +1265,23 @@ int main()
         loadTexture("assets/enemies/lugner/skill2.png"),
         loadTexture("assets/enemies/lugner/skill3.png")
     };
+    const EnemyStateTextures linieTextures = loadEnemyStateTextures(
+        "assets/enemies/linie/", true);
+    const std::array<std::optional<sf::Texture>, 2> linieSkillTextures {
+        loadTexture("assets/enemies/linie/skill1.png"),
+        loadTexture("assets/enemies/linie/skill2.png")
+    };
+    const EnemyStateTextures drahtTextures = loadEnemyStateTextures(
+        "assets/enemies/draht/");
+    const EnemyStateTextures auraTextures = loadEnemyStateTextures(
+        "assets/enemies/aura/", false, true, false);
+    const DialoguePortraitTextures dialoguePortraits {
+        loadTexture("assets/portraits/frieren/idle.png"),
+        loadTexture("assets/portraits/aura/initial.png"),
+        loadTexture("assets/portraits/aura/idle.png"),
+        loadTexture("assets/portraits/aura/windup.png"),
+        loadTexture("assets/portraits/aura/die.png")
+    };
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
@@ -1130,7 +1348,8 @@ int main()
                 {
                     drawCombat(window, *tower, headlessKnightTextures, chestMimicTextures,
                         birdDemonTextures, lugnerTextures, lugnerSkillTextures,
-                        playerAnimator, spellEffectAnimator);
+                        linieTextures, linieSkillTextures, drahtTextures,
+                        auraTextures, playerAnimator, spellEffectAnimator);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }
@@ -1162,6 +1381,7 @@ int main()
             if (!tower->loadoutOpen()) drawEquippedSlots(window, tower->run().player(),
                 combatView ? &*combatView : nullptr);
             else drawLoadoutOverlay(window, *tower);
+            if (tower->combat()) drawCombatOverlay(window, *tower->combat(), dialoguePortraits);
         }
 
         window.display();

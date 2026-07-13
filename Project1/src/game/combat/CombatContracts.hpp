@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <array>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include "game/spells/SpellSystem.hpp"
@@ -108,6 +109,20 @@ struct SpellEffectView
 {
     std::uint32_t spellId {};
     Aabb bounds;
+    float remaining {};
+    float duration {};
+};
+
+struct CombatDialogueLineView
+{
+    std::string_view speaker;
+    std::string_view text;
+    std::string_view portrait;
+};
+
+struct BossIntroView
+{
+    std::string_view name;
     float remaining {};
     float duration {};
 };

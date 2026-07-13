@@ -180,6 +180,22 @@ bool thirdBossEndsInVictory()
             "climbing after the third boss must enter victory");
 }
 
+bool firstBossIsAlwaysAura()
+{
+    arcane::app::TowerSessionConfig config;
+    config.floorsPerBoss = 1U;
+    config.bossEnemyHealth = 225;
+    for (const arcane::game::run::Seed seed : {1ULL, 2ULL, 77ULL, 918ULL})
+    {
+        arcane::app::TowerSession tower(seed, config);
+        if (!expect(tower.combat() != nullptr
+                && tower.combat()->enemyState().archetype == arcane::game::EnemyArchetype::Aura,
+            "first boss must remain Aura for every run seed while Red Mirror Dragon is deferred"))
+            return false;
+    }
+    return true;
+}
+
 bool specialFloorsAdvanceWithoutCombat()
 {
     arcane::app::TowerSessionConfig config;
@@ -469,6 +485,7 @@ int main()
         && loadoutSeparatesSpellAndRelicPages()
         && contactDefeatEndsTheTowerFlow()
         && thirdBossEndsInVictory()
+        && firstBossIsAlwaysAura()
         && specialFloorsAdvanceWithoutCombat()
         && purchasedMerchantSpellCanBeEquippedAndCast()
         && pauseCanContinueOrRestartFloorSnapshot()

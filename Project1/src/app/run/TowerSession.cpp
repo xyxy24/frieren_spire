@@ -491,8 +491,7 @@ void TowerSession::startNextFloor()
             : (run_.context().floorIndex % 2U == 0U ? 60 : 45));
     request.enemyArchetype = currentFloorType_ == game::run::FloorType::Boss
         ? (run_.context().bossesDefeated == 0U && config_.bossEnemyHealth == 225
-            ? ((floor.seed & 1ULL) == 0ULL
-                ? game::EnemyArchetype::Aura : game::EnemyArchetype::RedMirrorDragon)
+            ? game::EnemyArchetype::Aura
             : game::EnemyArchetype::Boss)
         : (config_.normalEnemyHealth > 0 ? game::EnemyArchetype::HeadlessKnight
             : (run_.context().floorIndex % 2U == 0U
@@ -552,8 +551,6 @@ void TowerSession::startNextFloor()
     request.enemyContactDamage = currentFloorType_ == game::run::FloorType::Boss ? 20 : 15;
     request.enemyAttackDamage = request.enemyArchetype == game::EnemyArchetype::HeadlessKnight ? 20 : 15;
     request.enemyControlSeconds = request.enemyArchetype == game::EnemyArchetype::ChestMimic ? 1.0F : 0.28F;
-    if (request.enemyArchetype == game::EnemyArchetype::RedMirrorDragon)
-        request.enemyMaximumHealth = 300;
     request.goldReward = currentFloorType_ == game::run::FloorType::Boss
         ? config_.bossGoldReward
         : config_.normalGoldReward;

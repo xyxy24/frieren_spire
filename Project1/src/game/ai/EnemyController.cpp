@@ -24,7 +24,11 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
     {
     case EnemyAction::Chase:
     {
-        const float triggerDistance = config_.width * 0.5F + config_.attackRange;
+        const bool displacementSkill = config_.activeDashDistance > 0.0F
+            || config_.skill == EnemySkill::Dive
+            || config_.skill == EnemySkill::LeapingCleave;
+        const float triggerDistance = config_.width * 0.5F + config_.attackRange
+            + (displacementSkill ? config_.activeDashDistance + playerBounds.width * 0.5F : 0.0F);
         if (canAttack && cooldownRemaining_ <= 0.0F && std::abs(horizontalDelta) <= triggerDistance)
         {
             beginWindup();
@@ -69,8 +73,11 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
         }
         else if (config_.skill == EnemySkill::LeapingCleave)
         {
-            position_.x += facingDirection_ * 120.0F * deltaSeconds;
-            const float progress = std::clamp(activeElapsed_ / std::max(config_.activeSeconds, 0.01F), 0.0F, 1.0F);
+            constexpr float LeapSeconds = 0.9F;
+            const float movingSeconds = std::min(deltaSeconds,
+                std::max(0.0F, LeapSeconds - (activeElapsed_ - deltaSeconds)));
+            position_.x += facingDirection_ * 160.0F * movingSeconds;
+            const float progress = std::clamp(activeElapsed_ / LeapSeconds, 0.0F, 1.0F);
             position_.y = worldBounds.groundTop - config_.height - 162.0F * 4.0F * progress * (1.0F - progress);
         }
         position_.x = std::clamp(position_.x, worldBounds.left, worldBounds.right - config_.width);
@@ -135,7 +142,7 @@ Aabb EnemyController::attackBounds() const noexcept
         return bounds();
     if (config_.skill == EnemySkill::LeapingCleave)
     {
-        if (activeElapsed_ < config_.activeSeconds * 0.85F) return {};
+        if (activeElapsed_ < 0.9F) return {};
         return {position_.x - config_.attackRange, groundTop_ - 24.0F,
             config_.width + config_.attackRange * 2.0F, 24.0F};
     }
