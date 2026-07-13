@@ -22,7 +22,7 @@ constexpr std::array Definitions {
     RelicDefinition {FirstClassBadgeId, "First-Class Mage Badge", "Press R on a regular reward once per act to reroll all three choices with the same damage, control and random categories."},
     RelicDefinition {OldSpellBookmarkId, "Old Spellbook Bookmark", "The equipped regular spell with the shortest base cooldown deals 12 percent more damage; the longest base cooldown is reduced by 10 percent."},
     RelicDefinition {ManaLensId, "Mana Detection Lens", "An active hit on a marked enemy reduces the longest remaining regular cooldown by 0.35 seconds; at most once per second."},
-    RelicDefinition {BrokenBarrierId, "Broken Defensive Formula", "Perfect Guard deals 20 damage and 0.25 second stagger in a 96 pixel radius, then reduces the longest regular cooldown by another 0.5 seconds."},
+    RelicDefinition {BrokenDashFormulaId, "Broken High-Speed Formula", "Crossing enemies with a fully charged Shade Dash deals 20 relic damage to each crossed enemy and reduces the longest regular spell cooldown by 0.5 seconds; triggers once per Shade Dash."},
     RelicDefinition {MimicTongueId, "Mimic Tongue", "Merchants offer one extra unowned relic, but all relic prices in that shop are increased by 10 percent and rounded up."},
     RelicDefinition {ManaSuppressionEarringId, "Mana Suppression Earring", "Your first active regular damage spell each combat deals 30 percent more damage, but starts 25 percent more cooldown."},
     RelicDefinition {SeriePageId, "Page from Serie's Grimoire", "Ultimate cooldown becomes 15.3 seconds, but all regular spell damage is reduced by 8 percent."},

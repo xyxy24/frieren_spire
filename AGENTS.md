@@ -64,7 +64,7 @@ Unless the user explicitly changes the design, preserve these rules:
 - A run ends in victory after defeating the third boss.
 - The default run contains three five-floor acts, with Boss floors fixed at floors 5, 10, and 15. Tests and explicit preview configurations may shorten `floorsPerBoss`.
 - The player exposes HP, gold, learned spells, relics, exactly three regular spell slots, and one dedicated ultimate slot for Boss spells.
-- Dash and guard are innate player actions bound to `K` and `L`; they never occupy learned-spell inventory or an equipment slot.
+- Dash is an innate player action bound to `K`; it never occupies learned-spell inventory or an equipment slot. Normal Dash has a 0.6-second cooldown and no invulnerability; when the independent 1.5-second Shade charge is ready, the next dash automatically becomes an invulnerable Shade Dash that marks crossed enemies. The former guard action is retired, and stable spell ID `1007` must not resolve or return to content pools.
 - Each regular equipped spell has its own cooldown. Boss spells share the ultimate slot's authoritative 18-second cooldown. No mana resource is currently specified.
 - A normal combat victory grants gold and a choice of one spell from three candidates.
 - A boss victory grants a choice of one stronger spell from three candidates.

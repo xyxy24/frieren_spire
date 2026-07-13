@@ -12,8 +12,8 @@ namespace arcane::game::spells
 {
 enum class SpellEffect : std::uint8_t {
     DirectDamage, FlowerField, GoddessBlessing, BloodMagic, FrostLance, FlameBurst,
-    InnateGuard, MagicThread, StoneShot, InnateDash, Phantom, SourGrape,
-    Cleaning, HotTea, BirdCapture, ManaTrace, BossZoltraak, GoddessSpears,
+    MagicThread, StoneShot, InnateDash, Phantom, ManaTrace,
+    BossZoltraak, GoddessSpears,
     SeveringSlash, Mimic, DestructionLightning, HellfireStorm, JudgmentBeam,
     EarthPillars, MirrorArray, MultiZoltraak, Dispel, ManaStrike, GoldenBinding,
     FloatSlam, StoneGolem, Flight, SpatialShatter, Seal, LightningStaff,

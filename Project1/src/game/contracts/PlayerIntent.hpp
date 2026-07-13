@@ -11,7 +11,6 @@ struct PlayerIntent
     bool jumpPressed {false};
     bool attackPressed {false};
     bool dashPressed {false};
-    bool guardPressed {false};
     std::array<bool, 3> spellPressed {false, false, false};
     bool ultimateSpellPressed {false};
     bool interactPressed {false};

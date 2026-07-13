@@ -72,9 +72,8 @@ struct PlayerStateView
     spells::SpellSlotView ultimateSpellSlot;
     float dashRemaining {0.0F};
     float dashCooldownRemaining {0.0F};
-    bool guarding {false};
-    float guardRemaining {0.0F};
-    float guardCooldownRemaining {0.0F};
+    bool shadowDashing {false};
+    float shadowDashChargeRemaining {0.0F};
     bool stunned {false};
     float stunRemaining {0.0F};
     float blessingRemaining {0.0F};

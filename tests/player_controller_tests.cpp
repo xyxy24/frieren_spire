@@ -85,7 +85,7 @@ bool landsOnGround()
         && expect(player.isGrounded(), "landed player should be grounded");
 }
 
-bool dashIsAnInnateBoundedCooldownAbility()
+bool dashUsesNormalCooldownAndIndependentShadeCharge()
 {
     arcane::game::PlayerController player;
     arcane::game::PlayerIntent dash;
@@ -94,24 +94,32 @@ bool dashIsAnInnateBoundedCooldownAbility()
     if (!expect(player.position().x > 160.0F
             && player.position().x < 160.0F + arcane::game::PlayerController::DashDistance,
             "dash must travel over time instead of teleporting")
-        || !expect(player.isDashing(), "dash must provide a short active invulnerability window")
+        || !expect(player.isDashing() && player.isShadowDashing(),
+            "the initially charged dash must start as a Shade Dash")
         || !expect(nearlyEqual(player.dashCooldownRemaining(),
             arcane::game::PlayerController::DashCooldownSeconds),
-            "dash must start its innate cooldown")) return false;
+            "every dash must start the short normal-dash cooldown")
+        || !expect(nearlyEqual(player.shadowDashChargeRemaining(),
+            arcane::game::PlayerController::ShadowDashChargeSeconds),
+            "Shade Dash must start its independent charge timer")) return false;
 
     arcane::game::PlayerIntent steerAgainstDash;
     steerAgainstDash.moveAxis = -1.0F;
     player.update(steerAgainstDash, 0.17F, TestBounds);
     const float completedDashX = player.position().x;
+    player.update({}, 0.43F, TestBounds);
     player.update(dash, 0.01F, TestBounds);
     return expect(nearlyEqual(completedDashX,
             160.0F + arcane::game::PlayerController::DashDistance),
             "dash must cover exactly 150 pixels over 0.18 seconds")
         && expect(nearlyEqual(player.facingDirection(), 1.0F),
             "dash direction must remain locked until the dash ends")
-        && expect(nearlyEqual(player.position().x, completedDashX),
-            "dash input must not work again while cooling down")
-        && expect(!player.isDashing(), "dash invulnerability must end with dash movement");
+        && expect(player.position().x > completedDashX && player.isDashing(),
+            "normal dash must be usable once its short cooldown ends even while Shade is charging")
+        && expect(!player.isShadowDashing(),
+            "a dash used before Shade finishes charging must be a normal, non-invulnerable dash")
+        && expect(player.shadowDashChargeRemaining() > 0.0F,
+            "normal dash must not reset or consume the independent Shade charge");
 }
 }
 
@@ -122,7 +130,7 @@ int main()
         && remembersLastMovementDirection()
         && jumpsFromGround()
         && landsOnGround()
-        && dashIsAnInnateBoundedCooldownAbility();
+        && dashUsesNormalCooldownAndIndependentShadeCharge();
 
     if (!passed)
     {

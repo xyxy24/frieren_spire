@@ -22,9 +22,6 @@ class CombatSession
 public:
     static constexpr float EnemyWidth = ai::EnemyController::Width;
     static constexpr float EnemyHeight = ai::EnemyController::Height;
-    static constexpr float GuardDurationSeconds = 0.45F;
-    static constexpr float PerfectGuardSeconds = 0.12F;
-    static constexpr float GuardCooldownSeconds = 2.4F;
 
     explicit CombatSession(CombatRequest request);
 
@@ -145,17 +142,11 @@ private:
     std::uint32_t burningFlowerTick_ {};
     DamageSource burningFlowerSource_ {DamageSource::PlayerSpell0};
     float burningFlowerMultiplier_ {1.0F};
-    float acidFieldRemaining_ {};
-    Aabb acidFieldBounds_;
     float phantomRemaining_ {};
     Aabb phantomBounds_;
-    float teaChannelRemaining_ {};
-    float teaStartX_ {};
-    float cleanseProtectionRemaining_ {};
     float postDashComboRemaining_ {};
     float spellInvulnerableRemaining_ {};
     std::uint32_t sleepStacks_ {};
-    bool perfectGuardConsumed_ {};
     bool flightBoostAvailable_ {};
     float lightningStaffRemaining_ {};
     std::uint32_t lightningStaffCharges_ {};
@@ -188,8 +179,6 @@ private:
     std::uint32_t beamTick_ {};
     float beamMultiplier_ {1.0F};
     std::uint32_t mirrorCopies_ {};
-    float guardRemaining_ {};
-    float guardCooldownRemaining_ {};
     std::uint64_t selfDamageSequence_ {};
     bool actualHpLost_ {};
     int flowerCrownConverted_ {};
