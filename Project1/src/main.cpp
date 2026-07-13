@@ -3,6 +3,7 @@
 #include "game/spells/SpellSystem.hpp"
 #include "platform/SfmlInputMapper.hpp"
 #include "presentation/PlayerAnimator.hpp"
+#include "presentation/SpellEffectAnimator.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -703,7 +704,8 @@ void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures,
-    const arcane::presentation::PlayerAnimator& playerAnimator)
+    const arcane::presentation::PlayerAnimator& playerAnimator,
+    const arcane::presentation::SpellEffectAnimator& spellEffectAnimator)
 {
     const arcane::game::CombatSession* combat = tower.combat();
     if (!combat) return;
@@ -772,6 +774,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         rangeShape.setOutlineColor(color);
         rangeShape.setOutlineThickness(2.0F);
         target.draw(rangeShape);
+        static_cast<void>(spellEffectAnimator.draw(
+            target, effect, player.facingDirection));
     }
 
     for (const arcane::game::EnemyStateView enemy : combat->enemyStates())
@@ -1028,6 +1032,8 @@ int main()
         "assets/enemies/bird_demon/");
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
+    arcane::presentation::SpellEffectAnimator spellEffectAnimator;
+    static_cast<void>(spellEffectAnimator.loadFromDirectory("assets/spells"));
     sf::Clock frameClock;
 
     while (window.isOpen())
@@ -1089,7 +1095,7 @@ int main()
                 if (tower->combat())
                 {
                     drawCombat(window, *tower, headlessKnightTextures, chestMimicTextures,
-                        birdDemonTextures, playerAnimator);
+                        birdDemonTextures, playerAnimator, spellEffectAnimator);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }

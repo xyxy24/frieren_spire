@@ -49,6 +49,7 @@ add_executable(Project1
     Project1/src/main.cpp
     Project1/src/platform/SfmlInputMapper.cpp
     Project1/src/presentation/PlayerAnimator.cpp
+    Project1/src/presentation/SpellEffectAnimator.cpp
 )
 
 target_link_libraries(Project1
@@ -66,6 +67,9 @@ add_custom_command(TARGET Project1 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/player/processed
         $<TARGET_FILE_DIR:Project1>/assets/player
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/spells/processed
+        $<TARGET_FILE_DIR:Project1>/assets/spells
     COMMENT "Copying runtime assets"
 )
 

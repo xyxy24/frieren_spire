@@ -32,3 +32,18 @@
   applies nearest-neighbor scaling, and normalizes every frame to the same gameplay anchor.
 - Purpose: player movement, attack, spell, dash, hit, interaction, and defeat presentation for
   the course prototype.
+
+## Spell pixel-VFX placeholders
+
+- Files: `../Project1/assets/spells/generated/*.png` and derived
+  `../Project1/assets/spells/processed/*.png`.
+- Added by: project team with AI-assisted generation and deterministic cleanup, 2026-07-13.
+- Original source/license: AI-generated classroom prototype material; no external asset pack.
+- Style reference: the project-owned player pixel-style reference was supplied only to match
+  pixel density and palette discipline; generated spell sheets contain no copied character art.
+- Processing: `scripts/Process-SpellVfx.py` removes chroma contamination, splits chronological
+  frames, applies one shared scale per animation, and exports transparent runtime atlases.
+- Purpose: shared casting, beam, projectile, forward-burst, scan, dispel, spatial-counter,
+  gravity-field, self-aura, charge-state, shield, tether, binding, sealing, target-telegraph,
+  ground-impact, decoy, golem, mirror-summon, field-conversion, blood, spatial-slash, firestorm,
+  and mimic VFX for the course build.
