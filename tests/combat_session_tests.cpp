@@ -131,6 +131,8 @@ bool enemyAttackHasWindupAndHitsOnce()
     arcane::game::CombatSession combat(request);
 
     combat.update(arcane::game::PlayerIntent {}, 2.99F);
+    if (!expect(!combat.enemyState().skillEffectBounds.has_value(),
+        "headless knight slash must not expose a visible range rectangle")) return false;
     combat.update(arcane::game::PlayerIntent {}, 0.30F);
     if (!expect(combat.playerState().currentHealth == 100,
         "enemy windup must not deal early damage")) return false;

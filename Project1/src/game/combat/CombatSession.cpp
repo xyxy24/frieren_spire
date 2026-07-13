@@ -1659,7 +1659,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
         if ((enemy.controller.action() == ai::EnemyAction::Windup
                 || enemy.controller.action() == ai::EnemyAction::Active)
             && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
-            && skill != ai::EnemySkill::Thread && skill != ai::EnemySkill::Domination)
+            && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
+            && skill != ai::EnemySkill::Domination)
         {
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -1714,7 +1715,8 @@ EnemyStateView CombatSession::enemyState() const noexcept
     if ((enemy.controller.action() == ai::EnemyAction::Windup
             || enemy.controller.action() == ai::EnemyAction::Active)
         && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
-        && skill != ai::EnemySkill::Thread && skill != ai::EnemySkill::Domination)
+        && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
+        && skill != ai::EnemySkill::Domination)
     {
         const auto area = enemy.controller.attackBounds();
         if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
