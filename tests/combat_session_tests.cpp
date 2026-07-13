@@ -337,11 +337,12 @@ bool regularSpellCatalogHasDefinitionsAndAuthoritativeRanges()
                 "every collectible spell must use the regular tier"))
             return false;
     }
-    if (!expect(arcane::game::spells::findDefinition(1012U) == nullptr
+    if (!expect(arcane::game::spells::findDefinition(1007U) == nullptr
+            && arcane::game::spells::findDefinition(1012U) == nullptr
             && arcane::game::spells::findDefinition(1013U) == nullptr
             && arcane::game::spells::findDefinition(1014U) == nullptr
             && arcane::game::spells::findDefinition(1015U) == nullptr,
-        "retired spells 1012 through 1015 must not remain in the catalog")) return false;
+        "retired spells 1007 and 1012 through 1015 must not remain in the catalog")) return false;
 
     std::array<std::optional<std::uint32_t>, 3> equipped {1001U, 1008U, 1021U};
     arcane::game::spells::SpellSystem spells(equipped);
@@ -356,7 +357,7 @@ bool regularSpellCatalogHasDefinitionsAndAuthoritativeRanges()
         && expect(slam.effectBounds.width == 120.0F && slam.effectBounds.height == 120.0F,
             "target-area spell must expose its authoritative area")
         && expect(!spells.equip(0U, 1007U) && !spells.equip(0U, 1010U),
-            "innate guard and dash must not occupy learned spell slots");
+            "retired guard and innate dash must not occupy learned spell slots");
 }
 
 bool innateActionsExposeSpellEffectPlaceholders()
@@ -369,17 +370,9 @@ bool innateActionsExposeSpellEffectPlaceholders()
     dash.dashPressed = true;
     dashCombat.update(dash, 0.01F);
     const auto dashEffects = dashCombat.spellEffects();
-    if (!expect(dashEffects.size() == 1U && dashEffects.front().spellId == 1010U
+    return expect(dashEffects.size() == 1U && dashEffects.front().spellId == 1010U
             && dashEffects.front().bounds.width == arcane::game::PlayerController::DashDistance,
-        "K dash must expose its 150px effect placeholder")) return false;
-
-    arcane::game::CombatSession guardCombat(request);
-    arcane::game::PlayerIntent guard;
-    guard.guardPressed = true;
-    guardCombat.update(guard, 0.01F);
-    const auto guardEffects = guardCombat.spellEffects();
-    return expect(guardEffects.size() == 1U && guardEffects.front().spellId == 1007U,
-        "L guard must expose its self effect placeholder");
+        "K dash must expose its 150px effect placeholder");
 }
 
 bool collectibleSpellsEmitEffectPlaceholders()
@@ -732,26 +725,26 @@ bool combatSessionCastsUltimateWithDedicatedInput()
             "combat view must expose the authoritative ultimate cooldown");
 }
 
-bool guardBlocksDamageAndUsesItsOwnCooldown()
+bool brokenHighSpeedFormulaDamagesCrossedEnemiesAndReducesCooldown()
 {
     auto request = adjacentEnemyRequest();
-    request.enemyArchetype = arcane::game::EnemyArchetype::ChestMimic;
-    request.enemySpawn = {180.0F, 576.0F};
+    request.enemySpawn = {250.0F, 576.0F};
     request.enemyAttackDamage = 0;
-    request.enemyContactDamage = 10;
+    request.enemyContactDamage = 0;
+    request.equippedSpellIds[0] = 1004U;
+    request.relicIds = {arcane::game::relics::BrokenDashFormulaId};
     arcane::game::CombatSession combat(request);
-    arcane::game::PlayerIntent guard;
-    guard.guardPressed = true;
-    combat.update(guard, 0.01F);
-    const auto guarded = combat.playerState();
-    if (!expect(guarded.currentHealth == 100 && guarded.guarding,
-            "innate guard must block overlapping enemy contact damage")
-        || !expect(guarded.guardCooldownRemaining == arcane::game::CombatSession::GuardCooldownSeconds,
-            "guard must start its independent two-second cooldown")) return false;
-
-    combat.update({}, 1.01F);
-    return expect(combat.playerState().currentHealth == 90,
-        "contact damage must apply again after the guard window expires");
+    arcane::game::PlayerIntent cast;
+    cast.spellPressed[0] = true;
+    combat.update(cast, 0.01F);
+    arcane::game::PlayerIntent dash;
+    dash.dashPressed = true;
+    combat.update(dash, 0.01F);
+    const auto state = combat.playerState();
+    return expect(combat.enemyState().currentHealth == 60,
+            "broken high-speed formula must deal 20 relic damage to an enemy crossed by Dash")
+        && expect(std::abs(state.spellSlots[0].cooldownRemaining - 1.29F) < 0.001F,
+            "a successful relic dash must reduce the longest regular cooldown by 0.5 seconds");
 }
 
 bool multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
@@ -1153,7 +1146,7 @@ int main()
         && directBossSpellsApplyTheirDistinctRules()
         && severingMagicGainsExecuteDamageBelowTwentyPercent()
         && combatSessionCastsUltimateWithDedicatedInput()
-        && guardBlocksDamageAndUsesItsOwnCooldown()
+        && brokenHighSpeedFormulaDamagesCrossedEnemiesAndReducesCooldown()
         && multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
         && chestMimicTriggersFromTheFrontAfterHalfCooldown()
         && enemyChasePreservesConfiguredBodyGap()

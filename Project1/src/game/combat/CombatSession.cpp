@@ -270,9 +270,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                             8, burningFlowerMultiplier_}));
         }
     }
-    acidFieldRemaining_ = std::max(0.0F, acidFieldRemaining_ - deltaSeconds);
     phantomRemaining_ = std::max(0.0F, phantomRemaining_ - deltaSeconds);
-    cleanseProtectionRemaining_ = std::max(0.0F, cleanseProtectionRemaining_ - deltaSeconds);
     postDashComboRemaining_ = std::max(0.0F, postDashComboRemaining_ - deltaSeconds);
     spellInvulnerableRemaining_ = std::max(0.0F, spellInvulnerableRemaining_ - deltaSeconds);
     lightningStaffRemaining_ = std::max(0.0F, lightningStaffRemaining_ - deltaSeconds);
@@ -331,8 +329,6 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     std::erase_if(pendingSpellImpacts_, [](const auto& impact) {
         return impact.delayRemaining <= 0.0F;
     });
-    guardRemaining_ = std::max(0.0F, guardRemaining_ - deltaSeconds);
-    guardCooldownRemaining_ = std::max(0.0F, guardCooldownRemaining_ - deltaSeconds);
     const bool wasDashing = player_.isDashing();
     const Vec2 beforePlayerUpdate = player_.position();
     PlayerIntent playerIntent = intent;
@@ -380,8 +376,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                         tornado.evolutionRemaining > 0.0F ? 10 : 20, 1.0F,
                         relics_.incomingDamageMultiplier(),
                         laterTick && relics_.has(relics::NorthernCloakId) ? 4 : 0,
-                        player_.isDashing() || guardRemaining_ > 0.0F
-                            || spellInvulnerableRemaining_ > 0.0F}));
+                        player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F}));
             }
         }
         else tornado.tickAccumulator = 0.0F;
@@ -398,57 +393,24 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             PlayerController::DashDurationSeconds, PlayerController::DashDurationSeconds});
         const Aabb dashPath {left, beforePlayerUpdate.y,
             PlayerController::DashDistance, PlayerController::Height};
+        const bool shadowDash = player_.isShadowDashing();
+        bool crossedEnemy = false;
         for (auto& enemy : enemies_)
             if (enemy.health.isAlive() && intersects(dashPath, enemy.controller.bounds()))
-                enemy.markedRemaining = std::max(enemy.markedRemaining, 2.0F);
-    }
-    if (teaChannelRemaining_ > 0.0F)
-    {
-        const float previous = teaChannelRemaining_;
-        teaChannelRemaining_ = std::max(0.0F, teaChannelRemaining_ - deltaSeconds);
-        if (std::abs(player_.position().x - teaStartX_) > 8.0F || player_.isStunned())
-            teaChannelRemaining_ = 0.0F;
-        else if (previous > 0.0F && teaChannelRemaining_ <= 0.0F)
-            static_cast<void>(healPlayer(18));
-    }
-    if (intent.guardPressed && !player_.isStunned() && !player_.isDashing()
-        && player_.flightRemaining() <= 0.0F
-        && guardCooldownRemaining_ <= 0.0F)
-    {
-        guardRemaining_ = GuardDurationSeconds;
-        guardCooldownRemaining_ = GuardCooldownSeconds;
-        perfectGuardConsumed_ = false;
-        activeSpellEffects_.push_back({1007U, playerBounds(),
-            GuardDurationSeconds, GuardDurationSeconds});
+            {
+                if (shadowDash) enemy.markedRemaining = std::max(enemy.markedRemaining, 2.0F);
+                if (shadowDash && relics_.has(relics::BrokenDashFormulaId))
+                {
+                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                        {DamageSource::Event, ++environmentalSequence_, 20}));
+                    crossedEnemy = true;
+                }
+            }
+        if (crossedEnemy) spells_.reduceLongestRegularCooldown(0.5F);
     }
     const float playerCenter = player_.position().x + PlayerController::Width * 0.5F;
     const bool canAct = !player_.isStunned() && !player_.isDashing()
-        && guardRemaining_ <= 0.0F && beamRemaining_ <= 0.0F;
-    const auto handleGuard = [this]() {
-        if (guardRemaining_ > GuardDurationSeconds - PerfectGuardSeconds
-            && !perfectGuardConsumed_)
-        {
-            spells_.reduceLongestRegularCooldown(1.0F);
-            if (relics_.has(relics::BrokenBarrierId))
-            {
-                spells_.reduceLongestRegularCooldown(0.5F);
-                const auto player = playerBounds();
-                const Aabb burst {player.left - 96.0F, player.top - 64.0F,
-                    player.width + 192.0F, player.height + 128.0F};
-                for (auto& enemy : enemies_)
-                    if (enemy.health.isAlive() && intersects(burst, enemy.controller.bounds()))
-                    {
-                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
-                            {DamageSource::Event, ++environmentalSequence_, 20}));
-                        const bool boss = enemy.archetype == EnemyArchetype::Aura
-                            || enemy.archetype == EnemyArchetype::RedMirrorDragon
-                            || enemy.archetype == EnemyArchetype::Boss;
-                        if (!boss) enemy.controlRemaining = std::max(enemy.controlRemaining, 0.25F);
-                    }
-            }
-            perfectGuardConsumed_ = true;
-        }
-    };
+        && beamRemaining_ <= 0.0F;
 
     for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
     {
@@ -465,8 +427,6 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         enemy.relicComboCooldown = std::max(0.0F, enemy.relicComboCooldown - deltaSeconds);
         enemy.kraftCooldown = std::max(0.0F, enemy.kraftCooldown - deltaSeconds);
         if (enemy.relicComboWindow <= 0.0F) enemy.relicComboHits = 0U;
-        if (acidFieldRemaining_ > 0.0F && intersects(acidFieldBounds_, enemy.controller.bounds()))
-            enemy.exposedRemaining = std::max(enemy.exposedRemaining, 0.1F);
         if (enemy.burnRemaining > 0.0F)
         {
             const float activeDelta = std::min(deltaSeconds, enemy.burnRemaining);
@@ -499,7 +459,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     const Aabb curse {flower.left + flower.width * 0.5F - 160.0F,
                         flower.top + flower.height * 0.5F - 160.0F, 320.0F, 320.0F};
                     if (intersects(playerBounds(), curse) && blessingRemaining_ <= 0.0F
-                        && !player_.isDashing() && guardRemaining_ <= 0.0F
+                        && !player_.isDashing()
                         && spellInvulnerableRemaining_ <= 0.0F)
                     {
                         sleepStacks_ = std::min<std::uint32_t>(5U, sleepStacks_ + 1U);
@@ -684,15 +644,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                         | enemy.breathSequence;
                     if (intersects(playerBounds(), flames))
                     {
-                        if (guardRemaining_ > 0.0F) handleGuard();
                         static_cast<void>(resolvePlayerDamage(
                             {DamageSource::EnemyAttack, sequence, 15, 1.0F,
-                                relics_.incomingDamageMultiplier()
-                                    * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F),
+                                relics_.incomingDamageMultiplier(),
                                 enemy.breathRemaining < 1.0F
                                     && relics_.has(relics::NorthernCloakId) ? 4 : 0,
-                                player_.isDashing() || guardRemaining_ > 0.0F
-                                    || spellInvulnerableRemaining_ > 0.0F}));
+                                player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F}));
                     }
                 }
                 if (enemy.breathRemaining <= 0.0F) enemy.breathCooldown = 12.0F;
@@ -903,8 +860,6 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             case spells::SpellEffect::GoddessBlessing: return 5.0F;
             case spells::SpellEffect::FlameBurst: return 3.0F;
             case spells::SpellEffect::Phantom: return 4.0F;
-            case spells::SpellEffect::SourGrape: return 5.0F;
-            case spells::SpellEffect::HotTea: return 1.0F;
             case spells::SpellEffect::ManaTrace: return 4.0F;
             case spells::SpellEffect::FloatSlam: return 1.0F;
             case spells::SpellEffect::StoneGolem: return 5.0F;
@@ -1076,42 +1031,6 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             phantomBounds_ = {left, player_.position().y,
                 PlayerController::Width, PlayerController::Height};
             activeSpellEffects_.back().bounds = phantomBounds_;
-        }
-        else if (cast.effect == spells::SpellEffect::SourGrape)
-        {
-            acidFieldRemaining_ = 5.0F;
-            acidFieldBounds_ = cast.effectBounds;
-        }
-        else if (cast.effect == spells::SpellEffect::Cleaning)
-        {
-            static_cast<void>(healPlayer(10));
-            cleanseProtectionRemaining_ = 1.0F;
-        }
-        else if (cast.effect == spells::SpellEffect::HotTea)
-        {
-            teaChannelRemaining_ = 1.0F;
-            teaStartX_ = player_.position().x;
-        }
-        else if (cast.effect == spells::SpellEffect::BirdCapture)
-        {
-            const auto distanceToPlayer = [playerCenter](const auto& enemy) {
-                if (!enemy.health.isAlive()) return std::numeric_limits<float>::max();
-                const auto bounds = enemy.controller.bounds();
-                return std::abs(bounds.left + bounds.width * 0.5F - playerCenter);
-            };
-            auto found = std::min_element(enemies_.begin(), enemies_.end(), [&](const auto& left,
-                const auto& right) { return distanceToPlayer(left) < distanceToPlayer(right); });
-            if (found != enemies_.end()
-                && !intersects(cast.effectBounds, found->controller.bounds())) found = enemies_.end();
-            if (found != enemies_.end())
-            {
-                static_cast<void>(found->damageResolver.resolve(found->health,
-                    {source, cast.sequence, cast.damage, multiplier}));
-                const bool boss = found->archetype == EnemyArchetype::Aura
-                    || found->archetype == EnemyArchetype::RedMirrorDragon
-                    || found->archetype == EnemyArchetype::Boss;
-                found->controlRemaining = (boss ? 0.7F : 2.5F) * relicControlMultiplier(*found);
-            }
         }
         else if (cast.effect == spells::SpellEffect::ManaTrace)
         {
@@ -1575,7 +1494,6 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (enemy.controller.action() == ai::EnemyAction::Active
             && intersects(playerBounds(), enemy.controller.attackBounds()))
         {
-            if (guardRemaining_ > 0.0F) handleGuard();
             int damage = 20;
             if (config.skill == ai::EnemySkill::Thread) damage = 10;
             if (config.skill == ai::EnemySkill::Domination) damage = 0;
@@ -1593,15 +1511,13 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 | enemy.controller.attackSequence();
             const auto result = resolvePlayerDamage(
                 {DamageSource::EnemyAttack, skillSequence, damage,
-                    1.0F, relics_.incomingDamageMultiplier()
-                        * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F), 0,
-                    player_.isDashing() || guardRemaining_ > 0.0F
-                        || spellInvulnerableRemaining_ > 0.0F
+                    1.0F, relics_.incomingDamageMultiplier(), 0,
+                    player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F
                         || (player_.flightRemaining() > 0.0F
                             && config.skill == ai::EnemySkill::LeapingCleave)});
             if (result.appliedDamage > 0) beamRemaining_ = 0.0F;
             const bool dominationHit = config.skill == ai::EnemySkill::Domination
-                && !player_.isDashing() && guardRemaining_ <= 0.0F
+                && !player_.isShadowDashing()
                 && spellInvulnerableRemaining_ <= 0.0F;
             if ((result.appliedDamage > 0 || dominationHit) && blessingRemaining_ <= 0.0F)
             {
@@ -1620,7 +1536,6 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (config.hasContactDamage && enemy.contactCooldown <= 0.0F
             && intersects(playerBounds(), enemy.controller.bounds()))
         {
-            if (guardRemaining_ > 0.0F) handleGuard();
             const std::uint64_t contactSequence = (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
                 | ++enemy.contactSequence;
             const bool legacyDamage = request_.enemies.empty()
@@ -1629,11 +1544,9 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const int contactDamage = legacyDamage ? request_.enemyContactDamage : 15;
             const auto contactResult = resolvePlayerDamage(
                 {DamageSource::EnemyContact, contactSequence, contactDamage,
-                    1.0F, relics_.incomingDamageMultiplier()
-                        * (cleanseProtectionRemaining_ > 0.0F ? 0.8F : 1.0F),
+                    1.0F, relics_.incomingDamageMultiplier(),
                     relics_.collisionFlatReduction(),
-                    player_.isDashing() || guardRemaining_ > 0.0F
-                        || spellInvulnerableRemaining_ > 0.0F});
+                    player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F});
             if (contactResult.appliedDamage > 0) beamRemaining_ = 0.0F;
             if (contactResult.appliedDamage > 0 && relics_.retaliatesOnCollision())
             {
@@ -1658,7 +1571,7 @@ PlayerStateView CombatSession::playerState() const noexcept
     return {player_.position(), playerHealth_.current(), playerHealth_.maximum(), player_.isGrounded(),
         player_.facingDirection(), attack_.isActive(), attack_.cooldownRemaining(), spells_.view(),
         spells_.ultimateView(), player_.dashRemaining(), player_.dashCooldownRemaining(),
-        guardRemaining_ > 0.0F, guardRemaining_, guardCooldownRemaining_,
+        player_.isShadowDashing(), player_.shadowDashChargeRemaining(),
         player_.isStunned(), player_.stunRemaining(), blessingRemaining_,
         relics_.vulnerableRemaining(), flowerFieldRemaining_, player_.flightRemaining(),
         barrierShield_ + persistentShield_};

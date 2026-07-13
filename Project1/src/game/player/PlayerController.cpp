@@ -32,6 +32,7 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
 
     stunRemaining_ = std::max(0.0F, stunRemaining_ - deltaSeconds);
     dashCooldownRemaining_ = std::max(0.0F, dashCooldownRemaining_ - deltaSeconds);
+    shadowDashChargeRemaining_ = std::max(0.0F, shadowDashChargeRemaining_ - deltaSeconds);
     flightRemaining_ = std::max(0.0F, flightRemaining_ - deltaSeconds);
     const float moveAxis = stunRemaining_ > 0.0F ? 0.0F : std::clamp(intent.moveAxis, -1.0F, 1.0F);
 
@@ -50,6 +51,8 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     {
         dashRemaining_ = DashDurationSeconds;
         dashCooldownRemaining_ = DashCooldownSeconds;
+        shadowDashActive_ = shadowDashChargeRemaining_ <= 0.0F;
+        if (shadowDashActive_) shadowDashChargeRemaining_ = ShadowDashChargeSeconds;
         dashDirection_ = facingDirection_;
         preDashVerticalVelocity_ = velocity_.y;
         consumedByDash = true;
@@ -142,8 +145,12 @@ void PlayerController::applyLaunch(const float upwardSpeed, const float stunSeco
 bool PlayerController::isStunned() const noexcept { return stunRemaining_ > 0.0F; }
 float PlayerController::stunRemaining() const noexcept { return stunRemaining_; }
 bool PlayerController::isDashing() const noexcept { return dashRemaining_ > 0.0F; }
+bool PlayerController::isShadowDashing() const noexcept
+{ return dashRemaining_ > 0.0F && shadowDashActive_; }
 float PlayerController::dashRemaining() const noexcept { return dashRemaining_; }
 float PlayerController::dashCooldownRemaining() const noexcept { return dashCooldownRemaining_; }
+float PlayerController::shadowDashChargeRemaining() const noexcept
+{ return shadowDashChargeRemaining_; }
 void PlayerController::grantFlight(const float seconds) noexcept
 { flightRemaining_ = std::max(flightRemaining_, std::max(0.0F, seconds)); }
 void PlayerController::translateHorizontal(const float distance, const WorldBounds& bounds) noexcept

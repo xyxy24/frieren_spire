@@ -289,14 +289,15 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
         }
         drawPixelText(target, label, {x + 8.0F, 638.0F}, 1.0F, readyColor);
     };
-    drawInnateAbility(startX - 218.0F, "K DASH",
+    drawInnateAbility(startX - 218.0F, "SHADE",
+        combatView ? combatView->shadowDashChargeRemaining : 0.0F,
+        arcane::game::PlayerController::ShadowDashChargeSeconds,
+        combatView && (combatView->shadowDashing
+            || combatView->shadowDashChargeRemaining <= 0.0F), sf::Color {174, 118, 235});
+    drawInnateAbility(startX - 110.0F, "K DASH",
         combatView ? combatView->dashCooldownRemaining : 0.0F,
         arcane::game::PlayerController::DashCooldownSeconds,
         combatView && combatView->dashRemaining > 0.0F, sf::Color {100, 220, 245});
-    drawInnateAbility(startX - 110.0F, "L GUARD",
-        combatView ? combatView->guardCooldownRemaining : 0.0F,
-        arcane::game::CombatSession::GuardCooldownSeconds,
-        combatView && combatView->guarding, sf::Color {125, 170, 255});
 }
 
 void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
@@ -680,12 +681,13 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const arcane::game::PlayerStateView player = combat->playerState();
     sf::RectangleShape playerShape({arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
     playerShape.setPosition({player.position.x, player.position.y});
-    playerShape.setFillColor(player.dashRemaining > 0.0F ? sf::Color {28, 22, 42}
-        : (player.guarding ? sf::Color {115, 155, 245}
-            : (player.stunned ? sf::Color {112, 180, 235}
-                : (player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242}))));
-    playerShape.setOutlineColor(player.dashRemaining > 0.0F
+    playerShape.setFillColor(player.shadowDashing ? sf::Color {28, 22, 42}
+        : player.dashRemaining > 0.0F ? sf::Color {100, 220, 245}
+        : player.stunned ? sf::Color {112, 180, 235}
+        : player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242});
+    playerShape.setOutlineColor(player.shadowDashing
         ? sf::Color {186, 145, 245}
+        : player.dashRemaining > 0.0F ? sf::Color {100, 220, 245}
         : sf::Color {142, 115, 200});
     playerShape.setOutlineThickness(3.0F);
     target.draw(playerShape);
@@ -703,10 +705,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         case 1004U: color = sf::Color {130, 231, 255}; break;
         case 1005U: color = sf::Color {105, 174, 255}; break;
         case 1006U: color = sf::Color {255, 112, 55}; break;
-        case 1007U: color = sf::Color {115, 155, 245}; break;
         case 1008U: color = sf::Color {202, 137, 255}; break;
         case 1009U: color = sf::Color {170, 154, 132}; break;
-        case 1010U: color = sf::Color {92, 61, 135}; break;
+        case 1010U: color = player.shadowDashing
+            ? sf::Color {92, 61, 135} : sf::Color {100, 220, 245}; break;
         case 1011U: color = sf::Color {172, 114, 237}; break;
         case 1016U: color = sf::Color {83, 214, 218}; break;
         case 1017U: color = sf::Color {102, 225, 255}; break;
@@ -874,7 +876,7 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
                 return title + "EVENT RESULT - E Close";
             return title + "EVENT CHOICE - U I O Select | E Close";
         }
-        return title + "A/D Move, Space Jump, J Attack, K Dash, L Guard, U/I/O Spells, R Ultimate, Tab Loadout";
+        return title + "A/D Move, Space Jump, J Attack, K Dash, U/I/O Spells, R Ultimate, Tab Loadout";
     case arcane::game::run::RunPhase::LootPending:
         return title + "ENEMY DROP - Move To Drop, E Inspect Reward | Tab Loadout";
     case arcane::game::run::RunPhase::Reward:
