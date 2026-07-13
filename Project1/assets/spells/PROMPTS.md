@@ -185,9 +185,10 @@ realign, close into a violet scar, and disappear.
 
 ## `hellfire-storm-source.png`
 
-Ten bottom-centered frames on a magenta key: mint hollow wind spiral pulls particles inward; an
-ember core converts the center and then the whole vortex into orange fire; three loop poses retain
-the same footprint and inward pull; upper fire breaks while low wind and embers fade.
+Eight bottom-centered seamless loop frames on a magenta key: a broad cracked base erupts into a
+tall infernal flame pillar with a pale white-hot core, orange body, crimson outer flame, dark-purple
+smoke pockets, and square embers. Adjacent poses visibly compress, fork, surge, collapse, and return
+to the first pose. Runtime places several equal-aspect pillars with independent phase offsets.
 
 ## `mimic-magic-source.png`
 

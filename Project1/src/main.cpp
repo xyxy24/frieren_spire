@@ -774,9 +774,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         color.a = static_cast<std::uint8_t>(130.0F + 125.0F * life);
         rangeShape.setOutlineColor(color);
         rangeShape.setOutlineThickness(2.0F);
-        target.draw(rangeShape);
-        static_cast<void>(spellEffectAnimator.draw(
-            target, effect, player.facingDirection));
+        if (!spellEffectAnimator.draw(target, effect, player.facingDirection, GroundTop))
+            target.draw(rangeShape);
     }
 
     for (const arcane::game::EnemyStateView enemy : combat->enemyStates())

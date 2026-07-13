@@ -19,7 +19,7 @@ public:
 
     [[nodiscard]] bool loadFromDirectory(const std::filesystem::path& directory);
     [[nodiscard]] bool draw(sf::RenderTarget& target, const game::SpellEffectView& effect,
-        float playerFacingDirection) const;
+        float playerFacingDirection, float groundTop) const;
 
 private:
     struct Clip

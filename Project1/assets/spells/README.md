@@ -32,4 +32,10 @@ Self auras also use a bottom-body anchor where appropriate so the effect remains
 the player sprite changes animation.
 
 AI outputs remain source key poses. Keep gameplay AABBs authoritative and do not infer collision,
-damage timing, or projectile speed from transparent texture bounds.
+damage timing, or projectile speed from transparent texture bounds. Presentation size is an
+independent per-spell choice: an atlas may extend beyond, repeat across, or occupy only part of an
+authoritative AABB. Hellfire Storm demonstrates this by tiling several uniformly scaled pillars
+across the field instead of stretching one sprite into the damage rectangle. Every active spell now
+selects an explicit runtime layout: fixed center, caster baseline, target baseline, forward endpoint,
+field row, tether, beam, triple beam, homing volley, or multi-pillar storm. No runtime spell atlas is
+scaled independently on the X and Y axes.
