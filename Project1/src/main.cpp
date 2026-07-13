@@ -709,6 +709,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
     const EnemyStateTextures& linieTextures,
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
+    const EnemyStateTextures& drahtTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator)
 {
@@ -800,6 +801,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &lugnerTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Linie)
             stateTextures = &linieTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Draht)
+            stateTextures = &drahtTextures;
         const sf::Texture* texture = nullptr;
         if (stateTextures)
         {
@@ -1105,6 +1108,8 @@ int main()
         loadTexture("assets/enemies/linie/skill1.png"),
         loadTexture("assets/enemies/linie/skill2.png")
     };
+    const EnemyStateTextures drahtTextures = loadEnemyStateTextures(
+        "assets/enemies/draht/");
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
@@ -1171,7 +1176,8 @@ int main()
                 {
                     drawCombat(window, *tower, headlessKnightTextures, chestMimicTextures,
                         birdDemonTextures, lugnerTextures, lugnerSkillTextures,
-                        linieTextures, linieSkillTextures, playerAnimator, spellEffectAnimator);
+                        linieTextures, linieSkillTextures, drahtTextures,
+                        playerAnimator, spellEffectAnimator);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }

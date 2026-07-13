@@ -35,6 +35,13 @@
 - Original source/license: not yet recorded; classroom prototype use only until the team fills this in.
 - Purpose: placeholder character states, airborne pose, and two-frame grounded cleave effect for Linie.
 
+## Draht placeholder
+
+- Files: `enemies/draht/idle.png`, `windup.png`, `attack.png`
+- Added by: project team member, 2026-07-13
+- Original source/license: not yet recorded; classroom prototype use only until the team fills this in.
+- Purpose: placeholder idle, thread-magic windup, and attack-active presentation for Draht. Thread magic intentionally has no separate effect texture.
+
 ## Player pixel-animation placeholders
 
 - Files: `../Project1/assets/player/generated/*.png` and derived
