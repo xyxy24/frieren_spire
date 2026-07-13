@@ -49,6 +49,7 @@ public:
     [[nodiscard]] EnemyAction action() const noexcept;
     [[nodiscard]] float facingDirection() const noexcept;
     [[nodiscard]] std::uint64_t attackSequence() const noexcept;
+    [[nodiscard]] float activeProgress() const noexcept;
     [[nodiscard]] Aabb attackBounds() const noexcept;
     [[nodiscard]] Aabb bounds() const noexcept;
     [[nodiscard]] const EnemyConfig& config() const noexcept;

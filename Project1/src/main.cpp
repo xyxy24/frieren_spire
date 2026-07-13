@@ -703,7 +703,8 @@ void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
 
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
-    const EnemyStateTextures& birdTextures,
+    const EnemyStateTextures& birdTextures, const EnemyStateTextures& lugnerTextures,
+    const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator)
 {
@@ -791,6 +792,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &mimicTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::BirdDemon)
             stateTextures = &birdTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
+            stateTextures = &lugnerTextures;
         const sf::Texture* texture = nullptr;
         if (stateTextures)
         {
@@ -826,6 +829,30 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         if (enemy.skillEffectBounds)
         {
             const auto area = *enemy.skillEffectBounds;
+            const bool lugnerBlood = enemy.archetype == arcane::game::EnemyArchetype::Lugner
+                && enemy.attackActive;
+            const sf::Texture* bloodTexture = nullptr;
+            if (lugnerBlood)
+            {
+                const std::size_t frame = std::min<std::size_t>(2U,
+                    static_cast<std::size_t>(enemy.skillEffectProgress * 3.0F));
+                if (lugnerSkillTextures[frame]) bloodTexture = &*lugnerSkillTextures[frame];
+            }
+            if (bloodTexture)
+            {
+                sf::Sprite effect(*bloodTexture);
+                const auto size = bloodTexture->getSize();
+                effect.setOrigin({static_cast<float>(size.x) * 0.5F,
+                    static_cast<float>(size.y) * 0.5F});
+                effect.setPosition({area.left + area.width * 0.5F,
+                    area.top + area.height * 0.5F});
+                effect.setScale({(enemy.facingDirection > 0.0F ? -1.0F : 1.0F)
+                        * area.width / static_cast<float>(size.x),
+                    area.height / static_cast<float>(size.y)});
+                target.draw(effect);
+            }
+            else
+            {
             sf::RectangleShape skillShape({area.width, area.height});
             skillShape.setPosition({area.left, area.top});
             skillShape.setFillColor(enemy.attackActive
@@ -834,6 +861,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 ? sf::Color {255, 120, 120} : sf::Color {255, 201, 105});
             skillShape.setOutlineThickness(2.0F);
             target.draw(skillShape);
+            }
         }
 
         if (primaryBoss)
@@ -1030,6 +1058,13 @@ int main()
         "assets/enemies/chest_mimic/");
     const EnemyStateTextures birdDemonTextures = loadEnemyStateTextures(
         "assets/enemies/bird_demon/");
+    const EnemyStateTextures lugnerTextures = loadEnemyStateTextures(
+        "assets/enemies/lugner/");
+    const std::array<std::optional<sf::Texture>, 3> lugnerSkillTextures {
+        loadTexture("assets/enemies/lugner/skill1.png"),
+        loadTexture("assets/enemies/lugner/skill2.png"),
+        loadTexture("assets/enemies/lugner/skill3.png")
+    };
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
@@ -1095,7 +1130,8 @@ int main()
                 if (tower->combat())
                 {
                     drawCombat(window, *tower, headlessKnightTextures, chestMimicTextures,
-                        birdDemonTextures, playerAnimator, spellEffectAnimator);
+                        birdDemonTextures, lugnerTextures, lugnerSkillTextures,
+                        playerAnimator, spellEffectAnimator);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }
