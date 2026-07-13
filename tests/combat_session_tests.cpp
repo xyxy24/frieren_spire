@@ -65,6 +65,34 @@ bool oneAttackHitsOnlyOnce()
         && expect(combat.enemyState().currentHealth == 85, "an active attack must hit an enemy only once");
 }
 
+bool playerViewSequencesOnlyAdvanceForSuccessfulActions()
+{
+    auto request = adjacentEnemyRequest();
+    request.equippedSpellIds[0] = 1004U;
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    arcane::game::CombatSession combat(request);
+
+    arcane::game::PlayerIntent actions;
+    actions.attackPressed = true;
+    actions.spellPressed[0] = true;
+    combat.update(actions, 0.01F);
+    const auto afterSuccess = combat.playerState();
+    if (!expect(afterSuccess.attackSequence == 1U,
+        "player view must expose a newly accepted basic attack")) return false;
+    if (!expect(afterSuccess.castSequence == 1U,
+        "player view must expose a newly accepted spell cast")) return false;
+    if (!expect(std::abs(afterSuccess.velocity.x) < 0.01F,
+        "player view must expose authoritative movement velocity")) return false;
+
+    combat.update(actions, 0.01F);
+    const auto afterCooldownRejection = combat.playerState();
+    return expect(afterCooldownRejection.attackSequence == afterSuccess.attackSequence,
+            "rejected basic attacks must not retrigger presentation")
+        && expect(afterCooldownRejection.castSequence == afterSuccess.castSequence,
+            "rejected spell casts must not retrigger presentation");
+}
+
 bool repeatedAttacksProduceVictoryResult()
 {
     arcane::game::CombatRequest request = adjacentEnemyRequest();
@@ -1125,6 +1153,7 @@ int main()
         && damageResolverDeduplicatesPerSource()
         && damageResolverCentralizesModifiersAndBlocking()
         && oneAttackHitsOnlyOnce()
+        && playerViewSequencesOnlyAdvanceForSuccessfulActions()
         && repeatedAttacksProduceVictoryResult()
         && enemyAttackHasWindupAndHitsOnce()
         && zeroHealthProducesDefeatResult()

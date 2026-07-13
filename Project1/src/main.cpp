@@ -2,6 +2,7 @@
 #include "game/relics/RelicSystem.hpp"
 #include "game/spells/SpellSystem.hpp"
 #include "platform/SfmlInputMapper.hpp"
+#include "presentation/PlayerAnimator.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -55,6 +56,22 @@ EnemyStateTextures loadEnemyStateTextures(const std::string_view base)
     textures.windup = loadTexture(std::string {base} + "windup.png");
     textures.attack = loadTexture(std::string {base} + "attack.png");
     return textures;
+}
+
+arcane::presentation::PlayerVisualState makePlayerVisualState(
+    const arcane::game::PlayerStateView& player)
+{
+    return {player.position, player.velocity, player.currentHealth, player.grounded,
+        player.facingDirection, player.attackSequence, player.castSequence,
+        player.dashRemaining, player.shadowDashing, player.stunned};
+}
+
+arcane::presentation::PlayerVisualState makePlayerVisualState(
+    const arcane::game::PlayerController& player, const int currentHealth)
+{
+    return {player.position(), player.velocity(), currentHealth, player.isGrounded(),
+        player.facingDirection(), 0U, 0U, player.dashRemaining(),
+        player.isShadowDashing(), player.isStunned()};
 }
 
 void drawHealthBar(
@@ -470,7 +487,26 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
 
 void drawStaircase(sf::RenderTarget& target, arcane::game::Aabb bounds, bool unlocked);
 
-void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+void drawPlayer(sf::RenderTarget& target, const arcane::presentation::PlayerAnimator& animator,
+    const arcane::presentation::PlayerVisualState& player, const sf::Color fallbackColor)
+{
+    const sf::Vector2f bottomCenter {
+        player.position.x + arcane::game::PlayerController::Width * 0.5F,
+        player.position.y + arcane::game::PlayerController::Height
+    };
+    if (animator.draw(target, bottomCenter, player.facingDirection)) return;
+
+    sf::RectangleShape shape(
+        {arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
+    shape.setPosition({player.position.x, player.position.y});
+    shape.setFillColor(fallbackColor);
+    shape.setOutlineColor(sf::Color {142, 115, 200});
+    shape.setOutlineThickness(3.0F);
+    target.draw(shape);
+}
+
+void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
+    const arcane::presentation::PlayerAnimator& playerAnimator)
 {
     sf::RectangleShape ground({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight) - GroundTop});
     ground.setPosition({0.0F, GroundTop});
@@ -478,11 +514,9 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     target.draw(ground);
     if (const auto* player = tower.explorationPlayer())
     {
-        sf::RectangleShape shape({arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
-        const auto position = player->position();
-        shape.setPosition({position.x, position.y});
-        shape.setFillColor(sf::Color {232, 232, 242});
-        target.draw(shape);
+        drawPlayer(target, playerAnimator,
+            makePlayerVisualState(*player, tower.run().player().currentHp),
+            sf::Color {232, 232, 242});
     }
     const auto npc = tower.npcBounds();
     sf::RectangleShape npcShape({npc.width, npc.height});
@@ -668,7 +702,8 @@ void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
 
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
-    const EnemyStateTextures& birdTextures)
+    const EnemyStateTextures& birdTextures,
+    const arcane::presentation::PlayerAnimator& playerAnimator)
 {
     const arcane::game::CombatSession* combat = tower.combat();
     if (!combat) return;
@@ -679,18 +714,11 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     target.draw(ground);
 
     const arcane::game::PlayerStateView player = combat->playerState();
-    sf::RectangleShape playerShape({arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
-    playerShape.setPosition({player.position.x, player.position.y});
-    playerShape.setFillColor(player.shadowDashing ? sf::Color {28, 22, 42}
+    const sf::Color playerFallback = player.shadowDashing ? sf::Color {28, 22, 42}
         : player.dashRemaining > 0.0F ? sf::Color {100, 220, 245}
         : player.stunned ? sf::Color {112, 180, 235}
-        : player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242});
-    playerShape.setOutlineColor(player.shadowDashing
-        ? sf::Color {186, 145, 245}
-        : player.dashRemaining > 0.0F ? sf::Color {100, 220, 245}
-        : sf::Color {142, 115, 200});
-    playerShape.setOutlineThickness(3.0F);
-    target.draw(playerShape);
+        : player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242};
+    drawPlayer(target, playerAnimator, makePlayerVisualState(player), playerFallback);
 
     for (const arcane::game::SpellEffectView effect : combat->spellEffects())
     {
@@ -998,6 +1026,8 @@ int main()
         "assets/enemies/chest_mimic/");
     const EnemyStateTextures birdDemonTextures = loadEnemyStateTextures(
         "assets/enemies/bird_demon/");
+    arcane::presentation::PlayerAnimator playerAnimator;
+    static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
     sf::Clock frameClock;
 
     while (window.isOpen())
@@ -1009,6 +1039,19 @@ int main()
 
         const float deltaSeconds = std::min(frameClock.restart().asSeconds(), MaximumFrameTime);
         app.update(inputMapper.sample(), deltaSeconds);
+
+        std::optional<arcane::presentation::PlayerVisualState> playerVisualState;
+        if (const auto* tower = app.tower())
+        {
+            if (const auto* combat = tower->combat())
+                playerVisualState = makePlayerVisualState(combat->playerState());
+            else if (const auto* player = tower->explorationPlayer())
+                playerVisualState = makePlayerVisualState(*player, tower->run().player().currentHp);
+        }
+        if (playerVisualState && (app.screen() == arcane::app::AppScreen::Playing
+            || app.screen() == arcane::app::AppScreen::Result))
+            playerAnimator.update(*playerVisualState, deltaSeconds);
+
         if (app.screen() == arcane::app::AppScreen::Start)
             window.setTitle(app.canContinue()
                 ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop"
@@ -1029,7 +1072,13 @@ int main()
         else if (app.screen() == arcane::app::AppScreen::Pause)
             drawPauseMenu(window, app.pauseMenuItem());
         else if (app.screen() == arcane::app::AppScreen::Result)
+        {
             drawResultMenu(window, app.victory());
+            if (!app.victory() && playerVisualState)
+                static_cast<void>(playerAnimator.draw(window,
+                    {static_cast<float>(WindowWidth) * 0.5F, GroundTop},
+                    playerVisualState->facingDirection));
+        }
         else if (const auto* tower = app.tower())
         {
             const auto phase = tower->run().phase();
@@ -1040,7 +1089,7 @@ int main()
                 if (tower->combat())
                 {
                     drawCombat(window, *tower, headlessKnightTextures, chestMimicTextures,
-                        birdDemonTextures);
+                        birdDemonTextures, playerAnimator);
                     drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
                     if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
                 }
@@ -1050,7 +1099,7 @@ int main()
                 && (tower->currentFloorType() == arcane::game::run::FloorType::Merchant
                     || tower->currentFloorType() == arcane::game::run::FloorType::Event))
             {
-                drawSpecialFloor(window, *tower);
+                drawSpecialFloor(window, *tower, playerAnimator);
                 if (tower->specialPanelOpen() && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
                     drawMerchantScreen(window, *tower);
                 if (tower->specialPanelOpen() && tower->currentFloorType() == arcane::game::run::FloorType::Event)

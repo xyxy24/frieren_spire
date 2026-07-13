@@ -62,12 +62,15 @@ struct CombatResult
 struct PlayerStateView
 {
     Vec2 position;
+    Vec2 velocity;
     int currentHealth {0};
     int maximumHealth {0};
     bool grounded {false};
     float facingDirection {1.0F};
     bool attackActive {false};
     float attackCooldownRemaining {0.0F};
+    std::uint64_t attackSequence {};
+    std::uint64_t castSequence {};
     std::array<spells::SpellSlotView, 3> spellSlots;
     spells::SpellSlotView ultimateSpellSlot;
     float dashRemaining {0.0F};
