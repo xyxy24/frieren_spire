@@ -40,6 +40,8 @@ public:
     [[nodiscard]] float dashRemaining() const noexcept;
     [[nodiscard]] float dashCooldownRemaining() const noexcept;
     [[nodiscard]] float flightRemaining() const noexcept;
+    void reduceDashCooldown(float seconds) noexcept;
+    void refreshDash() noexcept;
 
 private:
     static constexpr float MoveSpeed = 260.0F;

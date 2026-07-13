@@ -40,6 +40,7 @@ struct PlayerProgress
     std::optional<ContentId> equippedUltimateSpell;
     bool ultimateSpellUnlocked {false};
     std::vector<ContentId> relics;
+    std::array<bool, 3> rewardRerollUsed {};
 };
 
 struct RunContext

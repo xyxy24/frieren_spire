@@ -16,7 +16,8 @@ enum class SpellEffect : std::uint8_t {
     Cleaning, HotTea, BirdCapture, ManaTrace, BossZoltraak, GoddessSpears,
     SeveringSlash, Mimic, DestructionLightning, HellfireStorm, JudgmentBeam,
     EarthPillars, MirrorArray, MultiZoltraak, Dispel, ManaStrike, GoldenBinding,
-    FloatSlam, StoneGolem, Flight, SpatialShatter, Seal, LightningStaff
+    FloatSlam, StoneGolem, Flight, SpatialShatter, Seal, LightningStaff,
+    HomingVolley, DefensiveBarrier, WindPressure, GravityWell
 };
 enum class SpellShape : std::uint8_t { Self, ForwardBox, SelfArea, TargetArea, Summon };
 enum class SpellTier : std::uint8_t { Regular, Innate, Boss };
@@ -75,6 +76,10 @@ public:
     [[nodiscard]] bool equip(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
     [[nodiscard]] bool equipUltimate(std::optional<std::uint32_t> id) noexcept;
     void reduceLongestRegularCooldown(float seconds) noexcept;
+    void reduceRegularCooldown(std::size_t slot, float seconds) noexcept;
+    void addRegularCooldown(std::size_t slot, float seconds) noexcept;
+    void reduceUltimateCooldown(float seconds) noexcept;
+    void setUltimateCooldown(float seconds) noexcept;
 
 private:
     struct SlotState
@@ -87,5 +92,6 @@ private:
         Vec2 casterPosition, float facingDirection, const Aabb& targetBounds) noexcept;
     std::array<SlotState, 3> slots_;
     SlotState ultimate_;
+    float ultimateCooldownSeconds_ {UltimateCooldownSeconds};
 };
 }

@@ -308,6 +308,10 @@ void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession&
         sf::Color {255, 231, 145});
     drawPixelText(target, "READ THE EFFECT THEN PRESS U I OR O", {390.0F, 110.0F}, 1.3F,
         sf::Color {182, 174, 215});
+    if (std::find(tower.run().player().relics.begin(), tower.run().player().relics.end(),
+            arcane::game::relics::FirstClassBadgeId) != tower.run().player().relics.end())
+        drawPixelText(target, "R REROLL - ONCE PER ACT", {510.0F, 132.0F}, 0.9F,
+            sf::Color {145, 218, 255});
 
     constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
     constexpr std::array<std::string_view, 3> Keys {"U", "I", "O"};
@@ -506,12 +510,12 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
     if (!spellPage)
     {
         const auto& relics = tower.run().player().relics;
-        constexpr std::size_t Columns = 6U;
-        constexpr float CardWidth = 140.0F;
-        constexpr float CardHeight = 90.0F;
-        constexpr float HorizontalGap = 25.0F;
-        constexpr float VerticalGap = 50.0F;
-        constexpr float StartX = 157.5F;
+        constexpr std::size_t Columns = 8U;
+        constexpr float CardWidth = 110.0F;
+        constexpr float CardHeight = 72.0F;
+        constexpr float HorizontalGap = 20.0F;
+        constexpr float VerticalGap = 38.0F;
+        constexpr float StartX = 120.0F;
         constexpr float StartY = 90.0F;
 
         if (relics.empty())
@@ -532,7 +536,8 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
             drawCard(target, relics[index], position, {CardWidth, CardHeight},
                 tower.selectedRelic() == relics[index]);
             if (const auto* definition = arcane::game::relics::findDefinition(relics[index]))
-                drawPixelText(target, definition->name, {position.x, position.y + CardHeight + 10.0F}, 1.0F);
+                drawPixelText(target, wrapPixelText(definition->name, 18U),
+                    {position.x, position.y + CardHeight + 7.0F}, 0.78F);
             else
                 drawPixelText(target, "UNKNOWN RELIC", {position.x, position.y + CardHeight + 10.0F}, 1.0F);
         }
@@ -541,9 +546,10 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
         {
             if (const auto* definition = arcane::game::relics::findDefinition(*tower.selectedRelic()))
             {
-                drawPixelText(target, definition->name, {157.5F, 535.0F}, 1.8F,
+                drawPixelText(target, definition->name, {120.0F, 470.0F}, 1.6F,
                     sf::Color {255, 231, 145});
-                drawPixelText(target, definition->description, {157.5F, 570.0F}, 1.25F);
+                drawPixelText(target, wrapPixelText(definition->description, 115U),
+                    {120.0F, 505.0F}, 0.95F);
             }
             else
             {
@@ -713,6 +719,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         case 1024U: color = sf::Color {232, 121, 255}; break;
         case 1025U: color = sf::Color {220, 205, 255}; break;
         case 1026U: color = sf::Color {255, 238, 92}; break;
+        case 1027U: color = sf::Color {116, 228, 255}; break;
+        case 1028U: color = sf::Color {140, 177, 255}; break;
+        case 1029U: color = sf::Color {178, 244, 232}; break;
+        case 1030U: color = sf::Color {164, 105, 235}; break;
         case 2001U: color = sf::Color {108, 228, 255}; break;
         case 2002U: color = sf::Color {255, 232, 139}; break;
         case 2003U: color = sf::Color {238, 238, 255}; break;
@@ -1053,6 +1063,9 @@ int main()
             }
             drawHealthBar(window, {32.0F, 28.0F}, {300.0F, 22.0F}, displayedHealth,
                 tower->run().player().maxHp, sf::Color {108, 206, 126});
+            if (combatView && combatView->shield > 0)
+                drawPixelText(window, "SHIELD " + std::to_string(combatView->shield),
+                    {345.0F, 32.0F}, 1.0F, sf::Color {140, 190, 255});
             drawGold(window, tower->run().player().gold);
             if (!tower->loadoutOpen()) drawEquippedSlots(window, tower->run().player(),
                 combatView ? &*combatView : nullptr);

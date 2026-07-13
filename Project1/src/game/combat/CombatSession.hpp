@@ -47,7 +47,13 @@ private:
     static constexpr float HitStunSeconds = 0.28F;
     static constexpr float KnockbackSpeed = 360.0F;
 
+    struct EnemyRuntime;
     [[nodiscard]] Aabb playerBounds() const noexcept;
+    [[nodiscard]] DamageResult resolvePlayerDamage(DamageRequest request) noexcept;
+    int healPlayer(int amount) noexcept;
+    float relicControlMultiplier(EnemyRuntime& enemy) noexcept;
+    float playerControlDuration(float seconds) noexcept;
+    void onBlessingPreventedControl() noexcept;
     struct EnemyRuntime
     {
         EnemyArchetype archetype;
@@ -72,11 +78,17 @@ private:
         std::uint64_t burnSequenceBase {};
         std::uint32_t burnTick {};
         DamageSource burnSource {DamageSource::PlayerSpell0};
+        float burnMultiplier {1.0F};
         float exposedRemaining {};
         float markedRemaining {};
         float frozenRemaining {};
         float goldenBindRemaining {};
         float skillSealRemaining {};
+        bool controlRelicTriggered {};
+        float relicComboWindow {};
+        float relicComboCooldown {};
+        std::uint32_t relicComboHits {};
+        float kraftCooldown {};
         float specialCooldown {};
         float specialWindup {};
         float specialActive {};
@@ -153,6 +165,16 @@ private:
     DamageSource golemSource_ {DamageSource::PlayerSpell0};
     float golemMultiplier_ {1.0F};
     std::uint64_t golemSequence_ {};
+    int barrierShield_ {};
+    int persistentShield_ {};
+    float barrierRemaining_ {};
+    float gravityWellRemaining_ {};
+    float gravityWellTickAccumulator_ {};
+    Aabb gravityWellBounds_;
+    DamageSource gravityWellSource_ {DamageSource::PlayerSpell0};
+    float gravityWellMultiplier_ {1.0F};
+    std::uint64_t gravityWellSequenceBase_ {};
+    std::uint32_t gravityWellTick_ {};
     float hellfireRemaining_ {};
     float hellfireTickAccumulator_ {};
     Aabb hellfireBounds_;
@@ -169,6 +191,20 @@ private:
     float guardRemaining_ {};
     float guardCooldownRemaining_ {};
     std::uint64_t selfDamageSequence_ {};
+    bool actualHpLost_ {};
+    int flowerCrownConverted_ {};
+    float tacticalNotesRemaining_ {};
+    bool tacticalInterruptUsed_ {};
+    bool globalControlRelicUsed_ {};
+    std::array<bool, 3> holyStaffTriggered_ {};
+    bool mirrorRelicUsed_ {};
+    float lastRegularCastMultiplier_ {1.0F};
+    bool firstDamageSpellUsed_ {};
+    bool firstIncomingControlUsed_ {};
+    float manaLensCooldown_ {};
+    float warriorAxeCooldown_ {};
+    bool goddessTabletTriggered_ {};
+    float goddessTabletDamageRemaining_ {};
     std::vector<ActiveSpellEffect> activeSpellEffects_;
     std::vector<PendingSpellImpact> pendingSpellImpacts_;
     std::vector<ActivePillar> activePillars_;

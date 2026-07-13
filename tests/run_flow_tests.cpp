@@ -4,6 +4,7 @@
 #include "game/events/EventSystem.hpp"
 #include "game/floors/FloorScheduler.hpp"
 #include "game/run/DeterministicRng.hpp"
+#include "game/relics/RelicSystem.hpp"
 
 #include <array>
 #include <algorithm>
@@ -270,6 +271,27 @@ bool merchantStockAndFloorScheduleReproduce()
     return true;
 }
 
+bool firstClassBadgeRerollsOncePerAct()
+{
+    constexpr std::array<arcane::game::run::ContentId, 1> encounters {10U};
+    constexpr std::array<arcane::game::run::ContentId, 4> damage {1004U, 1005U, 1006U, 1009U};
+    constexpr std::array<arcane::game::run::ContentId, 4> control {1008U, 1011U, 1018U, 1020U};
+    constexpr std::array<arcane::game::run::ContentId, 8> full {
+        1004U, 1005U, 1006U, 1009U, 1008U, 1011U, 1018U, 1020U};
+    arcane::game::run::PlayerProgress player;
+    player.relics = {arcane::game::relics::FirstClassBadgeId};
+    arcane::app::RunController run(2468U, player);
+    const auto& floor = run.loadFloor(arcane::game::run::FloorType::Combat, encounters);
+    if (!run.resolveEncounter(victoryResult(floor.encounterIds[0], 0), full, damage, control)
+        || !run.openReward()) return false;
+    return expect(run.rerollRegularReward(damage, control, full),
+            "First-Class Badge must reroll a regular reward")
+        && expect(run.player().rewardRerollUsed[0],
+            "reroll must be recorded for the current act")
+        && expect(!run.rerollRegularReward(damage, control, full),
+            "First-Class Badge must not reroll twice in one act");
+}
+
 bool categorizedRewardsGuaranteeCombatRoles()
 {
     constexpr std::array<arcane::game::run::ContentId, 3> damage {1003U, 1004U, 1005U};
@@ -417,7 +439,8 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 
 int main()
 {
-    const bool passed = deterministicStreamsAreIsolated() && categorizedRewardsGuaranteeCombatRoles()
+    const bool passed = deterministicStreamsAreIsolated() && firstClassBadgeRerollsOncePerAct()
+        && categorizedRewardsGuaranteeCombatRoles()
         && completesFiveFloorLoops()
         && healsHalfMissingRoundedUp() && bossRewardUnlocksOnlyTheUltimateCollection()
         && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()

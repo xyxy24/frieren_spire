@@ -32,6 +32,10 @@ constexpr std::array Definitions {
     SpellDefinition {1024U, "Spatial Shatter", "Damage every enemy around you for 26. If the blast interrupts at least one active enemy attack, it deals 38 instead and makes you invulnerable for 0.35 seconds.", SpellEffect::SpatialShatter, SpellShape::SelfArea, 26, 9.0F, 115.0F, 96.0F},
     SpellDefinition {1025U, "Sealing Magic", "Deal 16 damage, interrupt the target's current attack and disable special attacks for 4 seconds on normal enemies or 1.5 seconds on bosses. A marked target is sealed 1 second longer.", SpellEffect::Seal, SpellShape::ForwardBox, 16, 10.0F, 200.0F, 72.0F},
     SpellDefinition {1026U, "Lightning Staff", "For 4 seconds, each of your next three basic attacks deals 7 additional lightning damage. The third charged attack also releases a 12 damage blast around you.", SpellEffect::LightningStaff, SpellShape::Self, 0, 9.0F, 0.0F, 0.0F},
+    SpellDefinition {1027U, "Homing Volley", "Fire three homing bolts at the nearest enemy within 320 pixels. Each bolt deals 7 damage; the third deals 6 extra damage if the target is flying.", SpellEffect::HomingVolley, SpellShape::TargetArea, 7, 3.5F, 320.0F, 72.0F},
+    SpellDefinition {1028U, "Defensive Barrier", "Gain a 24 point shield for 5 seconds. While any shield remains, ordinary enemy contact cannot interrupt your actions; when this barrier breaks it deals 12 damage around you.", SpellEffect::DefensiveBarrier, SpellShape::Self, 0, 10.0F, 0.0F, 0.0F},
+    SpellDefinition {1029U, "Wind Pressure", "Blast a wide area in front for 14 damage and strong knockback. Normal enemies that are charging, diving or attacking are interrupted; a wall collision adds 10 damage.", SpellEffect::WindPressure, SpellShape::ForwardBox, 14, 6.0F, 190.0F, 110.0F},
+    SpellDefinition {1030U, "Gravity Well", "Create a 2.5 second field at the target. It pulls enemies within 140 pixels toward its center and deals 6 damage each second.", SpellEffect::GravityWell, SpellShape::TargetArea, 0, 9.0F, 260.0F, 280.0F},
     SpellDefinition {2001U, "Demon Killing Zoltraak", "Fire a long beam that pierces every enemy in its path for 70 damage. Demon enemies take 30 percent additional damage; each enemy can be hit only once per cast.", SpellEffect::BossZoltraak, SpellShape::ForwardBox, 70, SpellSystem::UltimateCooldownSeconds, 420.0F, 64.0F, SpellTier::Boss},
     SpellDefinition {2002U, "Goddess Three Spears", "Drop three divine spears into the target area, each dealing 28 damage. If all three hit, restore 12 HP to the player.", SpellEffect::GoddessSpears, SpellShape::TargetArea, 28, SpellSystem::UltimateCooldownSeconds, 340.0F, 96.0F, SpellTier::Boss},
     SpellDefinition {2003U, "Severing Magic", "Slash a short area in front for 78 damage. Targets below 20 percent HP take 30 percent more; hitting Golden Binding consumes it for 16 additional damage.", SpellEffect::SeveringSlash, SpellShape::ForwardBox, 78, SpellSystem::UltimateCooldownSeconds, 105.0F, 96.0F, SpellTier::Boss},
@@ -86,7 +90,7 @@ SpellCastResult SpellSystem::tryCast(const std::size_t slot, const Vec2 casterPo
 SpellCastResult SpellSystem::tryCastUltimate(const Vec2 casterPosition,
     const float facingDirection, const Aabb& targetBounds) noexcept
 {
-    return tryCastState(ultimate_, UltimateCooldownSeconds,
+    return tryCastState(ultimate_, ultimateCooldownSeconds_,
         casterPosition, facingDirection, targetBounds);
 }
 
@@ -163,7 +167,7 @@ SpellSlotView SpellSystem::ultimateView() const noexcept
             ? std::optional<std::uint32_t> {ultimate_.definition->id}
             : std::nullopt,
         ultimate_.cooldownRemaining,
-        ultimate_.definition ? UltimateCooldownSeconds : 0.0F};
+        ultimate_.definition ? ultimateCooldownSeconds_ : 0.0F};
 }
 
 void SpellSystem::reduceLongestRegularCooldown(const float seconds) noexcept
@@ -175,4 +179,20 @@ void SpellSystem::reduceLongestRegularCooldown(const float seconds) noexcept
     if (found != slots_.end())
         found->cooldownRemaining = std::max(0.0F, found->cooldownRemaining - seconds);
 }
+
+void SpellSystem::reduceRegularCooldown(const std::size_t slot, const float seconds) noexcept
+{
+    if (slot < slots_.size()) slots_[slot].cooldownRemaining =
+        std::max(0.0F, slots_[slot].cooldownRemaining - std::max(0.0F, seconds));
+}
+
+void SpellSystem::addRegularCooldown(const std::size_t slot, const float seconds) noexcept
+{
+    if (slot < slots_.size()) slots_[slot].cooldownRemaining += std::max(0.0F, seconds);
+}
+
+void SpellSystem::reduceUltimateCooldown(const float seconds) noexcept
+{ ultimate_.cooldownRemaining = std::max(0.0F, ultimate_.cooldownRemaining - std::max(0.0F, seconds)); }
+void SpellSystem::setUltimateCooldown(const float seconds) noexcept
+{ ultimateCooldownSeconds_ = std::max(0.0F, seconds); }
 }

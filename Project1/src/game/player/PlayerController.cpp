@@ -154,4 +154,7 @@ void PlayerController::setHorizontalPosition(const float position, const WorldBo
     velocity_.x = 0.0F;
 }
 float PlayerController::flightRemaining() const noexcept { return flightRemaining_; }
+void PlayerController::reduceDashCooldown(const float seconds) noexcept
+{ dashCooldownRemaining_ = std::max(0.0F, dashCooldownRemaining_ - std::max(0.0F, seconds)); }
+void PlayerController::refreshDash() noexcept { dashCooldownRemaining_ = 0.0F; }
 }

@@ -1015,6 +1015,114 @@ bool swordRelicsModifyCollisionDamage()
     return expect(retaliation.enemyState().currentHealth == 45,
         "True Hero Sword must retaliate for thirty nearby damage");
 }
+
+bool expandedSpellAndRelicCatalogIsComplete()
+{
+    for (std::uint32_t id = 1027U; id <= 1030U; ++id)
+        if (!expect(arcane::game::spells::findDefinition(id) != nullptr,
+            "new spell IDs 1027 through 1030 must have definitions")) return false;
+    for (std::uint32_t id = 4001U; id <= 4024U; ++id)
+        if (!expect(arcane::game::relics::findDefinition(id) != nullptr,
+            "relic IDs 4001 through 4024 must have definitions")) return false;
+    return true;
+}
+
+bool newSpellsApplyTargetingShieldWindAndGravity()
+{
+    auto request = adjacentEnemyRequest();
+    request.equippedSpellIds = {1027U, 1028U, 1030U};
+    request.enemyAttackDamage = 0;
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+
+    arcane::game::PlayerIntent homing;
+    homing.spellPressed[0] = true;
+    combat.update(homing, 0.01F);
+    if (!expect(combat.enemyState().currentHealth == 79,
+        "Homing Volley must deal three seven-damage hits to a ground enemy")) return false;
+
+    arcane::game::PlayerIntent barrier;
+    barrier.spellPressed[1] = true;
+    combat.update(barrier, 0.01F);
+    if (!expect(combat.playerState().shield == 24,
+        "Defensive Barrier must grant twenty-four shield")) return false;
+
+    arcane::game::PlayerIntent gravity;
+    gravity.spellPressed[2] = true;
+    combat.update(gravity, 0.01F);
+    combat.update({}, 1.01F);
+    if (!expect(combat.enemyState().currentHealth == 73,
+        "Gravity Well must deal its first six-damage tick")) return false;
+
+    auto windRequest = adjacentEnemyRequest();
+    windRequest.equippedSpellIds[0] = 1029U;
+    windRequest.enemyAttackDamage = 0;
+    windRequest.enemyContactDamage = 0;
+    arcane::game::CombatSession wind(windRequest);
+    arcane::game::PlayerIntent castWind;
+    castWind.spellPressed[0] = true;
+    wind.update(castWind, 0.01F);
+    return expect(wind.enemyState().currentHealth == 86,
+            "Wind Pressure must deal fourteen damage")
+        && expect(wind.enemyState().position.x > 210.0F,
+            "Wind Pressure must knock the target away");
+}
+
+bool combatRelicsModifyCooldownBloodUltimateAndGold()
+{
+    auto cooldownRequest = adjacentEnemyRequest();
+    cooldownRequest.equippedSpellIds = {1004U, 1005U, std::nullopt};
+    cooldownRequest.relicIds = {arcane::game::relics::HolyStaffId};
+    cooldownRequest.enemyAttackDamage = 0;
+    cooldownRequest.enemyContactDamage = 0;
+    arcane::game::CombatSession cooldown(cooldownRequest);
+    arcane::game::PlayerIntent frost;
+    frost.spellPressed[1] = true;
+    cooldown.update(frost, 0.01F);
+    arcane::game::PlayerIntent zoltraak;
+    zoltraak.spellPressed[0] = true;
+    cooldown.update(zoltraak, 0.01F);
+    if (!expect(cooldown.playerState().spellSlots[1].cooldownRemaining < 3.8F,
+        "Holy Staff must reduce the other regular slot on its first cast")) return false;
+
+    auto bloodRequest = adjacentEnemyRequest();
+    bloodRequest.equippedSpellIds[0] = 1003U;
+    bloodRequest.relicIds = {arcane::game::relics::DemonCoinId};
+    bloodRequest.enemyAttackDamage = 0;
+    bloodRequest.enemyContactDamage = 0;
+    arcane::game::CombatSession blood(bloodRequest);
+    arcane::game::PlayerIntent castBlood;
+    castBlood.spellPressed[0] = true;
+    blood.update(castBlood, 0.01F);
+    if (!expect(blood.enemyState().currentHealth == 40,
+        "Demon Coin must increase Blood Magic final damage by twenty-five percent")) return false;
+
+    auto ultimateRequest = adjacentEnemyRequest();
+    ultimateRequest.equippedUltimateSpellId = 2001U;
+    ultimateRequest.relicIds = {arcane::game::relics::SeriePageId};
+    ultimateRequest.enemyMaximumHealth = 200;
+    ultimateRequest.enemyAttackDamage = 0;
+    ultimateRequest.enemyContactDamage = 0;
+    arcane::game::CombatSession ultimate(ultimateRequest);
+    arcane::game::PlayerIntent castUltimate;
+    castUltimate.ultimateSpellPressed = true;
+    ultimate.update(castUltimate, 0.01F);
+    if (!expect(std::abs(ultimate.playerState().ultimateSpellSlot.cooldownRemaining - 15.3F) < 0.01F,
+        "Serie Page must reduce the authoritative ultimate cooldown to 15.3 seconds")) return false;
+
+    auto goldRequest = adjacentEnemyRequest();
+    goldRequest.enemyMaximumHealth = 15;
+    goldRequest.enemyAttackDamage = 0;
+    goldRequest.enemyContactDamage = 0;
+    goldRequest.goldReward = 10;
+    goldRequest.relicIds = {arcane::game::relics::OldCopperCoinId};
+    arcane::game::CombatSession gold(goldRequest);
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    gold.update(attack, 0.01F);
+    return expect(gold.result() && gold.result()->goldAwarded == 20,
+        "Old Copper Coin must add ten gold to a flawless combat victory");
+}
 }
 
 int main()
@@ -1060,6 +1168,9 @@ int main()
         && lateSecondActEnemiesExposeConfiguredContent()
         && laufenTeleportsBehindAndImmediatelySideKicks()
         && swordRelicsModifyCollisionDamage()
+        && expandedSpellAndRelicCatalogIsComplete()
+        && newSpellsApplyTargetingShieldWindAndGravity()
+        && combatRelicsModifyCooldownBloodUltimateAndGold()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()

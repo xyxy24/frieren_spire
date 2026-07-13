@@ -29,6 +29,9 @@ public:
     [[nodiscard]] bool openReward();
     [[nodiscard]] bool chooseReward(game::run::ContentId choice);
     [[nodiscard]] bool claimFallbackReward();
+    [[nodiscard]] bool rerollRegularReward(std::span<const game::run::ContentId> damagePool,
+        std::span<const game::run::ContentId> controlPool,
+        std::span<const game::run::ContentId> fullPool);
     [[nodiscard]] game::economy::PurchaseResult purchaseMerchantItem(
         std::vector<game::economy::StockItem>& stock, game::run::ContentId itemId);
     [[nodiscard]] game::events::EventResult chooseEvent(game::events::EventTransaction& transaction,

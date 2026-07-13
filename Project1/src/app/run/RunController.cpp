@@ -2,6 +2,7 @@
 
 #include "game/run/DeterministicRng.hpp"
 #include "game/spells/SpellSystem.hpp"
+#include "game/relics/RelicSystem.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -130,6 +131,24 @@ bool RunController::claimFallbackReward()
     player_.gold += reward_->fallbackGold;
     rewardApplied_ = true;
     phase_ = game::run::RunPhase::FloorComplete;
+    return true;
+}
+
+bool RunController::rerollRegularReward(const std::span<const game::run::ContentId> damagePool,
+    const std::span<const game::run::ContentId> controlPool,
+    const std::span<const game::run::ContentId> fullPool)
+{
+    const std::size_t actIndex = context_.act > 0U ? context_.act - 1U : 0U;
+    if (phase_ != game::run::RunPhase::Reward || !reward_ || rewardApplied_
+        || currentFloorType_ == game::run::FloorType::Boss
+        || actIndex >= player_.rewardRerollUsed.size() || player_.rewardRerollUsed[actIndex]
+        || std::find(player_.relics.begin(), player_.relics.end(), game::relics::FirstClassBadgeId)
+            == player_.relics.end()) return false;
+    const auto seed = game::run::deriveStreamSeed(context_.floorSeed,
+        game::run::RandomStream::Reward) ^ 0xd1b54a32d192ed03ULL;
+    *reward_ = game::rewards::generateCategorizedOffer(damagePool, controlPool, fullPool,
+        player_.learnedSpells, seed);
+    player_.rewardRerollUsed[actIndex] = true;
     return true;
 }
 

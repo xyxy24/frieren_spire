@@ -11,15 +11,17 @@ namespace arcane::app
 {
 namespace
 {
-constexpr std::array<game::run::ContentId, 20> NormalRewardPool {
+constexpr std::array<game::run::ContentId, 24> NormalRewardPool {
     1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1008U, 1009U, 1011U, 1016U,
-    1017U, 1018U, 1019U, 1020U, 1021U, 1022U, 1023U, 1024U, 1025U, 1026U
+    1017U, 1018U, 1019U, 1020U, 1021U, 1022U, 1023U, 1024U, 1025U, 1026U,
+    1027U, 1028U, 1029U, 1030U
 };
-constexpr std::array<game::run::ContentId, 10> DamageRewardPool {
-    1003U, 1004U, 1005U, 1006U, 1009U, 1017U, 1019U, 1021U, 1024U, 1026U
+constexpr std::array<game::run::ContentId, 12> DamageRewardPool {
+    1003U, 1004U, 1005U, 1006U, 1009U, 1017U, 1019U, 1021U, 1024U, 1026U,
+    1027U, 1029U
 };
-constexpr std::array<game::run::ContentId, 6> ControlRewardPool {
-    1008U, 1011U, 1016U, 1018U, 1020U, 1025U
+constexpr std::array<game::run::ContentId, 7> ControlRewardPool {
+    1008U, 1011U, 1016U, 1018U, 1020U, 1025U, 1030U
 };
 constexpr std::array<game::run::ContentId, 9> BossRewardPool {
     2001U, 2002U, 2003U, 2006U, 2007U, 2009U, 2010U, 2011U, 2012U
@@ -44,11 +46,37 @@ constexpr std::array SpellMerchantCatalog {
     game::economy::CatalogItem {1023U, game::economy::ItemKind::Spell, 20},
     game::economy::CatalogItem {1024U, game::economy::ItemKind::Spell, 20},
     game::economy::CatalogItem {1025U, game::economy::ItemKind::Spell, 15},
-    game::economy::CatalogItem {1026U, game::economy::ItemKind::Spell, 20}
+    game::economy::CatalogItem {1026U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1027U, game::economy::ItemKind::Spell, 15},
+    game::economy::CatalogItem {1028U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1029U, game::economy::ItemKind::Spell, 20},
+    game::economy::CatalogItem {1030U, game::economy::ItemKind::Spell, 20}
 };
 constexpr std::array RelicMerchantCatalog {
-    game::economy::CatalogItem {4001U, game::economy::ItemKind::Relic, 15},
-    game::economy::CatalogItem {4002U, game::economy::ItemKind::Relic, 20}
+    game::economy::CatalogItem {4001U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4002U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4003U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4004U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4005U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4006U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4007U, game::economy::ItemKind::Relic, 55},
+    game::economy::CatalogItem {4008U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4009U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4010U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4011U, game::economy::ItemKind::Relic, 50},
+    game::economy::CatalogItem {4012U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4013U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4014U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4015U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4016U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4017U, game::economy::ItemKind::Relic, 50},
+    game::economy::CatalogItem {4018U, game::economy::ItemKind::Relic, 55},
+    game::economy::CatalogItem {4019U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4020U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4021U, game::economy::ItemKind::Relic, 40},
+    game::economy::CatalogItem {4022U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4023U, game::economy::ItemKind::Relic, 45},
+    game::economy::CatalogItem {4024U, game::economy::ItemKind::Relic, 40}
 };
 
 std::size_t eligibleCount(const std::span<const game::economy::CatalogItem> catalog,
@@ -82,6 +110,9 @@ TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config
             throw std::logic_error("merchant spell has no combat definition");
         }
     }
+    for (const auto& item : RelicMerchantCatalog)
+        if (game::relics::findDefinition(item.id) == nullptr)
+            throw std::logic_error("merchant relic has no definition");
 
     startNextFloor();
 }
@@ -176,6 +207,12 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
         if (run_.rewardOffer().kind == game::rewards::RewardKind::GoldFallback)
         {
             static_cast<void>(run_.claimFallbackReward());
+            break;
+        }
+        if (intent.menuSecondaryPressed && currentFloorType_ != game::run::FloorType::Boss)
+        {
+            static_cast<void>(run_.rerollRegularReward(DamageRewardPool, ControlRewardPool,
+                NormalRewardPool));
             break;
         }
         const auto candidates = run_.rewardOffer().candidates;
@@ -380,11 +417,19 @@ void TowerSession::startNextFloor()
                 SpellMerchantCatalog, run_.player(), merchantSeed, spellCount);
             merchantStock_.insert(merchantStock_.end(), spells.begin(), spells.end());
         }
-        const auto relicCount = std::min<std::size_t>(3U, eligibleCount(RelicMerchantCatalog, run_.player()));
+        const std::size_t relicCatalogCount = run_.context().act >= 3U ? 24U
+            : (run_.context().act >= 2U ? 20U : 12U);
+        const std::span relicCatalog {RelicMerchantCatalog.data(), relicCatalogCount};
+        const bool extraRelic = std::find(run_.player().relics.begin(), run_.player().relics.end(),
+            game::relics::MimicTongueId) != run_.player().relics.end();
+        const auto relicCount = std::min<std::size_t>(extraRelic ? 3U : 2U,
+            eligibleCount(relicCatalog, run_.player()));
         if (relicCount > 0U)
         {
-            auto relics = game::economy::generateStock(RelicMerchantCatalog, run_.player(),
+            auto relics = game::economy::generateStock(relicCatalog, run_.player(),
                 merchantSeed ^ 0x9e3779b97f4a7c15ULL, relicCount);
+            if (extraRelic)
+                for (auto& relic : relics) relic.price = (relic.price * 11 + 9) / 10;
             merchantStock_.insert(merchantStock_.end(), relics.begin(), relics.end());
         }
         selectedMerchantIndex_ = 0U;
