@@ -12,6 +12,7 @@
 #include "game/relics/RelicSystem.hpp"
 
 #include <cstdint>
+#include <array>
 #include <optional>
 #include <vector>
 
@@ -49,6 +50,8 @@ private:
     struct EnemyRuntime;
     [[nodiscard]] Aabb playerBounds() const noexcept;
     [[nodiscard]] DamageResult resolvePlayerDamage(DamageRequest request) noexcept;
+    [[nodiscard]] DamageResult resolveEnemyDamage(EnemyRuntime& enemy,
+        DamageRequest request) noexcept;
     int healPlayer(int amount) noexcept;
     float relicControlMultiplier(EnemyRuntime& enemy) noexcept;
     float playerControlDuration(float seconds) noexcept;
@@ -94,6 +97,13 @@ private:
         float specialElapsed {};
         float specialDirection {-1.0F};
         Aabb specialTargetBounds;
+        float concealmentProgress {};
+        bool fogCreated {};
+        std::array<float, 5> revolteCooldowns {};
+        int revolteSkill {-1};
+        bool revolteSecondPhase {};
+        bool revolteTransitionPending {};
+        bool revolteCounterDashPending {};
     };
     struct ActiveSpellEffect
     {
@@ -122,10 +132,21 @@ private:
         std::uint64_t sequence {};
         bool launched {};
     };
+    struct ActiveEnemyProjectile
+    {
+        Aabb bounds;
+        float direction {};
+        float remainingDistance {};
+        std::uint64_t sequence {};
+        int damage {20};
+    };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
     void finish(CombatOutcome outcome) noexcept;
-    enum class DialogueScript : std::uint8_t { None, AuraPreBattle, AuraFirstDomination, AuraDefeat };
+    enum class DialogueScript : std::uint8_t {
+        None, AuraPreBattle, AuraFirstDomination, AuraDefeat,
+        RevoltePreBattle, RevolteSecondPhase, RevolteDefeat
+    };
     void beginDialogue(DialogueScript script) noexcept;
     void advanceDialogue() noexcept;
 
@@ -204,6 +225,7 @@ private:
     std::vector<PendingSpellImpact> pendingSpellImpacts_;
     std::vector<ActivePillar> activePillars_;
     std::vector<ActiveTornado> activeTornadoes_;
+    std::vector<ActiveEnemyProjectile> activeEnemyProjectiles_;
     std::uint64_t environmentalSequence_ {};
     std::optional<CombatResult> result_;
     DialogueScript dialogueScript_ {DialogueScript::None};
@@ -211,6 +233,7 @@ private:
     bool auraFirstDominationDialogueShown_ {};
     bool auraGuaranteedDominationAvailable_ {true};
     bool auraDefeatDialogueShown_ {};
+    bool revolteDefeatDialogueShown_ {};
     std::optional<CombatOutcome> outcomeAfterDialogue_;
     float bossIntroRemaining_ {};
 };

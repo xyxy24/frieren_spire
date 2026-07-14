@@ -420,9 +420,14 @@ void TowerSession::startNextFloor()
         ? config_.bossEnemyHealth
         : (config_.normalEnemyHealth > 0 ? config_.normalEnemyHealth
             : (run_.context().floorIndex % 2U == 0U ? 60 : 45));
+    if (currentFloorType_ == game::run::FloorType::Boss
+        && run_.context().bossesDefeated == 1U && config_.bossEnemyHealth == 225)
+        request.enemyMaximumHealth = 300;
     request.enemyArchetype = currentFloorType_ == game::run::FloorType::Boss
-        ? (run_.context().bossesDefeated == 0U && config_.bossEnemyHealth == 225
-            ? game::EnemyArchetype::Aura
+        ? (config_.bossEnemyHealth == 225
+            ? (run_.context().bossesDefeated == 0U ? game::EnemyArchetype::Aura
+                : (run_.context().bossesDefeated == 1U ? game::EnemyArchetype::Revolte
+                    : game::EnemyArchetype::Boss))
             : game::EnemyArchetype::Boss)
         : (config_.normalEnemyHealth > 0 ? game::EnemyArchetype::HeadlessKnight
             : (run_.context().floorIndex % 2U == 0U
@@ -441,6 +446,10 @@ void TowerSession::startNextFloor()
             game::EnemyArchetype::Qual
         };
         constexpr std::array secondActLateGroup {
+            game::EnemyArchetype::Heimon, game::EnemyArchetype::DemonWarrior,
+            game::EnemyArchetype::LargeBirdDemon
+        };
+        constexpr std::array thirdActLateGroup {
             game::EnemyArchetype::Laufen, game::EnemyArchetype::Richter,
             game::EnemyArchetype::Denken
         };
@@ -450,6 +459,8 @@ void TowerSession::startNextFloor()
             encounter = secondActOpeningGroup;
         else if (run_.context().bossesDefeated == 1U && floorInAct == 3U)
             encounter = secondActLateGroup;
+        else if (run_.context().bossesDefeated == 2U && floorInAct == 3U)
+            encounter = thirdActLateGroup;
         else if (run_.context().bossesDefeated == 1U
             && (floorInAct == 1U || floorInAct == 2U))
         {

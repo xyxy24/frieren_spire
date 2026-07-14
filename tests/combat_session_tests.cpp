@@ -1329,6 +1329,91 @@ bool combatRelicsModifyCooldownBloodUltimateAndGold()
     return expect(gold.result() && gold.result()->goldAwarded == 20,
         "Old Copper Coin must add ten gold to a flawless combat victory");
 }
+
+bool revolteLocksAtFiveAndHealsForSecondPhase()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemySpawn = {210.0F, 544.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::Revolte;
+    request.enemyMaximumHealth = 30;
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    if (!expect(combat.bossIntro().has_value() && combat.bossIntro()->name == "REVOLTE",
+            "the second boss must expose Revolte's boss introduction")) return false;
+    combat.update({}, 2.4F);
+    advanceDialogue(combat);
+
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    combat.update(attack, 0.01F);
+    combat.update({}, 0.5F);
+    combat.update(attack, 0.01F);
+    if (!expect(combat.enemyState().currentHealth == 5,
+            "Revolte's first lethal threshold must lock at five HP")
+        || !expect(combat.dialogueLine().has_value()
+                && combat.dialogueLine()->speaker == "REVOLTE",
+            "reaching the threshold must pause combat for second-phase dialogue")) return false;
+    advanceDialogue(combat);
+    return expect(combat.enemyState().currentHealth == 15,
+        "second-phase dialogue must restore Revolte to half maximum HP");
+}
+
+bool newLateActEnemiesExposeFogProjectileAndFlightRules()
+{
+    arcane::game::CombatRequest fogRequest;
+    fogRequest.playerSpawn = {20.0F, 576.0F};
+    fogRequest.enemies = {{arcane::game::EnemyArchetype::Heimon, {1000.0F, 0.0F}}};
+    arcane::game::CombatSession fog(fogRequest);
+    const arcane::game::PlayerIntent idle;
+    fog.update(idle, 1.5F);
+    fog.update(idle, 0.5F);
+    fog.update(idle, 0.81F);
+    const auto hidden = fog.enemyState();
+    const auto fogEffects = fog.spellEffects();
+    if (!expect(hidden.maximumHealth == 125 && hidden.width == 42.0F && hidden.height == 72.0F,
+            "Heimon must expose the configured health and collision box")
+        || !expect(hidden.concealmentProgress >= 0.99F,
+            "an enemy remaining in Heimon's fog must fully conceal after 0.8 seconds")
+        || !expect(std::any_of(fogEffects.begin(), fogEffects.end(), [](const auto& effect) {
+                return effect.spellId == 9100U && effect.bounds.width == 640.0F
+                    && effect.bounds.height == 96.0F;
+            }), "Heimon's one-shot fog must persist with authoritative bounds")) return false;
+    const auto fogArea = *std::find_if(fogEffects.begin(), fogEffects.end(), [](const auto& effect) {
+        return effect.spellId == 9100U;
+    });
+    fog.update(idle, 0.25F);
+    const auto movedFogEffects = fog.spellEffects();
+    const auto movedFog = std::find_if(movedFogEffects.begin(), movedFogEffects.end(),
+        [](const auto& effect) { return effect.spellId == 9100U; });
+    if (!expect(movedFog != movedFogEffects.end()
+            && std::abs(movedFog->bounds.left - fogArea.bounds.left) < 0.01F,
+            "Heimon's fog must remain anchored after the caster moves")) return false;
+
+    arcane::game::CombatRequest warriorRequest;
+    warriorRequest.playerSpawn = {250.0F, 576.0F};
+    warriorRequest.enemies = {{arcane::game::EnemyArchetype::DemonWarrior, {360.0F, 0.0F}}};
+    arcane::game::CombatSession warrior(warriorRequest);
+    warrior.update(idle, 2.5F);
+    warrior.update(idle, 0.5F);
+    warrior.update(idle, 0.5F);
+    const auto warriorEffects = warrior.spellEffects();
+    if (!expect(warrior.enemyState().maximumHealth == 150,
+            "Demon Warrior must use its revised 150 HP")
+        || !expect(std::any_of(warriorEffects.begin(), warriorEffects.end(),
+            [](const auto& effect) { return effect.spellId == 9101U; }),
+            "Demon Warrior must emit its moving slash when the melee windup ends")) return false;
+
+    arcane::game::CombatRequest birdRequest;
+    birdRequest.enemies = {{arcane::game::EnemyArchetype::LargeBirdDemon, {800.0F, 0.0F}}};
+    arcane::game::CombatSession bird(birdRequest);
+    const auto birdState = bird.enemyState();
+    return expect(birdState.maximumHealth == 100 && birdState.width == 54.0F
+            && birdState.height == 42.0F,
+            "Large Bird Demon must expose its configured health and collision box")
+        && expect(std::abs(birdState.position.y - 454.0F) < 0.01F,
+            "Large Bird Demon must start 144 pixels above the ground");
+}
 }
 
 int main()
@@ -1372,6 +1457,7 @@ int main()
         && auraOpensWithTwoHeadlessKnights()
         && auraDominationUsesUpdatedCooldownAndStun()
         && defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
+        && revolteLocksAtFiveAndHealsForSecondPhase()
         && redMirrorDragonBreathTicksThreeTimes()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
@@ -1383,6 +1469,7 @@ int main()
         && expandedSpellAndRelicCatalogIsComplete()
         && newSpellsApplyTargetingShieldWindAndGravity()
         && combatRelicsModifyCooldownBloodUltimateAndGold()
+        && newLateActEnemiesExposeFogProjectileAndFlightRules()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()

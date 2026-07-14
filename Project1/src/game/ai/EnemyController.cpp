@@ -26,11 +26,19 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
     {
         const bool displacementSkill = config_.activeDashDistance > 0.0F
             || config_.skill == EnemySkill::Dive
-            || config_.skill == EnemySkill::LeapingCleave;
-        const float triggerDistance = config_.width * 0.5F + config_.attackRange
-            + (displacementSkill ? config_.activeDashDistance + playerBounds.width * 0.5F : 0.0F);
+            || config_.skill == EnemySkill::LeapingCleave
+            || config_.skill == EnemySkill::Swoop;
+        const float triggerDistance = config_.skill == EnemySkill::Swoop
+            ? 144.0F
+            : config_.width * 0.5F + config_.attackRange
+                + (displacementSkill ? config_.activeDashDistance + playerBounds.width * 0.5F : 0.0F);
         if (canAttack && cooldownRemaining_ <= 0.0F && std::abs(horizontalDelta) <= triggerDistance)
         {
+            if (config_.skill == EnemySkill::Swoop)
+            {
+                swoopTargetX_ = playerCenter + facingDirection_ * 64.0F;
+                swoopAscending_ = false;
+            }
             beginWindup();
         }
         else
@@ -79,6 +87,36 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
             position_.x += facingDirection_ * 160.0F * movingSeconds;
             const float progress = std::clamp(activeElapsed_ / LeapSeconds, 0.0F, 1.0F);
             position_.y = worldBounds.groundTop - config_.height - 162.0F * 4.0F * progress * (1.0F - progress);
+        }
+        else if (config_.skill == EnemySkill::Swoop)
+        {
+            const float airY = worldBounds.groundTop - 144.0F - config_.height;
+            const float groundY = worldBounds.groundTop - config_.height;
+            if (!swoopAscending_)
+            {
+                const float dx = swoopTargetX_ - (position_.x + config_.width * 0.5F);
+                const float dy = groundY - position_.y;
+                const float distance = std::sqrt(dx * dx + dy * dy);
+                if (distance <= 200.0F * deltaSeconds || distance <= 0.01F)
+                {
+                    position_.x += dx;
+                    position_.y = groundY;
+                    swoopAscending_ = true;
+                }
+                else
+                {
+                    position_.x += dx / distance * 200.0F * deltaSeconds;
+                    position_.y += dy / distance * 200.0F * deltaSeconds;
+                }
+            }
+            else
+            {
+                const float playerDelta = playerCenter - (position_.x + config_.width * 0.5F);
+                position_.x += std::clamp(playerDelta, -config_.moveSpeed * deltaSeconds,
+                    config_.moveSpeed * deltaSeconds);
+                position_.y = std::max(airY, position_.y - 100.0F * deltaSeconds);
+                if (position_.y <= airY) stateRemaining_ = 0.0F;
+            }
         }
         position_.x = std::clamp(position_.x, worldBounds.left, worldBounds.right - config_.width);
         stateRemaining_ -= deltaSeconds;

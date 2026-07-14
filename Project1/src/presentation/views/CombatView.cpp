@@ -116,6 +116,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         case 2010U: color = sf::Color {255, 245, 185}; break;
         case 2011U: color = sf::Color {184, 147, 99}; break;
         case 2012U: color = sf::Color {179, 224, 255}; break;
+        case 9100U: color = sf::Color {116, 132, 142}; break;
+        case 9101U: color = sf::Color {222, 236, 255}; break;
         default: break;
         }
         sf::RectangleShape rangeShape({effect.bounds.width, effect.bounds.height});
@@ -136,6 +138,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             && combat->dialogueLine().has_value();
         if (!enemy.alive && !showDefeatedAura) continue;
         const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
+            || enemy.archetype == arcane::game::EnemyArchetype::Revolte
             || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
             || enemy.archetype == arcane::game::EnemyArchetype::Boss;
         const EnemyStateTextures* stateTextures = nullptr;
@@ -179,6 +182,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             sprite.setPosition({enemy.position.x + enemy.width * 0.5F,
                 enemy.position.y + enemy.height});
             sprite.setScale({enemy.facingDirection > 0.0F ? -1.0F : 1.0F, 1.0F});
+            sprite.setColor(sf::Color {255, 255, 255, static_cast<std::uint8_t>(
+                255.0F * (1.0F - std::clamp(enemy.concealmentProgress, 0.0F, 1.0F)))});
             target.draw(sprite);
         }
         else
@@ -189,8 +194,12 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             ? sf::Color {129, 68, 172} : sf::Color {176, 70, 78};
         if (enemy.windingUp) enemyColor = sf::Color {242, 154, 69};
         if (enemy.attackActive) enemyColor = sf::Color {248, 222, 105};
+        enemyColor.a = static_cast<std::uint8_t>(255.0F
+            * (1.0F - std::clamp(enemy.concealmentProgress, 0.0F, 1.0F)));
         enemyShape.setFillColor(enemyColor);
-        enemyShape.setOutlineColor(sf::Color {245, 176, 129});
+        sf::Color outline {245, 176, 129};
+        outline.a = enemyColor.a;
+        enemyShape.setOutlineColor(outline);
         enemyShape.setOutlineThickness(primaryBoss ? 6.0F : 3.0F);
         target.draw(enemyShape);
         }
@@ -258,13 +267,17 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             }
         }
 
-        if (primaryBoss)
-            drawHealthBar(target, {static_cast<float>(WindowWidth) - 332.0F, 28.0F},
-                {300.0F, 22.0F}, enemy.currentHealth, enemy.maximumHealth, sf::Color {218, 92, 103});
-        else
-            drawHealthBar(target, {enemy.position.x - 4.0F, enemy.position.y - 14.0F},
-                {enemy.width + 8.0F, 7.0F}, enemy.currentHealth, enemy.maximumHealth,
-                sf::Color {218, 92, 103});
+        if (enemy.concealmentProgress < 1.0F)
+        {
+            if (primaryBoss)
+                drawHealthBar(target, {static_cast<float>(WindowWidth) - 332.0F, 28.0F},
+                    {300.0F, 22.0F}, enemy.currentHealth, enemy.maximumHealth,
+                    sf::Color {218, 92, 103});
+            else
+                drawHealthBar(target, {enemy.position.x - 4.0F, enemy.position.y - 14.0F},
+                    {enemy.width + 8.0F, 7.0F}, enemy.currentHealth, enemy.maximumHealth,
+                    sf::Color {218, 92, 103});
+        }
     }
 
     if (player.attackActive)
@@ -363,7 +376,7 @@ void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSessi
         drawPixelText(target, intro->name, {430.0F, 330.0F}, 3.0F,
             sf::Color {235, 193, 250,
                 static_cast<std::uint8_t>(255.0F * std::max(0.0F, alphaFactor))});
-        drawPixelText(target, "FIRST ACT BOSS", {520.0F, 430.0F}, 1.2F,
+        drawPixelText(target, "BOSS ENCOUNTER", {520.0F, 430.0F}, 1.2F,
             sf::Color {205, 195, 216,
                 static_cast<std::uint8_t>(230.0F * std::max(0.0F, alphaFactor))});
         return;

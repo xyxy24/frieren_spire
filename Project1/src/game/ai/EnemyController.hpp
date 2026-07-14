@@ -11,7 +11,8 @@ namespace arcane::game::ai
 enum class EnemyAction : std::uint8_t { Chase, Windup, Active, Recovery, Dead };
 enum class EnemySkill : std::uint8_t {
     Thrust, Slash, Dive, Blood, LeapingCleave, Thread, LeafBlade, WolfClaw,
-    KillingMagic, SideKick, EarthMagic, TornadoMagic, Domination, DragonClaw, BossAttack
+    KillingMagic, SideKick, EarthMagic, TornadoMagic, FogAttack, WhirlwindSlash,
+    Swoop, Domination, DragonClaw, BossAttack
 };
 
 struct EnemyConfig
@@ -65,5 +66,7 @@ private:
     float activeElapsed_ {};
     float cooldownRemaining_ {};
     float groundTop_ {640.0F};
+    float swoopTargetX_ {};
+    bool swoopAscending_ {};
 };
 }

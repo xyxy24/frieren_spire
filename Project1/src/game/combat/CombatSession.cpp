@@ -13,6 +13,12 @@ constexpr std::array SpellDamageSources {
     DamageSource::PlayerSpell0, DamageSource::PlayerSpell1, DamageSource::PlayerSpell2
 };
 
+constexpr bool isPlayerMagic(const DamageSource source) noexcept
+{
+    return source == DamageSource::PlayerSpell0 || source == DamageSource::PlayerSpell1
+        || source == DamageSource::PlayerSpell2 || source == DamageSource::PlayerUltimateSpell;
+}
+
 constexpr float fullClipDuration(const std::uint32_t frameCount, const float framesPerSecond) noexcept
 {
     return static_cast<float>(frameCount) / framesPerSecond;
@@ -75,6 +81,19 @@ constexpr std::array AuraDefeatDialogue {
     CombatDialogueLineView {"FRIEREN", "KILL YOURSELF, AURA.", "frieren"},
     CombatDialogueLineView {"AURA", "IMPOSSIBLE... HOW COULD I...", "aura-die"}
 };
+constexpr std::array RevoltePreBattleDialogue {
+    CombatDialogueLineView {"REVOLTE", "AN ELF MAGE. WHO ARE YOU?", "revolte"},
+    CombatDialogueLineView {"FRIEREN", "FOUR BLADES... EVEN DEFENSIVE MAGIC COULD HARDLY TAKE THEM HEAD-ON.", "frieren"},
+    CombatDialogueLineView {"REVOLTE", "I ASKED WHO YOU ARE.", "revolte"},
+    CombatDialogueLineView {"FRIEREN", "DO YOU GIVE YOUR NAME EVERY TIME YOU EXTERMINATE VERMIN?", "frieren"}
+};
+constexpr std::array RevolteSecondPhaseDialogue {
+    CombatDialogueLineView {"REVOLTE", "INTERESTING. IT SEEMS I MUST FIGHT YOU SERIOUSLY.", "revolte"},
+    CombatDialogueLineView {"FRIEREN", "...", "frieren"}
+};
+constexpr std::array RevolteDefeatDialogue {
+    CombatDialogueLineView {"REVOLTE", "YOU WIN, ELF.", "revolte"}
+};
 }
 
 ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
@@ -87,43 +106,55 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {0.0F, 72.0F, 72.0F, 0.5F, 72.0F / 520.0F, 0.0F, 72.0F,
             42.0F, 42.0F, 5.0F, true, false, EnemySkill::Thrust};
     case EnemyArchetype::HeadlessKnight:
-        return EnemyConfig {240.0F, 42.0F, 42.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {240.0F, 42.0F, 42.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 58.0F, 2.0F, true, false, EnemySkill::Slash};
     case EnemyArchetype::BirdDemon:
         return EnemyConfig {180.0F, 480.0F, 480.0F, 0.5F, 480.0F / 320.0F, 0.0F, 0.0F,
             42.0F, 32.0F, 6.0F, false, true, EnemySkill::Dive};
     case EnemyArchetype::Lugner:
-        return EnemyConfig {160.0F, 88.0F, 88.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {160.0F, 88.0F, 88.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 72.0F, 5.0F, false, false, EnemySkill::Blood};
     case EnemyArchetype::Linie:
         return EnemyConfig {180.0F, 84.0F, 84.0F, 0.5F, 1.9F, 0.0F, 144.0F,
             42.0F, 64.0F, 4.0F, true, false, EnemySkill::LeapingCleave};
     case EnemyArchetype::Draht:
-        return EnemyConfig {160.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {160.0F, 96.0F, 96.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 64.0F, 8.0F, false, false, EnemySkill::Thread};
     case EnemyArchetype::ChaosFlower:
-        return EnemyConfig {0.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {0.0F, 84.0F, 84.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             64.0F, 84.0F, 4.0F, true, false, EnemySkill::LeafBlade};
     case EnemyArchetype::FrostWolf:
-        return EnemyConfig {240.0F, 64.0F, 64.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {240.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             64.0F, 42.0F, 4.0F, true, false, EnemySkill::WolfClaw};
     case EnemyArchetype::Qual:
-        return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {120.0F, 96.0F, 96.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             64.0F, 96.0F, 3.0F, true, false, EnemySkill::KillingMagic};
     case EnemyArchetype::Laufen:
-        return EnemyConfig {180.0F, 64.0F, 64.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {180.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 64.0F, 3.0F, false, false, EnemySkill::SideKick};
     case EnemyArchetype::Richter:
-        return EnemyConfig {120.0F, 84.0F, 84.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {120.0F, 84.0F, 84.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 72.0F, 7.0F, false, false, EnemySkill::EarthMagic};
     case EnemyArchetype::Denken:
-        return EnemyConfig {100.0F, 120.0F, 120.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {100.0F, 120.0F, 120.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 64.0F, 9.0F, false, false, EnemySkill::TornadoMagic};
+    case EnemyArchetype::Heimon:
+        return EnemyConfig {160.0F, 96.0F, 96.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+            42.0F, 72.0F, 5.0F, false, false, EnemySkill::FogAttack};
+    case EnemyArchetype::DemonWarrior:
+        return EnemyConfig {180.0F, 42.0F, 42.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+            42.0F, 64.0F, 5.0F, true, false, EnemySkill::WhirlwindSlash};
+    case EnemyArchetype::LargeBirdDemon:
+        return EnemyConfig {160.0F, 144.0F, 144.0F, 0.5F, 4.0F, 0.0F, 0.0F,
+            54.0F, 42.0F, 6.0F, true, true, EnemySkill::Swoop};
+    case EnemyArchetype::Revolte:
+        return EnemyConfig {160.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+            64.0F, 96.0F, 7.0F, true, false, EnemySkill::BossAttack};
     case EnemyArchetype::Aura:
-        return EnemyConfig {120.0F, 100000.0F, 100000.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {120.0F, 100000.0F, 100000.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 64.0F, 7.0F, false, false, EnemySkill::Domination};
     case EnemyArchetype::RedMirrorDragon:
-        return EnemyConfig {96.0F, 72.0F, 72.0F, 0.5F, 1.0F, 0.0F, 0.0F,
+        return EnemyConfig {96.0F, 72.0F, 72.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             128.0F, 84.0F, 7.0F, true, false, EnemySkill::DragonClaw};
     case EnemyArchetype::Boss:
         return EnemyConfig {125.0F, 72.0F, 90.0F, 0.55F, 0.16F, 0.0F, 20.0F,
@@ -147,9 +178,11 @@ CombatSession::CombatSession(CombatRequest request)
         const auto config = enemyConfigFor(spawn.archetype);
         Vec2 position = spawn.position;
         if (!request_.enemies.empty() || spawn.archetype == EnemyArchetype::Aura
+            || spawn.archetype == EnemyArchetype::Revolte
             || spawn.archetype == EnemyArchetype::RedMirrorDragon)
             position.y = request_.worldBounds.groundTop - config.height;
-        if (config.flying) position.y = request_.worldBounds.groundTop - 132.0F - config.height;
+        if (config.flying) position.y = request_.worldBounds.groundTop
+            - (spawn.archetype == EnemyArchetype::LargeBirdDemon ? 144.0F : 132.0F) - config.height;
         const int health = request_.enemies.empty() ? request_.enemyMaximumHealth : [&] {
             switch (spawn.archetype)
             {
@@ -165,7 +198,11 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::Laufen: return 160;
             case EnemyArchetype::Richter: return 150;
             case EnemyArchetype::Denken: return 135;
+            case EnemyArchetype::Heimon: return 125;
+            case EnemyArchetype::DemonWarrior: return 150;
+            case EnemyArchetype::LargeBirdDemon: return 100;
             case EnemyArchetype::Aura: return 225;
+            case EnemyArchetype::Revolte: return 300;
             case EnemyArchetype::RedMirrorDragon: return 300;
             case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
             }
@@ -185,6 +222,10 @@ CombatSession::CombatSession(CombatRequest request)
             enemies_.back().specialCooldown = 3.5F;
         if (spawn.archetype == EnemyArchetype::Denken)
             enemies_.back().specialCooldown = 4.5F;
+        if (spawn.archetype == EnemyArchetype::Heimon)
+            enemies_.back().specialCooldown = 1.5F;
+        if (spawn.archetype == EnemyArchetype::Revolte)
+            enemies_.back().revolteCooldowns = {3.5F, 3.5F, 4.5F, 4.5F, 3.0F};
     }
     const auto aura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Aura;
@@ -208,7 +249,8 @@ CombatSession::CombatSession(CombatRequest request)
     }
     if (!playerHealth_.isAlive()) finish(CombatOutcome::Defeat);
     if (std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
-        return enemy.archetype == EnemyArchetype::Aura;
+        return enemy.archetype == EnemyArchetype::Aura
+            || enemy.archetype == EnemyArchetype::Revolte;
     })) bossIntroRemaining_ = 2.4F;
 }
 
@@ -236,8 +278,52 @@ DamageResult CombatSession::resolvePlayerDamage(DamageRequest request) noexcept
             player.width + 160.0F, player.height + 96.0F};
         for (auto& enemy : enemies_)
             if (enemy.health.isAlive() && intersects(burst, enemy.controller.bounds()))
-                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                     {DamageSource::Event, ++environmentalSequence_, 12}));
+    }
+    return result;
+}
+
+DamageResult CombatSession::resolveEnemyDamage(EnemyRuntime& enemy,
+    DamageRequest request) noexcept
+{
+    if (enemy.concealmentProgress >= 1.0F) request.blocked = true;
+    if (enemy.archetype == EnemyArchetype::Revolte && enemy.revolteTransitionPending)
+        request.blocked = true;
+    const bool parryingMagic = enemy.archetype == EnemyArchetype::Revolte
+        && enemy.revolteSkill == 3 && enemy.specialActive > 0.0F
+        && isPlayerMagic(request.source);
+    if (parryingMagic) request.targetMultiplier *= 0.5F;
+
+    if (enemy.archetype == EnemyArchetype::Revolte && !enemy.revolteSecondPhase
+        && !enemy.revolteTransitionPending && !request.blocked && request.baseDamage > 0)
+    {
+        const int predicted = std::max(0, static_cast<int>(std::lround(
+            static_cast<float>(request.baseDamage) * request.sourceMultiplier
+                * request.targetMultiplier)) - std::max(0, request.flatReduction));
+        if (predicted > enemy.health.current() - 5)
+        {
+            DamageRequest registered = request;
+            registered.blocked = true;
+            auto result = enemy.damageResolver.resolve(enemy.health, registered);
+            result.blocked = false;
+            result.resolvedDamage = std::max(0, enemy.health.current() - 5);
+            result.appliedDamage = enemy.health.damage(result.resolvedDamage);
+            result.healthAfter = enemy.health.current();
+            enemy.revolteTransitionPending = true;
+            enemy.specialActive = 0.0F;
+            enemy.revolteSkill = -1;
+            beginDialogue(DialogueScript::RevolteSecondPhase);
+            return result;
+        }
+    }
+
+    const auto result = enemy.damageResolver.resolve(enemy.health, request);
+    if (parryingMagic && result.appliedDamage > 0)
+    {
+        enemy.revolteCounterDashPending = true;
+        enemy.specialActive = 0.0F;
+        enemy.revolteSkill = -1;
     }
     return result;
 }
@@ -302,7 +388,14 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     if (bossIntroRemaining_ > 0.0F)
     {
         bossIntroRemaining_ = std::max(0.0F, bossIntroRemaining_ - deltaSeconds);
-        if (bossIntroRemaining_ <= 0.0F) beginDialogue(DialogueScript::AuraPreBattle);
+        if (bossIntroRemaining_ <= 0.0F)
+        {
+            const bool revolte = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+                return enemy.archetype == EnemyArchetype::Revolte;
+            });
+            beginDialogue(revolte ? DialogueScript::RevoltePreBattle
+                                  : DialogueScript::AuraPreBattle);
+        }
         return;
     }
     if (dialogueScript_ != DialogueScript::None)
@@ -342,7 +435,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 request_.worldBounds.groundTop - 300.0F, 600.0F, 300.0F};
             for (auto& enemy : enemies_)
                 if (enemy.health.isAlive() && intersects(field, enemy.controller.bounds()))
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {burningFlowerSource_, burningFlowerSequenceBase_ + burningFlowerTick_,
                             8, burningFlowerMultiplier_}));
         }
@@ -373,7 +466,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             ++gravityWellTick_;
             for (auto& enemy : enemies_)
                 if (enemy.health.isAlive() && intersects(gravityWellBounds_, enemy.controller.bounds()))
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {gravityWellSource_, gravityWellSequenceBase_ + gravityWellTick_,
                             6, gravityWellMultiplier_ * (enemy.markedRemaining > 0.0F ? 1.12F : 1.0F)}));
         }
@@ -386,7 +479,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             return enemy.health.isAlive();
         });
         if (found != enemies_.end())
-            static_cast<void>(found->damageResolver.resolve(found->health,
+            static_cast<void>(resolveEnemyDamage(*found,
                 {golemSource_, golemSequence_ * 16U + 1U, 20, golemMultiplier_}));
     }
     for (auto& effect : activeSpellEffects_)
@@ -397,8 +490,9 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         impact.delayRemaining -= deltaSeconds;
         if (impact.delayRemaining > 0.0F) continue;
         for (auto& enemy : enemies_)
-            if (enemy.health.isAlive() && intersects(impact.bounds, enemy.controller.bounds()))
-                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+            if (enemy.health.isAlive() && enemy.concealmentProgress < 1.0F
+                && intersects(impact.bounds, enemy.controller.bounds()))
+                static_cast<void>(resolveEnemyDamage(enemy,
                     {impact.source, impact.sequence, impact.damage, impact.multiplier
                         * (enemy.exposedRemaining > 0.0F ? 1.25F : 1.0F)
                         * (enemy.markedRemaining > 0.0F ? 1.12F : 1.0F)}));
@@ -459,6 +553,26 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         else tornado.tickAccumulator = 0.0F;
     }
     std::erase_if(activeTornadoes_, [](const auto& tornado) { return tornado.remaining <= 0.0F; });
+    for (auto& projectile : activeEnemyProjectiles_)
+    {
+        const float travel = std::min(projectile.remainingDistance, 200.0F * deltaSeconds);
+        projectile.bounds.left += projectile.direction * travel;
+        projectile.remainingDistance -= travel;
+        if (intersects(projectile.bounds, playerBounds()))
+        {
+            const auto result = resolvePlayerDamage({DamageSource::EnemyAttack,
+                projectile.sequence, projectile.damage, 1.0F,
+                relics_.incomingDamageMultiplier(), 0,
+                player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F});
+            if (result.appliedDamage > 0)
+                player_.applyHitReaction(projectile.direction * KnockbackSpeed,
+                    playerControlDuration(HitStunSeconds));
+            projectile.remainingDistance = 0.0F;
+        }
+    }
+    std::erase_if(activeEnemyProjectiles_, [](const auto& projectile) {
+        return projectile.remainingDistance <= 0.0F;
+    });
     if (player_.flightRemaining() <= 0.0F) flightBoostAvailable_ = false;
     if (wasDashing && !player_.isDashing()) postDashComboRemaining_ = 0.4F;
     if (intent.dashPressed && !wasDashing && player_.isDashing())
@@ -478,7 +592,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (shadowDash) enemy.markedRemaining = std::max(enemy.markedRemaining, 2.0F);
                 if (shadowDash && relics_.has(relics::BrokenDashFormulaId))
                 {
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {DamageSource::Event, ++environmentalSequence_, 20}));
                     crossedEnemy = true;
                 }
@@ -488,6 +602,14 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     const float playerCenter = player_.position().x + PlayerController::Width * 0.5F;
     const bool canAct = !player_.isStunned() && !player_.isDashing()
         && beamRemaining_ <= 0.0F;
+
+    std::vector<Aabb> fogAreas;
+    for (const auto& caster : enemies_)
+        if (caster.archetype == EnemyArchetype::Heimon && caster.health.isAlive()
+            && caster.fogCreated)
+        {
+            fogAreas.push_back(caster.specialTargetBounds);
+        }
 
     for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
     {
@@ -513,7 +635,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             {
                 enemy.burnTickAccumulator -= 1.0F;
                 ++enemy.burnTick;
-                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                     {enemy.burnSource, enemy.burnSequenceBase + enemy.burnTick, 4,
                         enemy.burnMultiplier}));
             }
@@ -521,9 +643,136 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (!enemy.health.isAlive()) continue;
         enemy.contactCooldown = std::max(0.0F, enemy.contactCooldown - deltaSeconds);
         const auto bounds = enemy.controller.bounds();
+        const bool insideFog = std::any_of(fogAreas.begin(), fogAreas.end(), [&](const Aabb& fog) {
+            return intersects(fog, bounds);
+        });
+        const bool revealingForSkill = enemy.controller.action() == ai::EnemyAction::Windup
+            || enemy.controller.action() == ai::EnemyAction::Active || enemy.specialWindup > 0.0F
+            || enemy.specialActive > 0.0F;
+        if (insideFog && !revealingForSkill)
+            enemy.concealmentProgress = std::min(1.0F,
+                enemy.concealmentProgress + deltaSeconds / 0.8F);
+        else enemy.concealmentProgress = 0.0F;
         const bool flowerSlowed = flowerFieldRemaining_ > 0.0F
             && std::abs(bounds.left + bounds.width * 0.5F - flowerFieldCenterX_) <= 300.0F;
         enemy.slowed = flowerSlowed || enemy.frostSlowRemaining > 0.0F;
+        if (enemy.archetype == EnemyArchetype::Heimon && !enemy.fogCreated)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto caster = enemy.controller.bounds();
+                    enemy.specialTargetBounds = {caster.left + caster.width * 0.5F - 320.0F,
+                        request_.worldBounds.groundTop - 96.0F, 640.0F, 96.0F};
+                    enemy.fogCreated = true;
+                }
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F
+                && enemy.controller.action() == ai::EnemyAction::Chase)
+            {
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::Revolte)
+        {
+            for (auto& cooldown : enemy.revolteCooldowns)
+                cooldown = std::max(0.0F, cooldown - deltaSeconds);
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto caster = enemy.controller.bounds();
+                    const float direction = enemy.specialDirection;
+                    const auto frontArea = [&](const float range) {
+                        return Aabb {direction > 0.0F ? caster.left + caster.width
+                                : caster.left - range,
+                            caster.top, range, caster.height};
+                    };
+                    const auto hitPlayer = [&](const float range, const int damage) {
+                        if (!intersects(playerBounds(), frontArea(range))) return;
+                        const auto result = resolvePlayerDamage({DamageSource::EnemyAttack,
+                            ++environmentalSequence_, damage, 1.0F,
+                            relics_.incomingDamageMultiplier(), 0,
+                            player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F});
+                        if (result.appliedDamage > 0)
+                            player_.applyHitReaction(direction * KnockbackSpeed,
+                                playerControlDuration(HitStunSeconds));
+                    };
+                    if (enemy.revolteSkill == 0 || enemy.revolteSkill == 1)
+                    {
+                        hitPlayer(42.0F, 20);
+                        const float left = direction > 0.0F
+                            ? caster.left + caster.width + 30.0F
+                            : caster.left - 42.0F - 30.0F;
+                        const float top = request_.worldBounds.groundTop
+                            - (enemy.revolteSkill == 0 ? 74.0F : 32.0F);
+                        activeEnemyProjectiles_.push_back({{left, top, 24.0F, 32.0F},
+                            direction, 96.0F, ++environmentalSequence_, 20});
+                        enemy.specialActive = 0.6F;
+                    }
+                    else if (enemy.revolteSkill == 2)
+                    {
+                        hitPlayer(64.0F, 25);
+                        const float left = direction > 0.0F
+                            ? caster.left + caster.width + 40.0F
+                            : caster.left - 64.0F - 40.0F;
+                        activeEnemyProjectiles_.push_back({{left,
+                            request_.worldBounds.groundTop - 64.0F, 48.0F, 64.0F},
+                            direction, 128.0F, ++environmentalSequence_, 25});
+                        enemy.specialActive = 0.6F;
+                    }
+                    else if (enemy.revolteSkill == 3) enemy.specialActive = 1.2F;
+                    else if (enemy.revolteSkill == 4)
+                        enemy.specialActive = 112.0F / 220.0F;
+                }
+                continue;
+            }
+            if (enemy.specialActive > 0.0F)
+            {
+                const float activeDelta = std::min(deltaSeconds, enemy.specialActive);
+                if (enemy.revolteSkill == 4)
+                    enemy.controller.translateHorizontal(
+                        enemy.specialDirection * 220.0F * activeDelta, request_.worldBounds);
+                enemy.specialActive -= activeDelta;
+                if (enemy.specialActive <= 0.0F)
+                {
+                    if (enemy.revolteSkill == 4)
+                        enemy.revolteCooldowns = {0.0F, 0.0F, 0.0F, 0.0F, 6.0F};
+                    enemy.revolteSkill = -1;
+                }
+                continue;
+            }
+            if (enemy.revolteCounterDashPending)
+            {
+                enemy.revolteCounterDashPending = false;
+                enemy.revolteSkill = 4;
+                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+            for (int skill = 0; skill < 5; ++skill)
+            {
+                if (skill == 4 && !enemy.revolteSecondPhase) continue;
+                if (enemy.revolteCooldowns[static_cast<std::size_t>(skill)] > 0.0F) continue;
+                const float distance = std::abs(playerCenter
+                    - (bounds.left + bounds.width * 0.5F));
+                if (skill < 2 && distance > bounds.width * 0.5F + 42.0F) continue;
+                if (skill == 2 && distance > bounds.width * 0.5F + 64.0F) continue;
+                enemy.revolteSkill = skill;
+                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialWindup = skill < 2 ? 0.3F : 0.5F;
+                enemy.revolteCooldowns[static_cast<std::size_t>(skill)] =
+                    skill < 2 ? 7.0F : (skill == 4 ? 6.0F : 9.0F);
+                break;
+            }
+            if (enemy.revolteSkill >= 0) continue;
+        }
         if (enemy.archetype == EnemyArchetype::ChaosFlower)
         {
             enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
@@ -746,7 +995,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const float speedMultiplier = flowerSlowed ? 0.65F
                 : (enemy.frostSlowRemaining > 0.0F ? 0.65F : 1.0F);
             const bool manualSkill = enemy.archetype == EnemyArchetype::Richter
-                || enemy.archetype == EnemyArchetype::Denken;
+                || enemy.archetype == EnemyArchetype::Denken
+                || enemy.archetype == EnemyArchetype::Revolte;
             enemy.controller.update(target, deltaSeconds, request_.worldBounds, speedMultiplier,
                 enemy.skillSealRemaining <= 0.0F && !manualSkill);
             if (enemy.archetype == EnemyArchetype::Aura
@@ -773,7 +1023,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const Aabb blast {golemBounds_.left - 49.0F, golemBounds_.top - 35.0F, 140.0F, 140.0F};
             for (auto& target : enemies_)
                 if (target.health.isAlive() && intersects(blast, target.controller.bounds()))
-                    static_cast<void>(target.damageResolver.resolve(target.health,
+                    static_cast<void>(resolveEnemyDamage(target,
                         {golemSource_, golemSequence_ * 16U + 2U, 24, golemMultiplier_}));
             activeSpellEffects_.push_back({1022U, blast, 1.0F, 1.0F});
         }
@@ -800,7 +1050,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const int tickDamage = hellfireTick_ <= 4U ? 15 : 14;
             for (auto& enemy : enemies_)
                 if (enemy.health.isAlive() && intersects(hellfireBounds_, enemy.controller.bounds()))
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {DamageSource::PlayerUltimateSpell, hellfireSequenceBase_ + hellfireTick_,
                             tickDamage, hellfireMultiplier_}));
         }
@@ -816,7 +1066,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             ++beamTick_;
             for (auto& enemy : enemies_)
                 if (enemy.health.isAlive() && intersects(beamBounds_, enemy.controller.bounds()))
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {DamageSource::PlayerUltimateSpell, beamSequenceBase_ + beamTick_,
                             15, beamMultiplier_}));
         }
@@ -885,7 +1135,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 && (enemy.markedRemaining > 0.0F || enemy.frozenRemaining > 0.0F
                     || enemy.goldenBindRemaining > 0.0F || enemy.skillSealRemaining > 0.0F))
             {
-                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                     {DamageSource::Event, sequence * 32U + 29U, 8}));
                 player_.reduceDashCooldown(0.25F);
                 enemy.kraftCooldown = 0.6F;
@@ -899,7 +1149,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             ++enemy.relicComboHits;
             if (enemy.relicComboHits >= 3U)
             {
-                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                     {DamageSource::Event, sequence * 32U + 31U, 18}));
                 if (slot) spells_.reduceRegularCooldown(*slot, 0.8F);
                 enemy.relicComboHits = 0U;
@@ -914,12 +1164,13 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         for (auto& enemy : enemies_)
             if (enemy.health.isAlive() && intersects(area, enemy.controller.bounds()))
             {
+                if (isPlayerMagic(source) && enemy.concealmentProgress >= 1.0F) continue;
                 float targetMultiplier = multiplier
                     * (enemy.exposedRemaining > 0.0F ? 1.25F : 1.0F)
                     * (enemy.markedRemaining > 0.0F ? 1.12F : 1.0F);
                 if (regularSlotForSource(source) && relics_.has(relics::ElderSealFragmentId))
                     targetMultiplier *= hitIndex == 1U ? 1.12F : (hitIndex >= 2U ? 1.24F : 1.0F);
-                const auto result = enemy.damageResolver.resolve(enemy.health,
+                const auto result = resolveEnemyDamage(enemy,
                     {source, sequence, damage, targetMultiplier});
                 if (result.appliedDamage > 0) onActiveHit(enemy, source, sequence);
                 ++hitIndex;
@@ -1027,7 +1278,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     const bool thermalShock = enemy.frostSlowRemaining > 0.0F
                         || enemy.frozenRemaining > 0.0F;
                     if (thermalShock)
-                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                             {source, cast.sequence * 16U + 14U, 10, multiplier}));
                     enemy.frostSlowRemaining = 0.0F;
                     enemy.frozenRemaining = 0.0F;
@@ -1063,12 +1314,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     enemy.controller.translateHorizontal(player_.facingDirection() * 80.0F,
                         request_.worldBounds);
                     if (std::abs(enemy.controller.position().x - before) < 79.0F)
-                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                             {source, cast.sequence * 16U + 15U, 14, multiplier}));
                     if (enemy.goldenBindRemaining > 0.0F)
                     {
                         enemy.goldenBindRemaining = 0.0F;
-                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                             {source, cast.sequence * 16U + 13U, 16, multiplier}));
                     }
                 }
@@ -1119,7 +1370,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     for (std::uint64_t beam = 1U; beam <= 3U && enemy.health.isAlive(); ++beam)
                     {
                         const int damage = beam == 3U && enemy.markedRemaining > 0.0F ? 20 : 10;
-                        const auto result = enemy.damageResolver.resolve(enemy.health,
+                        const auto result = resolveEnemyDamage(enemy,
                             {source, cast.sequence * 8U + beam, damage,
                                 multiplier * multiTargetMultiplier
                                     * (enemy.markedRemaining > 0.0F ? 1.12F : 1.0F)});
@@ -1154,13 +1405,13 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
                 {
                     const int damage = cast.damage + (postDashComboRemaining_ > 0.0F ? 10 : 0);
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {source, cast.sequence, damage, multiplier}));
                     const float before = enemy.controller.position().x;
                     enemy.controller.translateHorizontal(player_.facingDirection() * 120.0F,
                         request_.worldBounds);
                     if (std::abs(enemy.controller.position().x - before) < 119.0F)
-                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                             {source, cast.sequence * 16U + 15U, 12, multiplier}));
                 }
             postDashComboRemaining_ = 0.0F;
@@ -1255,7 +1506,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             if (found != enemies_.end())
                 for (std::uint64_t bolt = 1U; bolt <= 3U && found->health.isAlive(); ++bolt)
                 {
-                    const auto result = found->damageResolver.resolve(found->health,
+                    const auto result = resolveEnemyDamage(*found,
                         {source, cast.sequence * 8U + bolt,
                             7 + (bolt == 3U && found->controller.config().flying ? 6 : 0),
                             multiplier * (found->markedRemaining > 0.0F ? 1.12F : 1.0F)});
@@ -1276,7 +1527,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (!enemy.health.isAlive() || !intersects(cast.effectBounds, enemy.controller.bounds())) continue;
                 const float multiTargetMultiplier = relics_.has(relics::ElderSealFragmentId)
                     ? (hitIndex == 1U ? 1.12F : (hitIndex >= 2U ? 1.24F : 1.0F)) : 1.0F;
-                const auto result = enemy.damageResolver.resolve(enemy.health,
+                const auto result = resolveEnemyDamage(enemy,
                     {source, cast.sequence, 14, multiplier * multiTargetMultiplier
                         * (enemy.markedRemaining > 0.0F ? 1.12F : 1.0F)});
                 if (result.appliedDamage > 0) onActiveHit(enemy, source, cast.sequence);
@@ -1292,7 +1543,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 const bool hitWall = moved.left <= request_.worldBounds.left + 0.01F
                     || moved.left + moved.width >= request_.worldBounds.right - 0.01F;
                 if (hitWall && enemy.health.isAlive())
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {source, cast.sequence * 8U + 7U, 10, multiplier}));
                 ++hitIndex;
             }
@@ -1317,7 +1568,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     || enemy.archetype == EnemyArchetype::Linie
                     || enemy.archetype == EnemyArchetype::Draht
                     || enemy.archetype == EnemyArchetype::Aura;
-                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                     {source, cast.sequence, cast.damage, multiplier * (demon ? 1.3F : 1.0F)}));
             }
         }
@@ -1331,7 +1582,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 std::uint32_t landedSpears = 0U;
                 for (std::uint64_t spear = 1U; spear <= 3U && enemy.health.isAlive(); ++spear)
                 {
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {source, cast.sequence * 4U + spear, cast.damage, multiplier}));
                     ++landedSpears;
                 }
@@ -1345,13 +1596,13 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
                 {
                     const bool executeRange = enemy.health.current() * 5 <= enemy.health.maximum();
-                    static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                         {source, cast.sequence, cast.damage,
                             multiplier * (executeRange ? 1.3F : 1.0F)}));
                     if (enemy.goldenBindRemaining > 0.0F)
                     {
                         enemy.goldenBindRemaining = 0.0F;
-                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                             {source, cast.sequence * 16U + 13U, 16, multiplier}));
                     }
                 }
@@ -1428,7 +1679,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     auto& enemy = enemies_[enemyIndex];
                     if (enemy.health.isAlive() && intersects(pillar, enemy.controller.bounds()))
                     {
-                        static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                             {source, cast.sequence * 4U + pillarIndex + 1U,
                                 25, multiplier}));
                     }
@@ -1559,15 +1810,32 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             continue;
         }
         const auto& config = enemy.controller.config();
-        if (enemy.controller.action() == ai::EnemyAction::Active
-            && enemy.handledSkillSequence != enemy.controller.attackSequence())
+        const bool skillJustActivated = enemy.controller.action() == ai::EnemyAction::Active
+            && enemy.handledSkillSequence != enemy.controller.attackSequence();
+        if (skillJustActivated)
         {
             enemy.handledSkillSequence = enemy.controller.attackSequence();
             if (config.skill == ai::EnemySkill::Blood)
-                static_cast<void>(enemy.damageResolver.resolve(enemy.health,
+                    static_cast<void>(resolveEnemyDamage(enemy,
                     {DamageSource::Event, enemy.handledSkillSequence, 10}));
+            if (config.skill == ai::EnemySkill::WhirlwindSlash)
+            {
+                const auto caster = enemy.controller.bounds();
+                const float direction = enemy.controller.facingDirection();
+                const float left = direction > 0.0F
+                    ? caster.left + caster.width + 30.0F : caster.left - 42.0F - 30.0F;
+                const std::uint64_t sequence = (1ULL << 62U)
+                    | (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
+                    | enemy.handledSkillSequence;
+                activeEnemyProjectiles_.push_back({{left,
+                    request_.worldBounds.groundTop - 32.0F, 24.0F, 32.0F},
+                    direction, 96.0F, sequence});
+            }
         }
         if (enemy.controller.action() == ai::EnemyAction::Active
+            && config.skill != ai::EnemySkill::Swoop
+            && ((config.skill != ai::EnemySkill::Slash
+                    && config.skill != ai::EnemySkill::WhirlwindSlash) || skillJustActivated)
             && (config.skill == ai::EnemySkill::Domination
                 || intersects(playerBounds(), enemy.controller.attackBounds())))
         {
@@ -1617,7 +1885,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             else if ((result.appliedDamage > 0 || dominationHit) && blessingRemaining_ > 0.0F)
                 onBlessingPreventedControl();
         }
-        if (config.hasContactDamage && enemy.contactCooldown <= 0.0F
+        if (config.hasContactDamage && enemy.concealmentProgress < 1.0F
+            && enemy.contactCooldown <= 0.0F
             && intersects(playerBounds(), enemy.controller.bounds()))
         {
             const std::uint64_t contactSequence = (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
@@ -1639,7 +1908,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     player.width + 108.0F, player.height + 108.0F};
                 for (auto& target : enemies_)
                     if (target.health.isAlive() && intersects(retaliation, target.controller.bounds()))
-                        static_cast<void>(target.damageResolver.resolve(target.health,
+                        static_cast<void>(resolveEnemyDamage(target,
                             {DamageSource::Event, contactSequence, 30}));
             }
             enemy.contactCooldown = 1.0F;
@@ -1650,11 +1919,20 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         const bool auraEncounter = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
             return enemy.archetype == EnemyArchetype::Aura;
         });
+        const bool revolteEncounter = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::Revolte;
+        });
         if (auraEncounter && !auraDefeatDialogueShown_)
         {
             auraDefeatDialogueShown_ = true;
             outcomeAfterDialogue_ = CombatOutcome::Victory;
             beginDialogue(DialogueScript::AuraDefeat);
+        }
+        else if (revolteEncounter && !revolteDefeatDialogueShown_)
+        {
+            revolteDefeatDialogueShown_ = true;
+            outcomeAfterDialogue_ = CombatOutcome::Victory;
+            beginDialogue(DialogueScript::RevolteDefeat);
         }
         else finish(CombatOutcome::Victory);
     }
@@ -1700,6 +1978,15 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
         }
         if (enemy.archetype == EnemyArchetype::Richter && enemy.specialWindup > 0.0F)
             skillBounds = enemy.specialTargetBounds;
+        if (enemy.archetype == EnemyArchetype::Revolte
+            && (enemy.specialWindup > 0.0F || enemy.specialActive > 0.0F)
+            && enemy.revolteSkill >= 0 && enemy.revolteSkill <= 2)
+        {
+            const float range = enemy.revolteSkill == 2 ? 64.0F : 42.0F;
+            skillBounds = Aabb {enemy.specialDirection > 0.0F ? bounds.left + bounds.width
+                    : bounds.left - range,
+                bounds.top, range, bounds.height};
+        }
         if (enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
         {
             const auto area = enemy.controller.attackBounds();
@@ -1708,11 +1995,12 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
         const bool windingUp = enemy.controller.action() == ai::EnemyAction::Windup
             || enemy.breathWindup > 0.0F || enemy.specialWindup > 0.0F;
         const bool active = enemy.controller.action() == ai::EnemyAction::Active
-            || enemy.breathRemaining > 0.0F;
+            || enemy.breathRemaining > 0.0F || enemy.specialActive > 0.0F;
         views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
             windingUp, active, enemy.slowed, skillBounds, enemy.controller.facingDirection(),
-            enemy.markedRemaining > 0.0F, enemy.controller.activeProgress()});
+            enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
+            enemy.concealmentProgress});
     }
     return views;
 }
@@ -1720,7 +2008,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
 std::vector<SpellEffectView> CombatSession::spellEffects() const
 {
     std::vector<SpellEffectView> views;
-    views.reserve(activeSpellEffects_.size() + activePillars_.size() + activeTornadoes_.size());
+    views.reserve(activeSpellEffects_.size() + activePillars_.size() + activeTornadoes_.size()
+        + activeEnemyProjectiles_.size() + enemies_.size());
     for (const auto& effect : activeSpellEffects_)
         views.push_back({effect.spellId, effect.bounds, effect.remaining, effect.duration});
     for (const auto& pillar : activePillars_)
@@ -1728,6 +2017,15 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
     for (const auto& tornado : activeTornadoes_)
         views.push_back({tornado.evolutionRemaining > 0.0F ? 9002U : 9003U,
             tornado.bounds, tornado.remaining, 7.0F});
+    for (const auto& projectile : activeEnemyProjectiles_)
+        views.push_back({9101U, projectile.bounds,
+            projectile.remainingDistance / 200.0F, 96.0F / 200.0F});
+    for (const auto& enemy : enemies_)
+        if (enemy.archetype == EnemyArchetype::Heimon && enemy.health.isAlive()
+            && enemy.fogCreated)
+        {
+            views.push_back({9100U, enemy.specialTargetBounds, 1.0F, 1.0F});
+        }
     return views;
 }
 
@@ -1764,7 +2062,8 @@ EnemyStateView CombatSession::enemyState() const noexcept
         enemy.controller.action() == ai::EnemyAction::Windup || enemy.breathWindup > 0.0F,
         enemy.controller.action() == ai::EnemyAction::Active || enemy.breathRemaining > 0.0F,
         enemy.slowed, skillBounds, enemy.controller.facingDirection(),
-        enemy.markedRemaining > 0.0F, enemy.controller.activeProgress()};
+        enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
+        enemy.concealmentProgress};
 }
 
 Aabb CombatSession::attackBounds() const noexcept
@@ -1783,6 +2082,9 @@ std::optional<CombatDialogueLineView> CombatSession::dialogueLine() const noexce
     case DialogueScript::AuraPreBattle: return AuraPreBattleDialogue[dialogueLineIndex_];
     case DialogueScript::AuraFirstDomination: return AuraFirstDominationDialogue[dialogueLineIndex_];
     case DialogueScript::AuraDefeat: return AuraDefeatDialogue[dialogueLineIndex_];
+    case DialogueScript::RevoltePreBattle: return RevoltePreBattleDialogue[dialogueLineIndex_];
+    case DialogueScript::RevolteSecondPhase: return RevolteSecondPhaseDialogue[dialogueLineIndex_];
+    case DialogueScript::RevolteDefeat: return RevolteDefeatDialogue[dialogueLineIndex_];
     case DialogueScript::None: return std::nullopt;
     }
     return std::nullopt;
@@ -1790,7 +2092,11 @@ std::optional<CombatDialogueLineView> CombatSession::dialogueLine() const noexce
 std::optional<BossIntroView> CombatSession::bossIntro() const noexcept
 {
     if (bossIntroRemaining_ <= 0.0F) return std::nullopt;
-    return BossIntroView {"GUILLOTINE AURA", bossIntroRemaining_, 2.4F};
+    const bool revolte = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.archetype == EnemyArchetype::Revolte;
+    });
+    return BossIntroView {revolte ? "REVOLTE" : "GUILLOTINE AURA",
+        bossIntroRemaining_, 2.4F};
 }
 void CombatSession::beginDialogue(const DialogueScript script) noexcept
 {
@@ -1805,12 +2111,30 @@ void CombatSession::advanceDialogue() noexcept
     case DialogueScript::AuraPreBattle: lineCount = AuraPreBattleDialogue.size(); break;
     case DialogueScript::AuraFirstDomination: lineCount = AuraFirstDominationDialogue.size(); break;
     case DialogueScript::AuraDefeat: lineCount = AuraDefeatDialogue.size(); break;
+    case DialogueScript::RevoltePreBattle: lineCount = RevoltePreBattleDialogue.size(); break;
+    case DialogueScript::RevolteSecondPhase: lineCount = RevolteSecondPhaseDialogue.size(); break;
+    case DialogueScript::RevolteDefeat: lineCount = RevolteDefeatDialogue.size(); break;
     case DialogueScript::None: return;
     }
     ++dialogueLineIndex_;
     if (dialogueLineIndex_ < lineCount) return;
+    const DialogueScript completedScript = dialogueScript_;
     dialogueScript_ = DialogueScript::None;
     dialogueLineIndex_ = 0U;
+    if (completedScript == DialogueScript::RevolteSecondPhase)
+    {
+        const auto revolte = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::Revolte && enemy.health.isAlive();
+        });
+        if (revolte != enemies_.end())
+        {
+            static_cast<void>(revolte->health.heal(
+                revolte->health.maximum() / 2 - revolte->health.current()));
+            revolte->revolteSecondPhase = true;
+            revolte->revolteTransitionPending = false;
+            revolte->revolteCooldowns = {7.0F, 7.0F, 9.0F, 9.0F, 3.0F};
+        }
+    }
     if (outcomeAfterDialogue_)
     {
         const CombatOutcome outcome = *outcomeAfterDialogue_;
