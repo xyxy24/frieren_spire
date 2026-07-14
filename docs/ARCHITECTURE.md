@@ -65,7 +65,7 @@ flowchart TB
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
 
-当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。
+当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）与 `views/CombatView`（战斗场景、敌人贴图、Boss 对话）；`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。
 
 `ApplicationViewModel` 与 `LoadoutViewModel` 是有状态 ViewModel；`ApplicationSnapshot`、`LoadoutSnapshot`、`RewardViewModel`、`MerchantViewModel` 和装备槽投影是 View 的只读绑定对象。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。事件、战斗 HUD 和特殊楼层面板目前仍读取 Model 的只读快照，后续按同一边界迁移。
 

@@ -54,6 +54,9 @@ add_executable(Project1
     Project1/src/presentation/PlayerAnimator.cpp
     Project1/src/presentation/SpellCardArt.cpp
     Project1/src/presentation/SpellEffectAnimator.cpp
+    Project1/src/presentation/views/UiPrimitives.cpp
+    Project1/src/presentation/views/ScreenViews.cpp
+    Project1/src/presentation/views/CombatView.cpp
 )
 
 target_link_libraries(Project1
