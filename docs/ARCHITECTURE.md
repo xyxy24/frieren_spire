@@ -61,7 +61,7 @@ flowchart TB
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
 
-当前垂直切片由纯 C++ `TowerSession` 持有 `RunController` 和至多一个 `CombatSession`。SFML `main.cpp` 只提交 `PlayerIntent` 并读取状态快照；奖励按键、独立装备覆盖层、楼梯解锁及玩家与楼梯交互区域的相交校验由 `TowerSession` 与 `RunController` 决定。
+当前垂直切片由纯 C++ `TowerSession` 持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 现在只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 应用适配器的消息循环固定为事件泵、输入采样、应用更新、表现状态更新和统一帧渲染；商店、事件、战斗、HUD、Boss 揭幕与对话框的具体 View 分支封装在 `renderApplicationFrame`，不在循环正文展开。表现层只提交 `PlayerIntent` 并读取状态快照；奖励按键、独立装备覆盖层、楼梯解锁及玩家与楼梯交互区域的相交校验由 `TowerSession` 与 `RunController` 决定。
 
 ## 5. 状态所有权
 
