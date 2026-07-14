@@ -30,14 +30,38 @@ class VfxSource:
 
 
 SOURCES: dict[str, VfxSource] = {
-    "cast-arcane": VfxSource(6, 64, 64, 15, False),
-    "zoltraak-impact": VfxSource(8, 96, 96, 16, False),
-    "ice-lance": VfxSource(6, 96, 48, 18, False),
-    "stone-shot": VfxSource(6, 96, 48, 16, False),
-    "homing-bolt": VfxSource(6, 64, 32, 20, False),
-    "zoltraak-muzzle": VfxSource(6, 64, 64, 15, False),
-    "flame-burst": VfxSource(8, 192, 128, 16, False),
-    "wind-pressure": VfxSource(8, 192, 128, 16, False, "magenta"),
+    "cast-arcane": VfxSource(
+        6, 64, 64, 15, False,
+        panel_edges=(0, 367, 648, 1035, 1418, 1804, 2172),
+    ),
+    "zoltraak-impact": VfxSource(
+        8, 96, 96, 16, False,
+        panel_edges=(0, 259, 502, 780, 1072, 1398, 1664, 1867, 2172),
+    ),
+    "ice-lance": VfxSource(
+        6, 96, 48, 18, False,
+        panel_edges=(0, 210, 632, 1054, 1458, 1803, 2172),
+    ),
+    "stone-shot": VfxSource(
+        6, 96, 48, 16, False,
+        panel_edges=(0, 346, 652, 1048, 1422, 1792, 2172),
+    ),
+    "homing-bolt": VfxSource(
+        6, 64, 32, 20, False,
+        panel_edges=(0, 290, 709, 1057, 1454, 1852, 2172),
+    ),
+    "zoltraak-muzzle": VfxSource(
+        6, 64, 64, 15, False,
+        panel_edges=(0, 332, 681, 1040, 1398, 1898, 2172),
+    ),
+    "flame-burst": VfxSource(
+        8, 192, 128, 16, False,
+        panel_edges=(0, 242, 453, 684, 980, 1310, 1626, 1922, 2172),
+    ),
+    "wind-pressure": VfxSource(
+        8, 192, 128, 16, False, "magenta",
+        panel_edges=(0, 254, 481, 720, 1008, 1332, 1668, 1904, 2172),
+    ),
     "mana-strike": VfxSource(
         8,
         192,
@@ -46,19 +70,33 @@ SOURCES: dict[str, VfxSource] = {
         False,
         panel_edges=(0, 190, 398, 656, 972, 1284, 1608, 1875, 2172),
     ),
-    "mana-trace-ring": VfxSource(8, 192, 192, 14, False),
-    "dispel-ring": VfxSource(8, 192, 192, 16, False),
-    "spatial-shatter": VfxSource(10, 192, 192, 16, False),
+    "mana-trace-ring": VfxSource(
+        8, 192, 192, 14, False,
+        panel_edges=(0, 172, 394, 662, 914, 1164, 1480, 1724, 1983),
+    ),
+    "dispel-ring": VfxSource(
+        8, 192, 192, 16, False,
+        panel_edges=(0, 360, 644, 884, 1106, 1313, 1539, 1756, 1983),
+    ),
+    "spatial-shatter": VfxSource(
+        10, 192, 192, 16, False,
+        panel_edges=(0, 166, 344, 540, 734, 975, 1235, 1452, 1648, 1814, 1983),
+    ),
     "gravity-well": VfxSource(
-        8, 192, 96, 12, False, anchor_x=96, anchor_y=88, align_bottom=True
+        8, 192, 96, 12, False, anchor_x=96, anchor_y=88, align_bottom=True,
+        panel_edges=(0, 272, 566, 852, 1106, 1384, 1662, 1907, 2172),
     ),
     "goddess-blessing": VfxSource(
         8, 128, 128, 12, False, anchor_x=64, anchor_y=112, align_bottom=True
     ),
     "flight-aura": VfxSource(
-        8, 128, 128, 12, False, anchor_x=64, anchor_y=112, align_bottom=True
+        8, 128, 128, 12, False, anchor_x=64, anchor_y=112, align_bottom=True,
+        panel_edges=(0, 274, 535, 794, 1051, 1328, 1591, 1858, 2103),
     ),
-    "lightning-staff": VfxSource(8, 128, 128, 12, False),
+    "lightning-staff": VfxSource(
+        8, 128, 128, 12, False,
+        panel_edges=(0, 180, 402, 733, 1037, 1350, 1644, 1838, 2172),
+    ),
     "defensive-barrier": VfxSource(
         8, 128, 128, 14, False, anchor_x=64, anchor_y=112, align_bottom=True
     ),
@@ -74,16 +112,19 @@ SOURCES: dict[str, VfxSource] = {
     ),
     "sealing-magic": VfxSource(8, 96, 96, 14, False),
     "float-slam": VfxSource(
-        8, 192, 192, 14, False, anchor_x=96, anchor_y=176, align_bottom=True
+        8, 192, 192, 14, False, anchor_x=96, anchor_y=176, align_bottom=True,
+        panel_edges=(0, 272, 550, 830, 1096, 1341, 1572, 1892, 2172),
     ),
     "goddess-spears": VfxSource(
         10, 192, 192, 14, False, anchor_x=96, anchor_y=176, align_bottom=True
     ),
     "destruction-lightning": VfxSource(
-        10, 192, 192, 16, False, anchor_x=96, anchor_y=176, align_bottom=True
+        10, 192, 192, 16, False, anchor_x=96, anchor_y=176, align_bottom=True,
+        panel_edges=(0, 193, 388, 585, 760, 942, 1126, 1326, 1479, 1620, 1774),
     ),
     "earth-domination": VfxSource(
-        10, 192, 192, 12, False, anchor_x=96, anchor_y=176, align_bottom=True
+        10, 192, 192, 12, False, anchor_x=96, anchor_y=176, align_bottom=True,
+        panel_edges=(0, 195, 403, 637, 857, 1105, 1325, 1533, 1750, 1953, 2172),
     ),
     "phantom": VfxSource(
         10,
@@ -105,7 +146,7 @@ SOURCES: dict[str, VfxSource] = {
         anchor_x=64,
         anchor_y=92,
         align_bottom=True,
-        detect_boundaries=True,
+        panel_edges=(0, 178, 367, 586, 800, 1008, 1192, 1500, 1674, 1940, 2172),
     ),
     "mirror-array": VfxSource(
         9,

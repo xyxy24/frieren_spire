@@ -5,6 +5,7 @@
 #include "game/floors/FloorScheduler.hpp"
 #include "game/run/DeterministicRng.hpp"
 #include "game/relics/RelicSystem.hpp"
+#include "presentation/viewmodel/LoadoutViewModel.hpp"
 
 #include <array>
 #include <algorithm>
@@ -352,6 +353,7 @@ bool defaultScheduleBuildsThreeFiveFloorActs()
 
 bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 {
+    namespace ui = arcane::presentation::viewmodel;
     arcane::app::TowerSessionConfig config;
     config.enemySpawn = {210.0F, 576.0F};
     config.normalEnemyHealth = 15;
@@ -359,13 +361,14 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
     config.enableSpecialFloors = false;
     config.staircaseBounds = {300.0F, 560.0F, 90.0F, 80.0F};
     arcane::app::TowerSession tower(123U, config);
+    ui::LoadoutViewModel loadout;
 
     arcane::game::PlayerIntent toggleLoadout;
     toggleLoadout.toggleLoadoutPressed = true;
-    tower.update(toggleLoadout, 0.01F);
-    if (!expect(tower.loadoutOpen(), "loadout should be available during combat")) return false;
-    tower.update(toggleLoadout, 0.01F);
-    if (!expect(!tower.loadoutOpen(), "loadout should close without changing the run phase")
+    static_cast<void>(loadout.handleInput(toggleLoadout, tower));
+    if (!expect(loadout.open(), "loadout should be available during combat")) return false;
+    static_cast<void>(loadout.handleInput(toggleLoadout, tower));
+    if (!expect(!loadout.open(), "loadout should close without changing the run phase")
         || !expect(tower.run().phase() == arcane::game::run::RunPhase::InEncounter,
             "closing loadout should resume the underlying combat phase")) return false;
 
@@ -408,19 +411,19 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
             && !tower.run().player().equippedSpells[2],
             "chosen reward should not automatically replace an equipped spell")) return false;
 
-    tower.update(toggleLoadout, 0.01F);
-    if (!expect(tower.loadoutOpen(), "loadout should open on the completed floor")
-        || !expect(tower.selectedLearnedSpell() == (*candidates)[0],
+    static_cast<void>(loadout.handleInput(toggleLoadout, tower));
+    if (!expect(loadout.open(), "loadout should open on the completed floor")
+        || !expect(loadout.selectedSpell(tower.run().player()) == (*candidates)[0],
             "newly learned reward should be selectable in loadout")) return false;
 
     arcane::game::PlayerIntent equip;
     equip.spellPressed[1] = true;
-    tower.update(equip, 0.01F);
+    static_cast<void>(loadout.handleInput(equip, tower));
     if (!expect(tower.run().player().equippedSpells[1] == (*candidates)[0],
         "chosen spell should equip into the requested slot")) return false;
 
-    tower.update(toggleLoadout, 0.01F);
-    if (!expect(!tower.loadoutOpen(), "closing loadout should preserve the equipped spell")) return false;
+    static_cast<void>(loadout.handleInput(toggleLoadout, tower));
+    if (!expect(!loadout.open(), "closing loadout should preserve the equipped spell")) return false;
 
     tower.update(interact, 0.01F);
     if (!expect(tower.run().phase() == arcane::game::run::RunPhase::FloorComplete,

@@ -24,28 +24,32 @@
 ```mermaid
 flowchart TB
     Platform["平台与引擎适配\n窗口/输入/渲染/音频/文件"]
-    Presentation["表现层\n场景视图/HUD/动画/特效"]
-    Application["应用流程层\nGameApp/RunController/FloorController"]
-    Domain["玩法领域层\n战斗/魔法/遗物/奖励/商店"]
+    View["View\nSFML 场景/HUD/动画/特效"]
+    ViewModel["ViewModel\n页面状态/命令/只读快照"]
+    Model["Model\nTowerSession/RunController/CombatSession"]
+    Domain["领域规则\n战斗/魔法/遗物/奖励/商店"]
     Content["内容层\n魔法/遗物/敌人/楼层定义"]
     Infra["基础设施\nRNG/存档/日志/资源"]
 
-    Platform --> Presentation
-    Presentation --> Application
-    Application --> Domain
+    Platform --> View
+    View --> ViewModel
+    ViewModel --> Model
+    Model --> Domain
     Content --> Domain
-    Infra --> Application
+    Infra --> Model
     Infra --> Domain
 ```
 
-依赖方向应朝向稳定的玩法规则。领域层不直接调用具体渲染、音频或键盘 API；表现层读取领域状态并发送玩家意图。
+项目采用不依赖第三方库的 C++ MVVM：View 把设备输入映射为命令并绑定只读快照；ViewModel 保存页面状态、解释 UI 命令并调用 Model；Model 持有权威玩法状态与规则。依赖方向朝向稳定的玩法规则，Model 和领域层不直接调用 SFML、音频或键盘 API。
 
 ## 4. 核心系统与职责
 
 | 系统 | 责任 | 不负责 |
 |---|---|---|
-| `GameApp` | 启动、主循环、顶层状态切换 | 具体战斗规则 |
-| `TowerSession` | 把战斗结果、奖励、装备、楼梯和下一层串成可执行流程 | 绘制 SFML 图形 |
+| `SfmlApplication`（View） | 窗口主循环、绘制、动画和输入采样 | 保存页面选择或修改玩法规则 |
+| `ApplicationViewModel` | 管理 Start/Playing/Pause/Result，解释顶层命令并拥有当前 Model | SFML 绘制与战斗数值计算 |
+| `LoadoutViewModel` | 管理 Tab 开关、页签、光标和装备命令，生成构筑快照 | 持有已学魔法、遗物或装备的权威数据 |
+| `TowerSession`（Model） | 把战斗结果、奖励、楼梯和下一层串成可执行流程，并提供装备命令 | 保存 UI 页签/光标或绘制 SFML 图形 |
 | `RunController` | 创建/结束本局，持有本局种子、玩家构筑与 Boss 进度 | 绘制 HUD |
 | `FloorController` | 生成、加载、激活、结算和卸载一层 | 直接决定魔法伤害 |
 | `EncounterDirector` | 按楼层类型启动普通战、事件、商店或 Boss | 保存渲染对象 |
@@ -61,25 +65,24 @@ flowchart TB
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
 
-当前垂直切片由纯 C++ `TowerSession` 持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 现在只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 应用适配器的消息循环固定为事件泵、输入采样、应用更新、表现状态更新和统一帧渲染；商店、事件、战斗、HUD、Boss 揭幕与对话框的具体 View 分支封装在 `renderApplicationFrame`，不在循环正文展开。表现层只提交 `PlayerIntent` 并读取状态快照；奖励按键、独立装备覆盖层、楼梯解锁及玩家与楼梯交互区域的相交校验由 `TowerSession` 与 `RunController` 决定。
+当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。
+
+`ApplicationViewModel` 与 `LoadoutViewModel` 是有状态 ViewModel；`ApplicationSnapshot`、`LoadoutSnapshot`、`RewardViewModel`、`MerchantViewModel` 和装备槽投影是 View 的只读绑定对象。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。事件、战斗 HUD 和特殊楼层面板目前仍读取 Model 的只读快照，后续按同一边界迁移。
 
 ## 5. 状态所有权
 
 ```text
-GameApp
-└── RunController (仅在本局期间存在)
-    ├── RunState
-    │   ├── PlayerState
-    │   │   ├── LearnedSpells
-    │   │   ├── EquippedSlots[3]
-    │   │   └── RelicInventory
-    │   ├── floorIndex
-    │   ├── bossesDefeated
-    │   └── runSeed
-    └── FloorController (同一时间只有一个活动实例)
-        ├── FloorState
-        ├── Encounter
-        └── CombatWorld（仅战斗层存在）
+SfmlApplication (View，无玩法状态所有权)
+└── ApplicationViewModel
+    ├── ApplicationScreen / PauseMenuItem
+    ├── LoadoutViewModel
+    │   └── Open / Page / Section / Selection（仅 UI 状态）
+    └── TowerSession (Model，仅在本局期间存在)
+        ├── RunController
+        │   ├── PlayerProgress / EquippedSlots / Relics
+        │   └── floorIndex / bossesDefeated / runSeed
+        ├── FloorScheduler
+        └── CombatSession 或 ExplorationPlayer（仅当前层）
 ```
 
 - `RunController` 是本局状态的唯一所有者。
@@ -89,7 +92,7 @@ GameApp
 
 ## 6. 顶层状态机
 
-`AppFlowController` 持有可选的 `TowerSession` 并管理 `Start/Playing/Pause/Result` 页面。暂停页由 `PauseMenuItem::ReplayCurrentFloor/SaveAndExit` 保存当前高亮项；上下输入只修改菜单选择，确认后才重开本层或暂退。暂退到 Start 时保留同一个 `TowerSession` 供 Continue 使用，但当前没有磁盘序列化，进程关闭后不会保留。结果页确认则创建新实例。`TowerSession` 在每层调度前保存 `RunController` 与 `FloorScheduler` 快照，本层重开时恢复快照后重新生成同一种子楼层，不保存或复用旧层实体。
+`ApplicationViewModel` 持有可选的 `TowerSession` 并管理 `Start/Playing/Pause/Result` 页面。四个页面的命令分别由 `handleStart/handlePlaying/handlePause/handleResult` 处理，避免顶层输入与玩法更新堆积在一个 Controller 分支中。暂停页由 `PauseMenuItem::ReplayCurrentFloor/SaveAndExit` 保存当前高亮项；确认后才重开本层或暂退。暂退到 Start 时保留同一个 Model 供 Continue 使用，但当前没有磁盘序列化。`TowerSession` 在每层调度前保存 `RunController` 与 `FloorScheduler` 快照，本层重开时恢复快照后重新生成同一种子楼层。
 
 事件/商店验收入口使用 `TowerSessionConfig::firstFloorTypeOverride` 显式覆盖首层类型；正式新局不设置该字段，仍由 `FloorScheduler` 的确定性随机流和保底规则决定楼层。商店预览使用配置副本提供测试金币，不修改正式配置。预览入口只改变测试会话，不在调度器中加入环境相关的随机分支。
 
@@ -113,7 +116,7 @@ stateDiagram-v2
     Result --> MainMenu
 ```
 
-`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是顶层流程状态，而是可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的暂停覆盖层；关闭后恢复原状态。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页：魔法页可分别提交三槽普通装备命令和终极槽装备命令，并依据内容类别拒绝跨槽装备；遗物页只读取本局遗物集合和内容定义并显示效果，不复制或修改遗物权威状态。
+`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是 Model 的流程状态，而是 `LoadoutViewModel` 可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的覆盖层；打开时由它消费 UI 输入，Model 的玩法时间不推进。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页；装备通过显式 Model 命令提交，遗物页只绑定本局遗物快照。
 
 ## 7. 战斗与时间
 
@@ -167,6 +170,7 @@ stateDiagram-v2
 
 - `SfmlInputMapper` 将跳跃、攻击、施法、交互和菜单等一次性动作从 SFML `KeyPressed` 事件缓冲到下一次模拟更新，防止低帧率下短按发生在两次实时轮询之间而丢失；窗口关闭系统按键重复。水平与垂直移动轴仍读取实时键盘状态，以保留持续按住的控制语义。
 - 内置像素字体把一次文本调用中的所有亮点合并为一个三角形顶点数组提交，UI 不得为每个字体像素单独产生一次绘制调用。该优化只影响表现性能，不改变奖励选择或其他领域状态转换。
+- `SpellCardArt` 独立加载 `assets/spell_cards/<spell-id>.png` 中的 33 张方形卡面，并以同一内容 ID 在奖励、商店、Tab 配装页和 HUD 槽位中绘制；它不读取或复用 `SpellEffectAnimator` 的战斗图集。卡面插画和 Boss 金色边框只属于表现层；魔法类别、可装备性、伤害、范围与冷却仍只读取领域定义和运行时快照。
 - `CombatRequest` 输入遭遇 ID、种子、玩家出生点、敌人实例列表、场地边界、玩家初始 HP 和金币基础奖励。敌人列表为空时仍支持旧单敌人字段，供小型领域测试使用；正式普通楼层传入三个敌人实例，Boss 楼层传入一个。
 - `CombatResult` 只报告胜负、原遭遇 ID、击杀数、应发金币和战斗结束后的玩家 HP；它不直接修改 B 拥有的本局资源或楼层进度。
 - `PlayerStateView` 和 `EnemyStateView` 是表现/UI 可读取的快照。`CombatSession::enemyStates()` 返回每个敌人的类型、位置、碰撞尺寸、HP 和技能阶段，UI 据此在普通敌人头顶绘制独立血条；Boss 继续使用右上角血条。
@@ -328,6 +332,7 @@ Project1/
 │       ├── game/         # 纯玩法领域系统
 │       ├── content/      # 内容定义与校验
 │       ├── presentation/ # 视图、HUD、表现同步
+│       │   └── viewmodel/ # 奖励、商店、构筑与槽位的只读 UI 投影
 │       └── platform/     # 引擎/窗口/输入/音频适配
 ├── tests/                # 独立测试项目，建立框架后创建
 ├── assets/

@@ -22,7 +22,6 @@ FetchContent_MakeAvailable(SFML)
 
 add_library(arcane_core STATIC
     Project1/src/game/ai/EnemyController.cpp
-    Project1/src/app/run/AppFlowController.cpp
     Project1/src/app/run/TowerSession.cpp
     Project1/src/game/combat/AttackState.cpp
     Project1/src/game/combat/CombatSession.cpp
@@ -38,6 +37,9 @@ add_library(arcane_core STATIC
     Project1/src/game/economy/MerchantSystem.cpp
     Project1/src/game/events/EventSystem.cpp
     Project1/src/app/run/RunController.cpp
+    Project1/src/presentation/viewmodel/UiViewModels.cpp
+    Project1/src/presentation/viewmodel/LoadoutViewModel.cpp
+    Project1/src/presentation/viewmodel/ApplicationViewModel.cpp
 )
 
 target_include_directories(arcane_core
@@ -50,6 +52,7 @@ add_executable(Project1
     Project1/src/platform/SfmlInputMapper.cpp
     Project1/src/presentation/SfmlApplication.cpp
     Project1/src/presentation/PlayerAnimator.cpp
+    Project1/src/presentation/SpellCardArt.cpp
     Project1/src/presentation/SpellEffectAnimator.cpp
 )
 
@@ -71,6 +74,9 @@ add_custom_command(TARGET Project1 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/spells/processed
         $<TARGET_FILE_DIR:Project1>/assets/spells
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/spell_cards
+        $<TARGET_FILE_DIR:Project1>/assets/spell_cards
     COMMENT "Copying runtime assets"
 )
 

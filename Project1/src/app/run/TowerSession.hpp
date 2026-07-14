@@ -33,9 +33,6 @@ struct TowerSessionConfig
 
 enum class EventFloorState : std::uint8_t { Untriggered, Choosing, Result };
 enum class EventKind : std::uint8_t { AldenBall, HalfCenturyMeteorShower, SwordVillage };
-enum class LoadoutPage : std::uint8_t { Spells, Relics };
-enum class SpellLoadoutSection : std::uint8_t { Regular, Boss };
-
 class TowerSession
 {
 public:
@@ -48,11 +45,8 @@ public:
     [[nodiscard]] game::run::FloorType currentFloorType() const noexcept;
     [[nodiscard]] std::optional<std::array<game::run::ContentId, 3>> rewardCandidates() const;
     [[nodiscard]] std::optional<game::Aabb> lootDropBounds() const noexcept;
-    [[nodiscard]] bool loadoutOpen() const noexcept;
-    [[nodiscard]] LoadoutPage loadoutPage() const noexcept;
-    [[nodiscard]] SpellLoadoutSection spellLoadoutSection() const noexcept;
-    [[nodiscard]] std::optional<game::run::ContentId> selectedLearnedSpell() const noexcept;
-    [[nodiscard]] std::optional<game::run::ContentId> selectedRelic() const noexcept;
+    [[nodiscard]] bool equipRegularSpell(std::size_t slot, game::run::ContentId spell);
+    [[nodiscard]] bool equipUltimateSpell(game::run::ContentId spell);
     [[nodiscard]] game::Aabb staircaseBounds() const noexcept;
     [[nodiscard]] bool staircaseUnlocked() const noexcept;
     [[nodiscard]] const std::vector<game::economy::StockItem>& merchantStock() const noexcept;
@@ -68,8 +62,6 @@ public:
 
 private:
     void startNextFloor();
-    void updateLoadout(const game::PlayerIntent& intent);
-    void updateRelicPage(const game::PlayerIntent& intent);
     void updateSpecialFloor(const game::PlayerIntent& intent, float deltaSeconds);
 
     RunController run_;
@@ -79,12 +71,6 @@ private:
     std::optional<game::Aabb> lootDropBounds_;
     std::optional<game::PlayerController> explorationPlayer_;
     game::run::FloorType currentFloorType_ {game::run::FloorType::Combat};
-    std::size_t selectedLearnedSpellIndex_ {0};
-    std::size_t selectedBossSpellIndex_ {0};
-    std::size_t selectedRelicIndex_ {0};
-    bool loadoutOpen_ {false};
-    LoadoutPage loadoutPage_ {LoadoutPage::Spells};
-    SpellLoadoutSection spellLoadoutSection_ {SpellLoadoutSection::Regular};
     std::vector<game::economy::StockItem> merchantStock_;
     std::size_t selectedMerchantIndex_ {0};
     std::optional<game::events::EventTransaction> eventTransaction_;

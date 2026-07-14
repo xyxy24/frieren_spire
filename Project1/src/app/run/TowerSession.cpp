@@ -119,42 +119,6 @@ TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config
 
 void TowerSession::update(const game::PlayerIntent& intent, const float deltaSeconds)
 {
-    if (intent.toggleLoadoutPressed)
-    {
-        loadoutOpen_ = !loadoutOpen_;
-        if (loadoutOpen_) loadoutPage_ = LoadoutPage::Spells;
-        const auto learnedCount = run_.player().learnedSpells.size();
-        if (learnedCount > 0U && selectedLearnedSpellIndex_ >= learnedCount)
-        {
-            selectedLearnedSpellIndex_ = learnedCount - 1U;
-        }
-        const auto bossSpellCount = run_.player().learnedBossSpells.size();
-        if (bossSpellCount > 0U && selectedBossSpellIndex_ >= bossSpellCount)
-        {
-            selectedBossSpellIndex_ = bossSpellCount - 1U;
-        }
-        const auto relicCount = run_.player().relics.size();
-        if (relicCount > 0U && selectedRelicIndex_ >= relicCount)
-        {
-            selectedRelicIndex_ = relicCount - 1U;
-        }
-        return;
-    }
-
-    if (loadoutOpen_)
-    {
-        if (intent.menuPagePreviousPressed || intent.menuPageNextPressed)
-        {
-            loadoutPage_ = loadoutPage_ == LoadoutPage::Spells
-                ? LoadoutPage::Relics
-                : LoadoutPage::Spells;
-            return;
-        }
-        if (loadoutPage_ == LoadoutPage::Spells) updateLoadout(intent);
-        else updateRelicPage(intent);
-        return;
-    }
-
     switch (run_.phase())
     {
     case game::run::RunPhase::InEncounter:
@@ -218,20 +182,7 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
         const auto candidates = run_.rewardOffer().candidates;
         for (std::size_t index = 0; index < intent.spellPressed.size(); ++index)
         {
-            if (intent.spellPressed[index] && run_.chooseReward(candidates[index]))
-            {
-                if (currentFloorType_ == game::run::FloorType::Boss)
-                {
-                    selectedBossSpellIndex_ = run_.player().learnedBossSpells.size() - 1U;
-                    spellLoadoutSection_ = SpellLoadoutSection::Boss;
-                }
-                else
-                {
-                    selectedLearnedSpellIndex_ = run_.player().learnedSpells.size() - 1U;
-                    spellLoadoutSection_ = SpellLoadoutSection::Regular;
-                }
-                break;
-            }
+            if (intent.spellPressed[index] && run_.chooseReward(candidates[index])) break;
         }
         break;
     }
@@ -293,40 +244,20 @@ std::optional<game::Aabb> TowerSession::lootDropBounds() const noexcept
     return lootDropBounds_;
 }
 
-bool TowerSession::loadoutOpen() const noexcept
+bool TowerSession::equipRegularSpell(const std::size_t slot, const game::run::ContentId spell)
 {
-    return loadoutOpen_;
+    if (!run_.equip(slot, spell)) return false;
+    if (combat_)
+        return combat_->equipSpell(slot, run_.player().equippedSpells[slot]);
+    return true;
 }
 
-LoadoutPage TowerSession::loadoutPage() const noexcept
+bool TowerSession::equipUltimateSpell(const game::run::ContentId spell)
 {
-    return loadoutPage_;
-}
-
-SpellLoadoutSection TowerSession::spellLoadoutSection() const noexcept
-{
-    return spellLoadoutSection_;
-}
-
-std::optional<game::run::ContentId> TowerSession::selectedLearnedSpell() const noexcept
-{
-    if (spellLoadoutSection_ == SpellLoadoutSection::Boss)
-    {
-        const auto& learnedBossSpells = run_.player().learnedBossSpells;
-        if (learnedBossSpells.empty() || selectedBossSpellIndex_ >= learnedBossSpells.size())
-            return std::nullopt;
-        return learnedBossSpells[selectedBossSpellIndex_];
-    }
-    const auto& learned = run_.player().learnedSpells;
-    if (learned.empty() || selectedLearnedSpellIndex_ >= learned.size()) return std::nullopt;
-    return learned[selectedLearnedSpellIndex_];
-}
-
-std::optional<game::run::ContentId> TowerSession::selectedRelic() const noexcept
-{
-    const auto& relics = run_.player().relics;
-    if (relics.empty() || selectedRelicIndex_ >= relics.size()) return std::nullopt;
-    return relics[selectedRelicIndex_];
+    if (!run_.equipUltimate(spell)) return false;
+    if (combat_)
+        return combat_->equipUltimateSpell(run_.player().equippedUltimateSpell);
+    return true;
 }
 
 game::Aabb TowerSession::staircaseBounds() const noexcept
@@ -561,77 +492,6 @@ void TowerSession::startNextFloor()
     request.relicIds = run_.player().relics;
 
     combat_.emplace(request);
-}
-
-void TowerSession::updateLoadout(const game::PlayerIntent& intent)
-{
-    if (intent.menuUpPressed || intent.menuDownPressed)
-    {
-        spellLoadoutSection_ = spellLoadoutSection_ == SpellLoadoutSection::Regular
-            ? SpellLoadoutSection::Boss
-            : SpellLoadoutSection::Regular;
-        return;
-    }
-
-    if (spellLoadoutSection_ == SpellLoadoutSection::Boss)
-    {
-        const auto& learnedBossSpells = run_.player().learnedBossSpells;
-        if (learnedBossSpells.empty()) return;
-        if (intent.menuPreviousPressed)
-        {
-            selectedBossSpellIndex_ = selectedBossSpellIndex_ == 0U
-                ? learnedBossSpells.size() - 1U
-                : selectedBossSpellIndex_ - 1U;
-        }
-        if (intent.menuNextPressed)
-            selectedBossSpellIndex_ = (selectedBossSpellIndex_ + 1U) % learnedBossSpells.size();
-        if (intent.ultimateSpellPressed
-            && run_.equipUltimate(learnedBossSpells[selectedBossSpellIndex_]) && combat_)
-        {
-            static_cast<void>(combat_->equipUltimateSpell(run_.player().equippedUltimateSpell));
-        }
-        return;
-    }
-
-    const auto& learned = run_.player().learnedSpells;
-    if (learned.empty()) return;
-
-    if (intent.menuPreviousPressed)
-    {
-        selectedLearnedSpellIndex_ = selectedLearnedSpellIndex_ == 0U
-            ? learned.size() - 1U
-            : selectedLearnedSpellIndex_ - 1U;
-    }
-    if (intent.menuNextPressed)
-    {
-        selectedLearnedSpellIndex_ = (selectedLearnedSpellIndex_ + 1U) % learned.size();
-    }
-
-    for (std::size_t slot = 0; slot < intent.spellPressed.size(); ++slot)
-    {
-        if (intent.spellPressed[slot])
-        {
-            if (run_.equip(slot, learned[selectedLearnedSpellIndex_]) && combat_)
-                static_cast<void>(combat_->equipSpell(slot, run_.player().equippedSpells[slot]));
-        }
-    }
-}
-
-void TowerSession::updateRelicPage(const game::PlayerIntent& intent)
-{
-    const auto& relics = run_.player().relics;
-    if (relics.empty()) return;
-
-    if (intent.menuPreviousPressed)
-    {
-        selectedRelicIndex_ = selectedRelicIndex_ == 0U
-            ? relics.size() - 1U
-            : selectedRelicIndex_ - 1U;
-    }
-    if (intent.menuNextPressed)
-    {
-        selectedRelicIndex_ = (selectedRelicIndex_ + 1U) % relics.size();
-    }
 }
 
 void TowerSession::updateSpecialFloor(const game::PlayerIntent& intent, const float deltaSeconds)

@@ -31,11 +31,14 @@ anchor; ground effects such as Gravity Well declare a bottom-center anchor expli
 Self auras also use a bottom-body anchor where appropriate so the effect remains stable while
 the player sprite changes animation.
 
-Generated poses are not guaranteed to be evenly spaced across a contact sheet. Sources such as
-Mana Strike and Golden Binding therefore use reviewed `panel_edges` in `Process-SpellVfx.py`;
-dividing those sheets into equal-width columns cuts one pose across adjacent runtime frames.
-After processing, every foreground alpha bound must remain inside its frame cell rather than
-touching a left or right cell edge.
+Generated poses are not guaranteed to be evenly spaced across a contact sheet. All 32 current
+sources have been checked against their cleaned alpha bounds; every sheet whose equal-width or
+automatic boundary intersects foreground pixels now uses reviewed `panel_edges` in
+`Process-SpellVfx.py`. Dividing those sheets into equal columns can cut one pose across adjacent
+runtime frames. After processing, every foreground alpha bound must remain inside its frame cell
+rather than touching a left or right cell edge. Earth Dominion is the sole source whose two
+destruction poses contain overlapping stray particles, so its reviewed seam uses the lowest-density
+two-pixel column between the intact pillar bodies.
 
 AI outputs remain source key poses. Keep gameplay AABBs authoritative and do not infer collision,
 damage timing, or projectile speed from transparent texture bounds. Presentation size is an
@@ -45,3 +48,7 @@ across the field instead of stretching one sprite into the damage rectangle. Eve
 selects an explicit runtime layout: fixed center, caster baseline, target baseline, forward endpoint,
 field row, tether, beam, triple beam, homing volley, or multi-pillar storm. No runtime spell atlas is
 scaled independently on the X and Y axes.
+
+Spell-card illustrations are intentionally independent assets under `assets/spell_cards/`; combat
+atlases must not be cropped or reused as card faces. This separation allows either presentation to
+be replaced without silently changing the other.

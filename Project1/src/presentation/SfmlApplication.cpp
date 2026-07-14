@@ -1,10 +1,12 @@
-#include "app/run/AppFlowController.hpp"
+#include "presentation/viewmodel/ApplicationViewModel.hpp"
 #include "game/relics/RelicSystem.hpp"
 #include "game/spells/SpellSystem.hpp"
 #include "platform/SfmlInputMapper.hpp"
 #include "presentation/PlayerAnimator.hpp"
+#include "presentation/SpellCardArt.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
 #include "presentation/SfmlApplication.hpp"
+#include "presentation/viewmodel/UiViewModels.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -21,6 +23,8 @@
 
 namespace
 {
+namespace ui = arcane::presentation::viewmodel;
+
 constexpr unsigned int WindowWidth = 1280;
 constexpr unsigned int WindowHeight = 720;
 constexpr float GroundTop = 640.0F;
@@ -217,19 +221,19 @@ std::string formatTenths(const float value)
     return std::to_string(tenths / 10) + "." + std::to_string(std::abs(tenths % 10));
 }
 
-std::string spellRangeText(const arcane::game::spells::SpellDefinition& spell)
+std::string spellRangeText(const ui::SpellDetailViewModel& spell)
 {
-    using arcane::game::spells::SpellShape;
-    switch (spell.shape)
+    using ui::SpellRangeKind;
+    switch (spell.rangeKind)
     {
-    case SpellShape::Self: return "RANGE SELF";
-    case SpellShape::ForwardBox:
+    case SpellRangeKind::Self: return "RANGE SELF";
+    case SpellRangeKind::ForwardBox:
         return "RANGE " + formatTenths(spell.range) + " X " + formatTenths(spell.height);
-    case SpellShape::SelfArea:
+    case SpellRangeKind::SelfArea:
         return "RADIUS " + formatTenths(spell.range) + " X " + formatTenths(spell.height);
-    case SpellShape::TargetArea:
+    case SpellRangeKind::TargetArea:
         return "CAST " + formatTenths(spell.range) + " AREA " + formatTenths(spell.height);
-    case SpellShape::Summon:
+    case SpellRangeKind::Summon:
         return spell.range > 0.0F
             ? "SUMMON SELF AGGRO " + formatTenths(spell.range) : "SUMMON BESIDE SELF";
     }
@@ -238,17 +242,44 @@ std::string spellRangeText(const arcane::game::spells::SpellDefinition& spell)
 
 void drawCard(
     sf::RenderTarget& target,
-    const arcane::game::run::ContentId id,
+    const ui::ContentSummaryViewModel& content,
     const sf::Vector2f position,
     const sf::Vector2f size,
-    const bool selected)
+    const bool selected,
+    const arcane::presentation::SpellCardArt* spellCards = nullptr)
 {
+    const auto id = content.id;
+    const bool spellCard = content.kind == ui::ContentKind::Spell && spellCards != nullptr;
+    const bool bossSpell = content.bossSpell;
+    const sf::Color accent = bossSpell ? sf::Color {255, 205, 92} : colorForContent(id);
     sf::RectangleShape card(size);
     card.setPosition(position);
-    card.setFillColor(colorForContent(id));
-    card.setOutlineColor(selected ? sf::Color {255, 231, 145} : sf::Color {210, 210, 225});
+    card.setFillColor(spellCard
+        ? sf::Color {static_cast<std::uint8_t>(accent.r / 4U),
+            static_cast<std::uint8_t>(accent.g / 4U),
+            static_cast<std::uint8_t>(accent.b / 4U)}
+        : colorForContent(id));
+    card.setOutlineColor(selected ? sf::Color {255, 241, 178}
+        : (bossSpell ? sf::Color {255, 205, 92} : sf::Color {210, 210, 225}));
     card.setOutlineThickness(selected ? 6.0F : 3.0F);
     target.draw(card);
+
+    if (spellCard)
+    {
+        const float inset = std::max(5.0F, std::min(size.x, size.y) * 0.055F);
+        const float artHeight = size.y > size.x * 1.25F
+            ? std::min(size.y * 0.49F, size.x - inset * 2.0F)
+            : size.y - inset * 2.0F;
+        const sf::Vector2f artPosition {position.x + inset, position.y + inset};
+        const sf::Vector2f artSize {size.x - inset * 2.0F, artHeight};
+        sf::RectangleShape artPanel(artSize);
+        artPanel.setPosition(artPosition);
+        artPanel.setFillColor(sf::Color {10, 13, 24, 225});
+        artPanel.setOutlineColor(sf::Color {accent.r, accent.g, accent.b, 170});
+        artPanel.setOutlineThickness(std::max(1.0F, inset * 0.18F));
+        target.draw(artPanel);
+        if (spellCards->draw(target, id, artPosition, artSize)) return;
+    }
 
     sf::CircleShape sigil(size.x * 0.18F, 6U);
     sigil.setOrigin({sigil.getRadius(), sigil.getRadius()});
@@ -257,7 +288,20 @@ void drawCard(
     target.draw(sigil);
 }
 
-void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::PlayerProgress& player,
+void drawCard(
+    sf::RenderTarget& target,
+    const arcane::game::run::ContentId id,
+    const sf::Vector2f position,
+    const sf::Vector2f size,
+    const bool selected,
+    const arcane::presentation::SpellCardArt* spellCards = nullptr)
+{
+    drawCard(target, ui::makeContentSummaryViewModel(id, selected), position, size,
+        selected, spellCards);
+}
+
+void drawEquippedSlots(sf::RenderTarget& target, const ui::EquippedSlotsViewModel& model,
+    const arcane::presentation::SpellCardArt& spellCards,
     const arcane::game::PlayerStateView* combatView = nullptr)
 {
     constexpr float SlotSize = 66.0F;
@@ -266,16 +310,20 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
     const float totalWidth = SlotSize * 4.0F + Gap * 2.0F + UltimateGap;
     const float startX = (static_cast<float>(WindowWidth) - totalWidth) * 0.5F;
 
-    for (std::size_t index = 0; index < player.equippedSpells.size(); ++index)
+    for (std::size_t index = 0; index < model.regular.size(); ++index)
     {
         sf::RectangleShape slot({SlotSize, SlotSize});
         slot.setPosition({startX + static_cast<float>(index) * (SlotSize + Gap), 630.0F});
-        slot.setFillColor(player.equippedSpells[index]
-            ? colorForContent(*player.equippedSpells[index])
+        slot.setFillColor(model.regular[index]
+            ? colorForContent(model.regular[index]->id)
             : sf::Color {38, 41, 52});
         slot.setOutlineColor(sf::Color {175, 164, 214});
         slot.setOutlineThickness(3.0F);
         target.draw(slot);
+        if (model.regular[index])
+            static_cast<void>(spellCards.draw(target, model.regular[index]->id,
+                {startX + static_cast<float>(index) * (SlotSize + Gap) + 4.0F, 634.0F},
+                {SlotSize - 8.0F, SlotSize - 8.0F}));
         if (combatView && combatView->spellSlots[index].cooldownDuration > 0.0F)
         {
             const float ratio = std::clamp(combatView->spellSlots[index].cooldownRemaining
@@ -290,14 +338,17 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
     const float ultimateX = startX + SlotSize * 3.0F + Gap * 2.0F + UltimateGap;
     sf::RectangleShape ultimateSlot({SlotSize, SlotSize});
     ultimateSlot.setPosition({ultimateX, 630.0F});
-    ultimateSlot.setFillColor(player.equippedUltimateSpell
-        ? colorForContent(*player.equippedUltimateSpell)
+    ultimateSlot.setFillColor(model.ultimate
+        ? colorForContent(model.ultimate->id)
         : sf::Color {38, 41, 52});
-    ultimateSlot.setOutlineColor(player.ultimateSpellUnlocked
+    ultimateSlot.setOutlineColor(model.ultimateUnlocked
         ? sf::Color {255, 205, 92}
         : sf::Color {85, 85, 98});
     ultimateSlot.setOutlineThickness(4.0F);
     target.draw(ultimateSlot);
+    if (model.ultimate)
+        static_cast<void>(spellCards.draw(target, model.ultimate->id,
+            {ultimateX + 4.0F, 634.0F}, {SlotSize - 8.0F, SlotSize - 8.0F}));
     if (combatView && combatView->ultimateSpellSlot.cooldownDuration > 0.0F)
     {
         const float ratio = std::clamp(combatView->ultimateSpellSlot.cooldownRemaining
@@ -307,9 +358,9 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
         cooldown.setFillColor(sf::Color {8, 10, 18, 205});
         target.draw(cooldown);
     }
-    drawPixelText(target, player.ultimateSpellUnlocked ? "R" : "LOCK",
-        {ultimateX + (player.ultimateSpellUnlocked ? 27.0F : 10.0F), 607.0F}, 1.0F,
-        player.ultimateSpellUnlocked ? sf::Color {255, 221, 130} : sf::Color {105, 105, 118});
+    drawPixelText(target, model.ultimateUnlocked ? "R" : "LOCK",
+        {ultimateX + (model.ultimateUnlocked ? 27.0F : 10.0F), 607.0F}, 1.0F,
+        model.ultimateUnlocked ? sf::Color {255, 221, 130} : sf::Color {105, 105, 118});
 
     const auto drawInnateAbility = [&](const float x, const std::string_view label,
         const float cooldownRemaining, const float cooldownDuration, const bool active,
@@ -342,28 +393,27 @@ void drawEquippedSlots(sf::RenderTarget& target, const arcane::game::run::Player
         combatView && combatView->dashRemaining > 0.0F, sf::Color {100, 220, 245});
 }
 
-void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+void drawRewardScreen(sf::RenderTarget& target, const ui::RewardViewModel& model,
+    const arcane::presentation::SpellCardArt& spellCards)
 {
-    const auto candidates = tower.rewardCandidates();
-    if (!candidates) return;
-
     drawPixelText(target, "CHOOSE ONE SPELLBOOK", {465.0F, 70.0F}, 2.0F,
         sf::Color {255, 231, 145});
     drawPixelText(target, "READ THE EFFECT THEN PRESS U I OR O", {390.0F, 110.0F}, 1.3F,
         sf::Color {182, 174, 215});
-    if (std::find(tower.run().player().relics.begin(), tower.run().player().relics.end(),
-            arcane::game::relics::FirstClassBadgeId) != tower.run().player().relics.end())
+    if (model.showRerollHint)
         drawPixelText(target, "R REROLL - ONCE PER ACT", {510.0F, 132.0F}, 0.9F,
             sf::Color {145, 218, 255});
 
     constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
     constexpr std::array<std::string_view, 3> Keys {"U", "I", "O"};
-    for (std::size_t index = 0; index < candidates->size(); ++index)
+    for (std::size_t index = 0; index < model.cards.size(); ++index)
     {
+        const auto& card = model.cards[index];
         drawPixelText(target, Keys[index], {CardX[index] + 96.0F, 150.0F}, 1.5F,
             sf::Color {255, 231, 145});
-        drawCard(target, (*candidates)[index], {CardX[index], 180.0F}, {210.0F, 340.0F}, false);
-        if (const auto* definition = arcane::game::spells::findDefinition((*candidates)[index]))
+        drawCard(target, card.summary, {CardX[index], 180.0F}, {210.0F, 340.0F},
+            false, &spellCards);
+        if (card.spell)
         {
             sf::RectangleShape informationPanel({194.0F, 154.0F});
             informationPanel.setPosition({CardX[index] + 8.0F, 358.0F});
@@ -372,19 +422,20 @@ void drawRewardScreen(sf::RenderTarget& target, const arcane::app::TowerSession&
             informationPanel.setOutlineThickness(2.0F);
             target.draw(informationPanel);
 
-            drawPixelText(target, definition->name, {CardX[index] + 8.0F, 370.0F}, 1.05F,
+            drawPixelText(target, card.summary.name, {CardX[index] + 8.0F, 370.0F}, 1.05F,
                 sf::Color {255, 238, 173});
-            drawPixelText(target, wrapPixelText(definition->description, 38U),
+            drawPixelText(target, wrapPixelText(card.description, 38U),
                 {CardX[index] + 8.0F, 394.0F}, 0.80F);
-            drawPixelText(target, "CD " + formatTenths(definition->cooldownSeconds) + " SEC",
+            drawPixelText(target, "CD " + formatTenths(card.spell->cooldownSeconds) + " SEC",
                 {CardX[index] + 8.0F, 472.0F}, 0.95F, sf::Color {145, 218, 255});
-            drawPixelText(target, spellRangeText(*definition),
+            drawPixelText(target, spellRangeText(*card.spell),
                 {CardX[index] + 8.0F, 492.0F}, 0.85F, sf::Color {174, 242, 184});
         }
     }
 }
 
-void drawMerchantScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+void drawMerchantScreen(sf::RenderTarget& target, const ui::MerchantViewModel& model,
+    const arcane::presentation::SpellCardArt& spellCards)
 {
     sf::RectangleShape panel({1120.0F, 650.0F});
     panel.setPosition({80.0F, 45.0F});
@@ -406,48 +457,46 @@ void drawMerchantScreen(sf::RenderTarget& target, const arcane::app::TowerSessio
     detailPanel.setOutlineThickness(2.0F);
     target.draw(detailPanel);
 
-    if (const auto selected = tower.selectedMerchantItem())
+    if (model.selectedDetail)
     {
-        if (const auto* spell = arcane::game::spells::findDefinition(*selected))
+        const auto& detail = *model.selectedDetail;
+        if (detail.summary.kind == ui::ContentKind::Spell && detail.spell)
         {
             drawPixelText(target, "SPELL", {115.0F, 185.0F}, 1.0F,
                 sf::Color {145, 218, 255});
-            drawPixelText(target, wrapPixelText(spell->name, 25U),
+            drawPixelText(target, wrapPixelText(detail.summary.name, 25U),
                 {115.0F, 215.0F}, 0.95F, sf::Color {255, 238, 173});
-            drawPixelText(target, wrapPixelText(spell->description, 34U),
+            drawPixelText(target, wrapPixelText(detail.description, 34U),
                 {115.0F, 275.0F}, 0.78F);
-            drawPixelText(target, "CD " + formatTenths(spell->cooldownSeconds) + " SEC",
+            drawPixelText(target, "CD " + formatTenths(detail.spell->cooldownSeconds) + " SEC",
                 {115.0F, 520.0F}, 0.90F, sf::Color {145, 218, 255});
-            drawPixelText(target, wrapPixelText(spellRangeText(*spell), 30U),
+            drawPixelText(target, wrapPixelText(spellRangeText(*detail.spell), 30U),
                 {115.0F, 550.0F}, 0.82F, sf::Color {174, 242, 184});
         }
-        else if (const auto* relic = arcane::game::relics::findDefinition(*selected))
+        else if (detail.summary.kind == ui::ContentKind::Relic)
         {
             drawPixelText(target, "RELIC", {115.0F, 185.0F}, 1.0F,
                 sf::Color {220, 177, 255});
-            drawPixelText(target, wrapPixelText(relic->name, 25U),
+            drawPixelText(target, wrapPixelText(detail.summary.name, 25U),
                 {115.0F, 215.0F}, 0.95F, sf::Color {255, 238, 173});
-            drawPixelText(target, wrapPixelText(relic->description, 34U),
+            drawPixelText(target, wrapPixelText(detail.description, 34U),
                 {115.0F, 275.0F}, 0.78F);
         }
     }
 
     constexpr std::array<float, 3> CardX {320.0F, 590.0F, 860.0F};
-    const auto& stock = tower.merchantStock();
     std::size_t spellColumn = 0U;
     std::size_t relicColumn = 0U;
-    for (const auto& item : stock)
+    for (const auto& item : model.items)
     {
-        const bool spellItem = item.kind == arcane::game::economy::ItemKind::Spell;
+        const bool spellItem = item.content.kind == ui::ContentKind::Spell;
         const std::size_t column = spellItem ? spellColumn++ : relicColumn++;
         if (column >= CardX.size()) continue;
         const float y = spellItem ? 145.0F : 425.0F;
-        const bool selected = tower.selectedMerchantItem() == item.id;
-        drawCard(target, item.id, {CardX[column], y}, {165.0F, 175.0F}, selected);
-        if (const auto* spell = arcane::game::spells::findDefinition(item.id))
-            drawPixelText(target, spell->name, {CardX[column], y + 185.0F}, 1.0F);
-        else if (const auto* relic = arcane::game::relics::findDefinition(item.id))
-            drawPixelText(target, relic->name, {CardX[column], y + 185.0F}, 1.0F);
+        drawCard(target, item.content, {CardX[column], y}, {165.0F, 175.0F},
+            item.content.selected,
+            &spellCards);
+        drawPixelText(target, item.content.name, {CardX[column], y + 185.0F}, 1.0F);
         drawPixelText(target, std::to_string(item.price) + " GOLD",
             {CardX[column], y + 210.0F}, 1.15F, sf::Color {255, 225, 145});
     }
@@ -554,13 +603,14 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked());
 }
 
-void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+void drawLoadoutOverlay(sf::RenderTarget& target, const ui::LoadoutSnapshot& model,
+    const arcane::presentation::SpellCardArt& spellCards)
 {
     sf::RectangleShape overlay({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});
     overlay.setFillColor(sf::Color {14, 12, 25, 235});
     target.draw(overlay);
 
-    const bool spellPage = tower.loadoutPage() == arcane::app::LoadoutPage::Spells;
+    const bool spellPage = model.page == ui::LoadoutPage::Spells;
     drawPixelText(target, "SPELLS PAGE 1 OF 2", {120.0F, 30.0F}, 1.6F,
         spellPage ? sf::Color {255, 231, 145} : sf::Color {125, 126, 145});
     drawPixelText(target, "Q E SWITCH PAGE", {510.0F, 32.0F}, 1.4F, sf::Color {182, 174, 215});
@@ -569,7 +619,7 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
 
     if (!spellPage)
     {
-        const auto& relics = tower.run().player().relics;
+        const auto& relics = model.relics;
         constexpr std::size_t Columns = 8U;
         constexpr float CardWidth = 110.0F;
         constexpr float CardHeight = 72.0F;
@@ -594,21 +644,22 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
                 StartY + static_cast<float>(row) * (CardHeight + VerticalGap)
             };
             drawCard(target, relics[index], position, {CardWidth, CardHeight},
-                tower.selectedRelic() == relics[index]);
-            if (const auto* definition = arcane::game::relics::findDefinition(relics[index]))
-                drawPixelText(target, wrapPixelText(definition->name, 18U),
+                relics[index].selected);
+            if (relics[index].kind == ui::ContentKind::Relic)
+                drawPixelText(target, wrapPixelText(relics[index].name, 18U),
                     {position.x, position.y + CardHeight + 7.0F}, 0.78F);
             else
                 drawPixelText(target, "UNKNOWN RELIC", {position.x, position.y + CardHeight + 10.0F}, 1.0F);
         }
 
-        if (tower.selectedRelic())
+        if (model.selectedDetail)
         {
-            if (const auto* definition = arcane::game::relics::findDefinition(*tower.selectedRelic()))
+            const auto& detail = *model.selectedDetail;
+            if (detail.summary.kind == ui::ContentKind::Relic)
             {
-                drawPixelText(target, definition->name, {120.0F, 470.0F}, 1.6F,
+                drawPixelText(target, detail.summary.name, {120.0F, 470.0F}, 1.6F,
                     sf::Color {255, 231, 145});
-                drawPixelText(target, wrapPixelText(definition->description, 115U),
+                drawPixelText(target, wrapPixelText(detail.description, 115U),
                     {120.0F, 505.0F}, 0.95F);
             }
             else
@@ -620,9 +671,8 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
         return;
     }
 
-    const auto& player = tower.run().player();
-    const auto& learned = player.learnedSpells;
-    const auto& learnedBoss = player.learnedBossSpells;
+    const auto& learned = model.regularSpells;
+    const auto& learnedBoss = model.bossSpells;
     constexpr std::size_t Columns = 10U;
     constexpr float CardWidth = 90.0F;
     constexpr float CardHeight = 95.0F;
@@ -632,7 +682,7 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
     constexpr float StartY = 110.0F;
 
     drawPixelText(target, "REGULAR SPELLS", {190.0F, 78.0F}, 1.3F,
-        tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Regular
+        model.spellSection == ui::SpellSection::Regular
             ? sf::Color {255, 231, 145} : sf::Color {130, 130, 150});
 
     for (std::size_t index = 0; index < learned.size(); ++index)
@@ -648,13 +698,14 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
             learned[index],
             position,
             {CardWidth, CardHeight},
-            tower.selectedLearnedSpell() == learned[index]);
+            learned[index].selected,
+            &spellCards);
     }
 
-    drawPixelText(target, player.ultimateSpellUnlocked ? "BOSS SPELLS - R EQUIP ULTIMATE"
+    drawPixelText(target, model.equipped.ultimateUnlocked ? "BOSS SPELLS - R EQUIP ULTIMATE"
             : "BOSS SPELLS - DEFEAT BOSS 1 TO UNLOCK",
         {120.0F, 330.0F}, 1.25F,
-        tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss
+        model.spellSection == ui::SpellSection::Boss
             ? sf::Color {255, 205, 92} : sf::Color {130, 130, 150});
     for (std::size_t index = 0; index < learnedBoss.size(); ++index)
     {
@@ -663,23 +714,25 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const arcane::app::TowerSessio
             365.0F + static_cast<float>(index / Columns) * (CardHeight + VerticalGap)
         };
         drawCard(target, learnedBoss[index], position, {CardWidth, CardHeight},
-            tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss
-                && tower.selectedLearnedSpell() == learnedBoss[index]);
+            learnedBoss[index].selected, &spellCards);
     }
 
-    drawEquippedSlots(target, tower.run().player());
-    if (tower.selectedLearnedSpell())
-        if (const auto* definition = arcane::game::spells::findDefinition(*tower.selectedLearnedSpell()))
+    drawEquippedSlots(target, model.equipped, spellCards);
+    if (model.selectedDetail)
+    {
+        const auto& detail = *model.selectedDetail;
+        if (detail.summary.kind == ui::ContentKind::Spell && detail.spell)
         {
-            drawPixelText(target, definition->name, {120.0F, 500.0F}, 1.5F,
+            drawPixelText(target, detail.summary.name, {120.0F, 500.0F}, 1.5F,
                 sf::Color {255, 231, 145});
-            drawPixelText(target, wrapPixelText(definition->description, 105U),
+            drawPixelText(target, wrapPixelText(detail.description, 105U),
                 {120.0F, 528.0F}, 0.85F);
-            drawPixelText(target, "CD " + formatTenths(definition->cooldownSeconds) + " SEC",
+            drawPixelText(target, "CD " + formatTenths(detail.spell->cooldownSeconds) + " SEC",
                 {120.0F, 590.0F}, 0.95F, sf::Color {145, 218, 255});
-            drawPixelText(target, spellRangeText(*definition),
+            drawPixelText(target, spellRangeText(*detail.spell),
                 {420.0F, 590.0F}, 0.90F, sf::Color {174, 242, 184});
         }
+    }
 }
 
 void drawStaircase(
@@ -1093,8 +1146,11 @@ void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSessi
     drawPixelText(target, "ENTER", {1146.0F, 663.0F}, 0.9F, sf::Color {190, 184, 205});
 }
 
-std::string makeWindowTitle(const arcane::app::TowerSession& tower)
+std::string makeWindowTitle(const ui::ApplicationViewModel& app)
 {
+    const auto* towerModel = app.model();
+    if (!towerModel) return "Arcane Spire";
+    const auto& tower = *towerModel;
     const auto& run = tower.run();
     const auto& player = run.player();
     std::string title = "Arcane Spire | Floor " + std::to_string(run.context().floorIndex + 1U)
@@ -1103,24 +1159,20 @@ std::string makeWindowTitle(const arcane::app::TowerSession& tower)
         + " | Gold " + std::to_string(player.gold)
         + " | Boss " + std::to_string(run.context().bossesDefeated) + "/3 | ";
 
-    if (tower.loadoutOpen())
+    const auto& loadout = app.loadout();
+    if (loadout.open())
     {
-        if (tower.loadoutPage() == arcane::app::LoadoutPage::Relics)
+        const auto loadoutModel = loadout.snapshot(player);
+        if (loadout.page() == ui::LoadoutPage::Relics)
         {
-            const std::string selected = tower.selectedRelic()
-                ? (arcane::game::relics::findDefinition(*tower.selectedRelic())
-                    ? arcane::game::relics::findDefinition(*tower.selectedRelic())->name
-                    : std::to_string(*tower.selectedRelic()))
-                : std::string {"None"};
+            const std::string selected = loadoutModel.selectedDetail
+                ? std::string {loadoutModel.selectedDetail->summary.name} : std::string {"None"};
             return title + "RELIC COLLECTION - Selected " + selected
                 + " | A/D Select, Q/E Spell Page, Tab Close";
         }
-        const std::string selected = tower.selectedLearnedSpell()
-            ? (arcane::game::spells::findDefinition(*tower.selectedLearnedSpell())
-                ? arcane::game::spells::findDefinition(*tower.selectedLearnedSpell())->name
-                : std::to_string(*tower.selectedLearnedSpell()))
-            : std::string {"None"};
-        const bool bossSection = tower.spellLoadoutSection() == arcane::app::SpellLoadoutSection::Boss;
+        const std::string selected = loadoutModel.selectedDetail
+            ? std::string {loadoutModel.selectedDetail->summary.name} : std::string {"None"};
+        const bool bossSection = loadout.spellSection() == ui::SpellSection::Boss;
         return title + (bossSection ? "BOSS SPELL LOADOUT - Selected " : "REGULAR SPELL LOADOUT - Selected ")
             + selected + (bossSection ? " | A/D Select, R Equip Ultimate" : " | A/D Select, U/I/O Equip Slot")
             + ", W/S Switch Spell Group, Q/E Relic Page, Tab Close";
@@ -1199,13 +1251,13 @@ void drawStartMenu(sf::RenderTarget& target, const bool canContinue)
     drawPixelText(target, "F3 SHOP PREVIEW", {510.0F, 470.0F}, 1.5F, sf::Color {222, 190, 125});
 }
 
-void drawPauseMenu(sf::RenderTarget& target, const arcane::app::PauseMenuItem selection)
+void drawPauseMenu(sf::RenderTarget& target, const ui::PauseMenuItem selection)
 {
     drawPixelText(target, "PAUSED", {555.0F, 150.0F}, 2.5F, sf::Color {232, 218, 255});
     drawMenuPanel(target, 250.0F, sf::Color {74, 66, 105}, "REPLAY CURRENT FLOOR",
-        selection == arcane::app::PauseMenuItem::ReplayCurrentFloor);
+        selection == ui::PauseMenuItem::ReplayCurrentFloor);
     drawMenuPanel(target, 370.0F, sf::Color {74, 66, 105}, "SAVE AND EXIT",
-        selection == arcane::app::PauseMenuItem::SaveAndExit);
+        selection == ui::PauseMenuItem::SaveAndExit);
     drawPixelText(target, "W S OR UP DOWN SELECT", {445.0F, 500.0F}, 1.4F);
     drawPixelText(target, "ENTER CONFIRM   ESC RESUME", {420.0F, 540.0F}, 1.4F);
     drawPixelText(target, "SAVE IS RETAINED UNTIL APP CLOSES", {380.0F, 590.0F}, 1.2F,
@@ -1251,32 +1303,34 @@ void drawGold(sf::RenderTarget& target, const int gold)
 }
 
 std::optional<arcane::presentation::PlayerVisualState> updatePresentationState(
-    const arcane::app::AppFlowController& app, arcane::presentation::PlayerAnimator& animator,
+    const ui::ApplicationViewModel& app, arcane::presentation::PlayerAnimator& animator,
     const float deltaSeconds)
 {
     std::optional<arcane::presentation::PlayerVisualState> state;
-    if (const auto* tower = app.tower())
+    if (const auto* tower = app.model())
     {
         if (const auto* combat = tower->combat()) state = makePlayerVisualState(combat->playerState());
         else if (const auto* player = tower->explorationPlayer())
             state = makePlayerVisualState(*player, tower->run().player().currentHp);
     }
-    if (state && (app.screen() == arcane::app::AppScreen::Playing
-        || app.screen() == arcane::app::AppScreen::Result)) animator.update(*state, deltaSeconds);
+    const auto application = app.snapshot();
+    if (state && (application.screen == ui::ApplicationScreen::Playing
+        || application.screen == ui::ApplicationScreen::Result)) animator.update(*state, deltaSeconds);
     return state;
 }
 
-void updateWindowTitle(sf::RenderWindow& window, const arcane::app::AppFlowController& app)
+void updateWindowTitle(sf::RenderWindow& window, const ui::ApplicationViewModel& app)
 {
-    if (app.screen() == arcane::app::AppScreen::Start)
-        window.setTitle(app.canContinue() ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop"
+    const auto model = app.snapshot();
+    if (model.screen == ui::ApplicationScreen::Start)
+        window.setTitle(model.canContinue ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop"
             : "Arcane Spire | START - Enter | F2 Event | F3 Shop");
-    else if (app.screen() == arcane::app::AppScreen::Pause)
+    else if (model.screen == ui::ApplicationScreen::Pause)
         window.setTitle("Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume");
-    else if (app.screen() == arcane::app::AppScreen::Result)
-        window.setTitle(app.victory() ? "Arcane Spire | WIN - Enter Start"
+    else if (model.screen == ui::ApplicationScreen::Result)
+        window.setTitle(model.victory ? "Arcane Spire | WIN - Enter Start"
             : "Arcane Spire | DEFEAT - Enter Start");
-    else if (app.tower()) window.setTitle(makeWindowTitle(*app.tower()) + " | Esc Pause");
+    else if (app.model()) window.setTitle(makeWindowTitle(app) + " | Esc Pause");
 }
 
 struct RenderResources
@@ -1292,28 +1346,30 @@ struct RenderResources
     const EnemyStateTextures& aura;
     const DialoguePortraitTextures& portraits;
     const arcane::presentation::PlayerAnimator& playerAnimator;
+    const arcane::presentation::SpellCardArt& spellCards;
     const arcane::presentation::SpellEffectAnimator& spellAnimator;
 };
 
-void renderApplicationFrame(sf::RenderWindow& window, const arcane::app::AppFlowController& app,
+void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewModel& app,
     const std::optional<arcane::presentation::PlayerVisualState>& playerVisualState,
     const RenderResources& resources)
 {
     sf::Color background {18, 20, 28};
-    if (app.screen() == arcane::app::AppScreen::Result)
-        background = app.victory() ? sf::Color {20, 67, 49} : sf::Color {68, 24, 31};
+    const auto application = app.snapshot();
+    if (application.screen == ui::ApplicationScreen::Result)
+        background = application.victory ? sf::Color {20, 67, 49} : sf::Color {68, 24, 31};
     window.clear(background);
-    if (app.screen() == arcane::app::AppScreen::Start) drawStartMenu(window, app.canContinue());
-    else if (app.screen() == arcane::app::AppScreen::Pause) drawPauseMenu(window, app.pauseMenuItem());
-    else if (app.screen() == arcane::app::AppScreen::Result)
+    if (application.screen == ui::ApplicationScreen::Start) drawStartMenu(window, application.canContinue);
+    else if (application.screen == ui::ApplicationScreen::Pause) drawPauseMenu(window, application.pauseMenuItem);
+    else if (application.screen == ui::ApplicationScreen::Result)
     {
-        drawResultMenu(window, app.victory());
-        if (!app.victory() && playerVisualState)
+        drawResultMenu(window, application.victory);
+        if (!application.victory && playerVisualState)
             static_cast<void>(resources.playerAnimator.draw(window,
                 {static_cast<float>(WindowWidth) * 0.5F, GroundTop},
                 playerVisualState->facingDirection));
     }
-    else if (const auto* tower = app.tower())
+    else if (const auto* tower = app.model())
     {
         const auto phase = tower->run().phase();
         if ((phase == arcane::game::run::RunPhase::InEncounter
@@ -1326,7 +1382,11 @@ void renderApplicationFrame(sf::RenderWindow& window, const arcane::app::AppFlow
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
             if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
         }
-        if (phase == arcane::game::run::RunPhase::Reward) drawRewardScreen(window, *tower);
+        if (phase == arcane::game::run::RunPhase::Reward)
+        {
+            if (const auto model = app.reward())
+                drawRewardScreen(window, *model, resources.spellCards);
+        }
         if (phase == arcane::game::run::RunPhase::InEncounter
             && (tower->currentFloorType() == arcane::game::run::FloorType::Merchant
                 || tower->currentFloorType() == arcane::game::run::FloorType::Event))
@@ -1334,7 +1394,10 @@ void renderApplicationFrame(sf::RenderWindow& window, const arcane::app::AppFlow
             drawSpecialFloor(window, *tower, resources.playerAnimator);
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
-                drawMerchantScreen(window, *tower);
+            {
+                if (const auto model = app.merchant())
+                    drawMerchantScreen(window, *model, resources.spellCards);
+            }
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Event)
                 drawEventScreen(window, *tower);
@@ -1348,9 +1411,17 @@ void renderApplicationFrame(sf::RenderWindow& window, const arcane::app::AppFlow
             drawPixelText(window, "SHIELD " + std::to_string(combatView->shield),
                 {345.0F, 32.0F}, 1.0F, sf::Color {140, 190, 255});
         drawGold(window, tower->run().player().gold);
-        if (!tower->loadoutOpen())
-            drawEquippedSlots(window, tower->run().player(), combatView ? &*combatView : nullptr);
-        else drawLoadoutOverlay(window, *tower);
+        if (!app.loadout().open())
+        {
+            if (const auto model = app.equippedSlots())
+                drawEquippedSlots(window, *model, resources.spellCards,
+                    combatView ? &*combatView : nullptr);
+        }
+        else
+        {
+            const auto model = app.loadout().snapshot(tower->run().player());
+            drawLoadoutOverlay(window, model, resources.spellCards);
+        }
         if (tower->combat()) drawCombatOverlay(window, *tower->combat(), resources.portraits);
     }
     window.display();
@@ -1366,7 +1437,7 @@ int arcane::presentation::SfmlApplication::run()
     arcane::platform::SfmlInputMapper inputMapper;
     arcane::app::TowerSessionConfig config;
     config.worldBounds = {0.0F, static_cast<float>(WindowWidth), GroundTop};
-    arcane::app::AppFlowController app(makeRuntimeSeed(), config);
+    ui::ApplicationViewModel app(makeRuntimeSeed(), config);
     const EnemyStateTextures headlessKnightTextures = loadEnemyStateTextures(
         "assets/enemies/headless_knight/");
     const EnemyStateTextures chestMimicTextures = loadEnemyStateTextures(
@@ -1399,12 +1470,14 @@ int arcane::presentation::SfmlApplication::run()
     };
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
+    arcane::presentation::SpellCardArt spellCards;
+    static_cast<void>(spellCards.loadFromDirectory("assets/spell_cards"));
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
     static_cast<void>(spellEffectAnimator.loadFromDirectory("assets/spells"));
     const RenderResources renderResources {headlessKnightTextures, chestMimicTextures,
         birdDemonTextures, lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
-        playerAnimator, spellEffectAnimator};
+        playerAnimator, spellCards, spellEffectAnimator};
     sf::Clock frameClock;
 
     while (window.isOpen())
