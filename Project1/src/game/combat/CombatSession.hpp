@@ -23,6 +23,7 @@ class CombatSession
 public:
     static constexpr float EnemyWidth = ai::EnemyController::Width;
     static constexpr float EnemyHeight = ai::EnemyController::Height;
+    static constexpr float PlayerHitInvulnerabilitySeconds = 0.60F;
 
     explicit CombatSession(CombatRequest request);
 
@@ -159,6 +160,8 @@ private:
     spells::SpellSystem spells_;
     relics::RelicRuntime relics_;
     DamageResolver playerDamageResolver_;
+    float playerHitInvulnerabilityRemaining_ {};
+    std::uint64_t playerHurtSequence_ {};
     float blessingRemaining_ {};
     float flowerFieldRemaining_ {};
     float flowerFieldCenterX_ {};

@@ -182,18 +182,23 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
 void drawStaircase(sf::RenderTarget& target, arcane::game::Aabb bounds, bool unlocked);
 
 void drawPlayer(sf::RenderTarget& target, const arcane::presentation::PlayerAnimator& animator,
-    const arcane::presentation::PlayerVisualState& player, const sf::Color fallbackColor)
+    const arcane::presentation::PlayerVisualState& player, const sf::Color fallbackColor,
+    const sf::Color spriteTint)
 {
     const sf::Vector2f bottomCenter {
         player.position.x + arcane::game::PlayerController::Width * 0.5F,
         player.position.y + arcane::game::PlayerController::Height
     };
-    if (animator.draw(target, bottomCenter, player.facingDirection)) return;
+    if (animator.draw(target, bottomCenter, player.facingDirection, spriteTint)) return;
 
     sf::RectangleShape shape(
         {arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
     shape.setPosition({player.position.x, player.position.y});
-    shape.setFillColor(fallbackColor);
+    sf::Color tintedFallback = fallbackColor;
+    tintedFallback.a = spriteTint.a;
+    if (spriteTint.r == 255 && spriteTint.g < 255)
+        tintedFallback = sf::Color {255, spriteTint.g, spriteTint.b, spriteTint.a};
+    shape.setFillColor(tintedFallback);
     shape.setOutlineColor(sf::Color {142, 115, 200});
     shape.setOutlineThickness(3.0F);
     target.draw(shape);
@@ -398,4 +403,3 @@ void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
     target.draw(drop);
 }
 }
-

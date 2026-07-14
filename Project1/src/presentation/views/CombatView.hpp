@@ -3,6 +3,7 @@
 #include "app/run/TowerSession.hpp"
 #include "presentation/PlayerAnimator.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
+#include "presentation/viewmodel/CombatFeedbackViewModel.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -46,7 +47,8 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& linieTextures,
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
     const EnemyStateTextures& drahtTextures, const EnemyStateTextures& auraTextures,
-    const PlayerAnimator& playerAnimator, const SpellEffectAnimator& spellEffectAnimator);
+    const PlayerAnimator& playerAnimator, const SpellEffectAnimator& spellEffectAnimator,
+    const viewmodel::CombatFeedbackSnapshot& feedback);
 void drawCombatOverlay(sf::RenderTarget& target, const game::CombatSession& combat,
     const DialoguePortraitTextures& portraits);
 }

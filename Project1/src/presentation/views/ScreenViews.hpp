@@ -15,7 +15,8 @@ void drawMerchantScreen(sf::RenderTarget& target, const viewmodel::MerchantViewM
     const SpellCardArt& spellCards);
 void drawEventScreen(sf::RenderTarget& target, const app::TowerSession& tower);
 void drawPlayer(sf::RenderTarget& target, const PlayerAnimator& animator,
-    const PlayerVisualState& state, sf::Color fallbackColor);
+    const PlayerVisualState& state, sf::Color fallbackColor,
+    sf::Color spriteTint = sf::Color::White);
 void drawSpecialFloor(sf::RenderTarget& target, const app::TowerSession& tower,
     const PlayerAnimator& playerAnimator);
 void drawLoadoutOverlay(sf::RenderTarget& target, const viewmodel::LoadoutSnapshot& model,

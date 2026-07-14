@@ -2,8 +2,11 @@
 #include "game/relics/RelicSystem.hpp"
 #include "game/spells/SpellSystem.hpp"
 #include "presentation/viewmodel/UiViewModels.hpp"
+#include "presentation/viewmodel/CombatFeedbackViewModel.hpp"
 
 #include <iostream>
+#include <array>
+#include <cmath>
 #include <optional>
 #include <string_view>
 
@@ -485,6 +488,50 @@ bool loadoutEquipsAndCastsUnlockedUltimateSpell()
         "equipped ultimate spell must cast through the tower combat flow");
 }
 
+bool combatFeedbackTracksAuthoritativeHealthDeltas()
+{
+    ui::CombatFeedbackViewModel feedback;
+    arcane::game::PlayerStateView player;
+    player.position = {100.0F, 500.0F};
+    player.currentHealth = 100;
+    arcane::game::EnemyStateView enemy;
+    enemy.position = {300.0F, 500.0F};
+    enemy.currentHealth = 80;
+    enemy.maximumHealth = 80;
+    enemy.alive = true;
+    std::array enemies {enemy};
+    feedback.update(player, enemies, 0.01F);
+    if (!expect(feedback.snapshot().damageNumbers.empty(),
+        "feedback initialization must not invent damage events")) return false;
+
+    player.currentHealth = 88;
+    enemies[0].currentHealth = 55;
+    feedback.update(player, enemies, 0.01F);
+    const auto& active = feedback.snapshot();
+    if (!expect(active.damageNumbers.size() == 2U,
+            "player and enemy health deltas must each create one damage number")
+        || !expect(active.impactBursts.size() == 2U,
+            "each applied health delta must create a short impact burst")
+        || !expect(active.playerFlashRatio > 0.0F && active.enemyFlashRatios[0] > 0.0F,
+            "health loss must start target-specific hit flashes")
+        || !expect(std::abs(active.enemyImpactOffsets[0]) > 0.01F,
+            "enemy damage must create a presentation-only impact kick")
+        || !expect(active.hitStopRemaining > 0.08F
+                && feedback.combatDeltaSeconds(0.016F) == 0.0F,
+            "medium damage must request hit stop without advancing combat time")
+        || !expect(std::abs(active.cameraOffset.x) > 0.01F
+                || std::abs(active.cameraOffset.y) > 0.01F,
+            "damage feedback must expose deterministic camera shake")) return false;
+
+    feedback.update(player, enemies, 1.0F);
+    return expect(feedback.snapshot().damageNumbers.empty(),
+            "damage numbers must expire using presentation delta time")
+        && expect(feedback.snapshot().playerFlashRatio == 0.0F,
+            "hit flashes must expire without mutating combat state")
+        && expect(std::abs(feedback.combatDeltaSeconds(0.016F) - 0.016F) < 0.0001F,
+            "combat delta time must resume after hit stop expires");
+}
+
 bool applicationViewModelSelectsNewRewardWithoutAutoEquipping()
 {
     auto config = fastFlowConfig();
@@ -515,7 +562,42 @@ bool applicationViewModelSelectsNewRewardWithoutAutoEquipping()
         || !expect(app.loadout().selectedSpell(app.model()->run().player()) == chosen,
             "loadout view model must select the newly learned spell")
         || !expect(!app.model()->run().player().equippedSpells[0],
-            "selecting a reward must not bypass the explicit equip command")) return false;
+            "selecting a reward must not bypass the explicit equip command")
+        || !expect(app.spellAcquisition().active()
+                && app.spellAcquisition().snapshot()->content.summary.id == chosen,
+            "selecting a reward must start the acquisition presentation for that spell"))
+        return false;
+
+    const auto completedPhase = app.model()->run().phase();
+    arcane::game::PlayerIntent blockedInput;
+    blockedInput.toggleLoadoutPressed = true;
+    blockedInput.pausePressed = true;
+    blockedInput.interactPressed = true;
+    blockedInput.spellPressed[0] = true;
+    app.update(blockedInput, 0.25F);
+    if (!expect(app.spellAcquisition().active() && !app.loadout().open(),
+            "the acquisition presentation must consume pause, loadout, and world input")
+        || !expect(app.snapshot().screen == ui::ApplicationScreen::Playing
+                && app.model()->run().phase() == completedPhase,
+            "the acquisition presentation must freeze the underlying application flow"))
+        return false;
+
+    app.update(confirm, 0.01F);
+    if (!expect(app.spellAcquisition().active(),
+            "confirmation must not dismiss the acquisition before its minimum display time"))
+        return false;
+
+    arcane::game::PlayerIntent idle;
+    app.update(idle, 2.0F);
+    const auto revealed = app.spellAcquisition().snapshot();
+    if (!expect(revealed && revealed->chargeProgress == 1.0F
+                && revealed->unlockProgress == 1.0F && revealed->revealProgress == 1.0F
+                && revealed->canDismiss,
+            "the acquisition timeline must deterministically reach its confirmable reveal"))
+        return false;
+    app.update(confirm, 0.01F);
+    if (!expect(!app.spellAcquisition().active(),
+            "confirmation after the reveal must close the acquisition presentation")) return false;
 
     arcane::game::PlayerIntent toggle;
     toggle.toggleLoadoutPressed = true;
@@ -524,6 +606,24 @@ bool applicationViewModelSelectsNewRewardWithoutAutoEquipping()
     return expect(app.loadout().open() && loadout.selectedDetail
             && loadout.selectedDetail->summary.id == chosen,
         "view must receive the selected reward through the loadout snapshot");
+}
+
+bool bossSpellAcquisitionUsesTheLongerCeremony()
+{
+    ui::SpellAcquisitionViewModel acquisition;
+    acquisition.start(2001U);
+    arcane::game::PlayerIntent confirm;
+    confirm.menuConfirmPressed = true;
+    acquisition.update(confirm, ui::SpellAcquisitionViewModel::MinimumDisplaySeconds + 0.05F);
+    if (!expect(acquisition.active() && acquisition.snapshot()->bossSpell
+            && !acquisition.snapshot()->canDismiss,
+        "boss spells must use the longer ultimate acquisition ceremony")) return false;
+    acquisition.update({}, 0.40F);
+    if (!expect(acquisition.snapshot()->canDismiss,
+            "boss acquisition must eventually become confirmable")) return false;
+    acquisition.update(confirm, 0.0F);
+    return expect(!acquisition.active(),
+        "boss acquisition must close after its longer minimum display time");
 }
 
 bool viewModelsProjectAuthoritativeContentWithoutRenderingRules()
@@ -583,6 +683,8 @@ int main()
     const bool passed = combatRewardLoadoutAndStairsFormOneFlow()
         && loadoutSeparatesSpellAndRelicPages()
         && applicationViewModelSelectsNewRewardWithoutAutoEquipping()
+        && bossSpellAcquisitionUsesTheLongerCeremony()
+        && combatFeedbackTracksAuthoritativeHealthDeltas()
         && contactDefeatEndsTheTowerFlow()
         && thirdBossEndsInVictory()
         && firstBossIsAlwaysAura()

@@ -3,6 +3,7 @@
 #include "game/math/Vec2.hpp"
 
 #include <SFML/Graphics/RenderTarget.hpp>
+#include <SFML/Graphics/Color.hpp>
 #include <SFML/Graphics/Texture.hpp>
 
 #include <array>
@@ -37,6 +38,7 @@ struct PlayerVisualState
     float facingDirection {1.0F};
     std::uint64_t attackSequence {};
     std::uint64_t castSequence {};
+    std::uint64_t hurtSequence {};
     float dashRemaining {};
     bool shadowDashing {false};
     bool stunned {false};
@@ -48,7 +50,7 @@ public:
     [[nodiscard]] bool loadFromDirectory(const std::filesystem::path& directory);
     void update(const PlayerVisualState& player, float deltaSeconds) noexcept;
     [[nodiscard]] bool draw(sf::RenderTarget& target, sf::Vector2f bottomCenter,
-        float facingDirection) const;
+        float facingDirection, sf::Color tint = sf::Color::White) const;
     void reset() noexcept;
 
     [[nodiscard]] PlayerAnimation animation() const noexcept;
@@ -74,5 +76,6 @@ private:
     float actionSeconds_ {};
     std::uint64_t observedAttackSequence_ {};
     std::uint64_t observedCastSequence_ {};
+    std::uint64_t observedHurtSequence_ {};
 };
 }

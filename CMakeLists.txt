@@ -40,6 +40,8 @@ add_library(arcane_core STATIC
     Project1/src/presentation/viewmodel/UiViewModels.cpp
     Project1/src/presentation/viewmodel/LoadoutViewModel.cpp
     Project1/src/presentation/viewmodel/ApplicationViewModel.cpp
+    Project1/src/presentation/viewmodel/CombatFeedbackViewModel.cpp
+    Project1/src/presentation/viewmodel/SpellAcquisitionViewModel.cpp
 )
 
 target_include_directories(arcane_core
@@ -57,6 +59,7 @@ add_executable(Project1
     Project1/src/presentation/views/UiPrimitives.cpp
     Project1/src/presentation/views/ScreenViews.cpp
     Project1/src/presentation/views/CombatView.cpp
+    Project1/src/presentation/views/SpellAcquisitionView.cpp
 )
 
 target_link_libraries(Project1
