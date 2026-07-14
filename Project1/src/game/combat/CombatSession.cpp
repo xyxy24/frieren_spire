@@ -142,7 +142,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {160.0F, 96.0F, 96.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 72.0F, 5.0F, false, false, EnemySkill::FogAttack};
     case EnemyArchetype::DemonWarrior:
-        return EnemyConfig {180.0F, 42.0F, 42.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+        return EnemyConfig {180.0F, 124.0F, 42.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 64.0F, 5.0F, true, false, EnemySkill::WhirlwindSlash};
     case EnemyArchetype::LargeBirdDemon:
         return EnemyConfig {160.0F, 144.0F, 144.0F, 0.5F, 4.0F, 0.0F, 0.0F,
@@ -716,28 +716,28 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     {
                         hitPlayer(42.0F, 20);
                         const float left = direction > 0.0F
-                            ? caster.left + caster.width + 30.0F
-                            : caster.left - 42.0F - 30.0F;
+                            ? caster.left + caster.width + 26.0F
+                            : caster.left - 42.0F - 26.0F;
                         const float top = request_.worldBounds.groundTop
-                            - (enemy.revolteSkill == 0 ? 74.0F : 32.0F);
-                        activeEnemyProjectiles_.push_back({{left, top, 24.0F, 32.0F},
-                            direction, 96.0F, ++environmentalSequence_, 20});
+                            - (enemy.revolteSkill == 0 ? 84.0F : 42.0F);
+                        activeEnemyProjectiles_.push_back({{left, top, 32.0F, 42.0F},
+                            direction, 144.0F, 144.0F, ++environmentalSequence_, 20});
                         enemy.specialActive = 0.6F;
                     }
                     else if (enemy.revolteSkill == 2)
                     {
                         hitPlayer(64.0F, 25);
                         const float left = direction > 0.0F
-                            ? caster.left + caster.width + 40.0F
-                            : caster.left - 64.0F - 40.0F;
+                            ? caster.left + caster.width + 37.0F
+                            : caster.left - 64.0F - 37.0F;
                         activeEnemyProjectiles_.push_back({{left,
-                            request_.worldBounds.groundTop - 64.0F, 48.0F, 64.0F},
-                            direction, 128.0F, ++environmentalSequence_, 25});
+                            request_.worldBounds.groundTop - 72.0F, 54.0F, 72.0F},
+                            direction, 168.0F, 168.0F, ++environmentalSequence_, 25});
                         enemy.specialActive = 0.6F;
                     }
                     else if (enemy.revolteSkill == 3) enemy.specialActive = 1.2F;
                     else if (enemy.revolteSkill == 4)
-                        enemy.specialActive = 112.0F / 220.0F;
+                        enemy.specialActive = 144.0F / 220.0F;
                 }
                 continue;
             }
@@ -770,8 +770,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (enemy.revolteCooldowns[static_cast<std::size_t>(skill)] > 0.0F) continue;
                 const float distance = std::abs(playerCenter
                     - (bounds.left + bounds.width * 0.5F));
-                if (skill < 2 && distance > bounds.width * 0.5F + 42.0F) continue;
-                if (skill == 2 && distance > bounds.width * 0.5F + 64.0F) continue;
+                if (skill < 2 && distance > bounds.width * 0.5F + 124.0F) continue;
+                if (skill == 2 && distance > bounds.width * 0.5F + 464.0F / 3.0F) continue;
                 enemy.revolteSkill = skill;
                 enemy.specialDirection = enemy.controller.facingDirection();
                 enemy.specialWindup = skill < 2 ? 0.3F : 0.5F;
@@ -1831,13 +1831,13 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 const auto caster = enemy.controller.bounds();
                 const float direction = enemy.controller.facingDirection();
                 const float left = direction > 0.0F
-                    ? caster.left + caster.width + 30.0F : caster.left - 42.0F - 30.0F;
+                    ? caster.left + caster.width + 26.0F : caster.left - 42.0F - 26.0F;
                 const std::uint64_t sequence = (1ULL << 62U)
                     | (static_cast<std::uint64_t>(enemyIndex + 1U) << 32U)
                     | enemy.handledSkillSequence;
                 activeEnemyProjectiles_.push_back({{left,
-                    request_.worldBounds.groundTop - 32.0F, 24.0F, 32.0F},
-                    direction, 96.0F, sequence});
+                    request_.worldBounds.groundTop - 42.0F, 32.0F, 42.0F},
+                    direction, 144.0F, 144.0F, sequence, 20});
             }
         }
         if (enemy.controller.action() == ai::EnemyAction::Active
@@ -2028,7 +2028,7 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
             tornado.bounds, tornado.remaining, 7.0F});
     for (const auto& projectile : activeEnemyProjectiles_)
         views.push_back({9101U, projectile.bounds,
-            projectile.remainingDistance / 200.0F, 96.0F / 200.0F});
+            projectile.remainingDistance / 200.0F, projectile.totalDistance / 200.0F});
     for (const auto& enemy : enemies_)
         if (enemy.archetype == EnemyArchetype::Heimon && enemy.health.isAlive()
             && enemy.fogCreated)

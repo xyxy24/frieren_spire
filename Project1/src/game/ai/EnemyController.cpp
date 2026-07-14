@@ -30,7 +30,7 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
             || config_.skill == EnemySkill::Swoop;
         const float triggerDistance = config_.skill == EnemySkill::Swoop
             ? 144.0F
-            : config_.width * 0.5F + config_.attackRange
+            : config_.width * 0.5F + config_.attackDistance
                 + (displacementSkill ? config_.activeDashDistance + playerBounds.width * 0.5F : 0.0F);
         if (canAttack && cooldownRemaining_ <= 0.0F && std::abs(horizontalDelta) <= triggerDistance)
         {

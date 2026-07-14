@@ -138,6 +138,7 @@ private:
         Aabb bounds;
         float direction {};
         float remainingDistance {};
+        float totalDistance {};
         std::uint64_t sequence {};
         int damage {20};
     };

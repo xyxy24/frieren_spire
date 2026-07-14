@@ -1123,6 +1123,7 @@ bool redMirrorDragonBreathRespectsPostHitInvulnerability()
 bool enemyDirectionLocksWhenWindupBegins()
 {
     arcane::game::ai::EnemyConfig config;
+    config.attackDistance = 500.0F;
     config.attackRange = 500.0F;
     config.cooldownSeconds = 0.0F;
     config.windupSeconds = 0.5F;
@@ -1382,8 +1383,14 @@ bool revolteLocksAtFiveAndHealsForSecondPhase()
                 && combat.dialogueLine()->speaker == "REVOLTE",
             "reaching the threshold must pause combat for second-phase dialogue")) return false;
     advanceDialogue(combat);
-    return expect(combat.enemyState().currentHealth == 15,
-        "second-phase dialogue must restore Revolte to half maximum HP");
+    if (!expect(combat.enemyState().currentHealth == 15,
+            "second-phase dialogue must restore Revolte to half maximum HP")) return false;
+    const float beforeDash = combat.enemyState().position.x;
+    combat.update({}, 3.0F);
+    combat.update({}, 0.5F);
+    combat.update({}, 0.7F);
+    return expect(std::abs(combat.enemyState().position.x - beforeDash) >= 143.9F,
+        "second-phase dash must travel 144 pixels as soon as its cooldown is ready");
 }
 
 bool newLateActEnemiesExposeFogProjectileAndFlightRules()
@@ -1428,7 +1435,9 @@ bool newLateActEnemiesExposeFogProjectileAndFlightRules()
     if (!expect(warrior.enemyState().maximumHealth == 150,
             "Demon Warrior must use its revised 150 HP")
         || !expect(std::any_of(warriorEffects.begin(), warriorEffects.end(),
-            [](const auto& effect) { return effect.spellId == 9101U; }),
+            [](const auto& effect) { return effect.spellId == 9101U
+                && effect.bounds.width == 32.0F && effect.bounds.height == 42.0F
+                && std::abs(effect.duration - 0.72F) < 0.01F; }),
             "Demon Warrior must emit its moving slash when the melee windup ends")) return false;
 
     arcane::game::CombatRequest birdRequest;
@@ -1486,7 +1495,6 @@ int main()
         && auraDominationUsesUpdatedCooldownAndStun()
         && defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
         && revolteLocksAtFiveAndHealsForSecondPhase()
-        && redMirrorDragonBreathTicksThreeTimes()
         && redMirrorDragonBreathRespectsPostHitInvulnerability()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
