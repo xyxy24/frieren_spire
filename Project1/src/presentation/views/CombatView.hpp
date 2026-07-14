@@ -19,6 +19,7 @@ struct EnemyStateTextures
     std::optional<sf::Texture> initial;
     std::optional<sf::Texture> idle;
     std::optional<sf::Texture> windup;
+    std::optional<sf::Texture> preJump;
     std::optional<sf::Texture> jump;
     std::optional<sf::Texture> attack;
     std::optional<sf::Texture> die;
@@ -35,14 +36,16 @@ struct DialoguePortraitTextures
 
 [[nodiscard]] std::optional<sf::Texture> loadTexture(const std::string& path);
 [[nodiscard]] EnemyStateTextures loadEnemyStateTextures(std::string_view base,
-    bool loadJump = false, bool loadIntroAndDeath = false, bool loadAttack = true);
+    bool loadJump = false, bool loadIntroAndDeath = false, bool loadAttack = true,
+    bool loadPreJump = false);
 [[nodiscard]] PlayerVisualState makePlayerVisualState(const game::PlayerStateView& player);
 [[nodiscard]] PlayerVisualState makePlayerVisualState(
     const game::PlayerController& player, int currentHealth);
 
 void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
-    const EnemyStateTextures& birdTextures, const EnemyStateTextures& lugnerTextures,
+    const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
+    const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
     const EnemyStateTextures& linieTextures,
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,

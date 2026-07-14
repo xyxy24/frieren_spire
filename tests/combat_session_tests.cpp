@@ -963,6 +963,32 @@ bool enemyChasePreservesConfiguredBodyGap()
             "non-contact enemies must preserve a forty-two-pixel body gap");
 }
 
+bool frostWolfClawUsesAnInstantHitWindow()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::FrostWolf, {245.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+
+    combat.update({}, 2.01F);
+    if (!expect(!combat.enemyState().skillEffectBounds.has_value(),
+        "Frost Wolf claw must not expose a visible range rectangle")) return false;
+    arcane::game::PlayerIntent moveAway;
+    moveAway.moveAxis = -1.0F;
+    combat.update(moveAway, 0.20F);
+    combat.update({}, 0.30F);
+    const int healthWhenClawActivates = combat.playerState().currentHealth;
+
+    arcane::game::PlayerIntent moveIntoClaw;
+    moveIntoClaw.moveAxis = 1.0F;
+    combat.update(moveIntoClaw, 0.30F);
+
+    return expect(healthWhenClawActivates == 100,
+            "Frost Wolf claw must not hit a player outside its range when windup ends")
+        && expect(combat.playerState().currentHealth == healthWhenClawActivates,
+            "Frost Wolf claw must not hit a player who enters during the visual active time");
+}
+
 bool chestMimicBiteStunsWithoutKnockback()
 {
     arcane::game::CombatRequest request;
@@ -1488,6 +1514,7 @@ int main()
         && multiEnemyEncounterExposesConfiguredContentAndStartsOnCooldown()
         && chestMimicTriggersFromTheFrontAfterHalfCooldown()
         && enemyChasePreservesConfiguredBodyGap()
+        && frostWolfClawUsesAnInstantHitWindow()
         && chestMimicBiteStunsWithoutKnockback()
         && linieUsesGroundedMediumImpactArea()
         && displacementSkillTriggersWhenPlayerEdgeEntersExtendedRange()

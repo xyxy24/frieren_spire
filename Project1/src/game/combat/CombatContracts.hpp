@@ -107,6 +107,8 @@ struct EnemyStateView
     bool marked {false};
     float skillEffectProgress {};
     float concealmentProgress {};
+    bool specialWindingUp {false};
+    bool specialAttackActive {false};
 };
 
 struct SpellEffectView

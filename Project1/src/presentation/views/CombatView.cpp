@@ -20,12 +20,13 @@ std::optional<sf::Texture> loadTexture(const std::string& path)
 }
 
 EnemyStateTextures loadEnemyStateTextures(const std::string_view base, const bool loadJump,
-    const bool loadIntroAndDeath, const bool loadAttack)
+    const bool loadIntroAndDeath, const bool loadAttack, const bool loadPreJump)
 {
     EnemyStateTextures textures;
     if (loadIntroAndDeath) textures.initial = loadTexture(std::string {base} + "initial.png");
     textures.idle = loadTexture(std::string {base} + "idle.png");
     textures.windup = loadTexture(std::string {base} + "windup.png");
+    if (loadPreJump) textures.preJump = loadTexture(std::string {base} + "prejump.png");
     if (loadJump) textures.jump = loadTexture(std::string {base} + "jump.png");
     if (loadAttack) textures.attack = loadTexture(std::string {base} + "attack.png");
     if (loadIntroAndDeath) textures.die = loadTexture(std::string {base} + "die.png");
@@ -50,7 +51,8 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
 
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
-    const EnemyStateTextures& birdTextures, const EnemyStateTextures& lugnerTextures,
+    const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
+    const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
     const EnemyStateTextures& linieTextures,
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
@@ -160,6 +162,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &mimicTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::BirdDemon)
             stateTextures = &birdTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf)
+            stateTextures = &frostWolfTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
             stateTextures = &lugnerTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Linie)
@@ -178,6 +182,12 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                         || dialogue->portrait == "frieren-pre")));
             if (showDefeatedAura && stateTextures->die) texture = &*stateTextures->die;
             else if (auraInitial && stateTextures->initial) texture = &*stateTextures->initial;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
+                && enemy.specialAttackActive && stateTextures->jump)
+                texture = &*stateTextures->jump;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
+                && enemy.specialWindingUp && stateTextures->preJump)
+                texture = &*stateTextures->preJump;
             else if (enemy.archetype == arcane::game::EnemyArchetype::Linie
                 && enemy.attackActive && !enemy.skillEffectBounds
                 && stateTextures->jump) texture = &*stateTextures->jump;
@@ -193,7 +203,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 static_cast<float>(textureSize.y)});
             sprite.setPosition({enemy.position.x + enemy.width * 0.5F + impactOffset,
                 enemy.position.y + enemy.height});
-            sprite.setScale({enemy.facingDirection > 0.0F ? -1.0F : 1.0F, 1.0F});
+            float horizontalScale = enemy.facingDirection > 0.0F ? -1.0F : 1.0F;
+            if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf)
+                horizontalScale = -horizontalScale;
+            sprite.setScale({horizontalScale, 1.0F});
 auto alpha = static_cast<std::uint8_t>(255.0F * (1.0F - std::clamp(enemy.concealmentProgress, 0.0F, 1.0F)));
 if (hitFlashing) sprite.setColor(sf::Color{255, 166, 166, alpha});
 else sprite.setColor(sf::Color{255, 255, 255, alpha});

@@ -821,7 +821,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
                 if (enemy.specialWindup <= 0.0F)
                 {
-                    enemy.specialActive = 0.4F;
+                    enemy.specialActive = 0.45F;
                     enemy.specialElapsed = 0.0F;
                     enemy.specialDirection = enemy.controller.facingDirection();
                 }
@@ -833,10 +833,14 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 enemy.specialActive -= activeDelta;
                 enemy.specialElapsed += activeDelta;
                 auto position = enemy.controller.position();
-                position.x += enemy.specialDirection * 240.0F * activeDelta;
-                const float progress = std::clamp(enemy.specialElapsed / 0.4F, 0.0F, 1.0F);
+                position.x += enemy.specialDirection * 260.0F * activeDelta;
+                constexpr float FrostWolfPounceGravity = 1600.0F;
+                const float verticalDisplacement = std::max(0.0F,
+                    360.0F * enemy.specialElapsed
+                        - 0.5F * FrostWolfPounceGravity * enemy.specialElapsed
+                            * enemy.specialElapsed);
                 position.y = request_.worldBounds.groundTop - bounds.height
-                    - 32.0F * 4.0F * progress * (1.0F - progress);
+                    - verticalDisplacement;
                 enemy.controller.setPosition(position, request_.worldBounds);
                 if (enemy.specialActive <= 0.0F) enemy.specialCooldown = 6.0F;
                 continue;
@@ -1843,7 +1847,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (enemy.controller.action() == ai::EnemyAction::Active
             && config.skill != ai::EnemySkill::Swoop
             && ((config.skill != ai::EnemySkill::Slash
-                    && config.skill != ai::EnemySkill::WhirlwindSlash) || skillJustActivated)
+                    && config.skill != ai::EnemySkill::WhirlwindSlash
+                    && config.skill != ai::EnemySkill::WolfClaw) || skillJustActivated)
             && (config.skill == ai::EnemySkill::Domination
                 || intersects(playerBounds(), enemy.controller.attackBounds())))
         {
@@ -1973,7 +1978,7 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
                 || enemy.controller.action() == ai::EnemyAction::Active)
             && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
             && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
-            && skill != ai::EnemySkill::Domination)
+            && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw)
         {
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -1996,7 +2001,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
                     : bounds.left - range,
                 bounds.top, range, bounds.height};
         }
-        if (enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
+        if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
+            && skill != ai::EnemySkill::WolfClaw)
         {
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -2009,7 +2015,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
             windingUp, active, enemy.slowed, skillBounds, enemy.controller.facingDirection(),
             enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
-            enemy.concealmentProgress});
+            enemy.concealmentProgress, enemy.specialWindup > 0.0F,
+            enemy.specialActive > 0.0F});
     }
     return views;
 }
@@ -2049,7 +2056,7 @@ EnemyStateView CombatSession::enemyState() const noexcept
             || enemy.controller.action() == ai::EnemyAction::Active)
         && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
         && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
-        && skill != ai::EnemySkill::Domination)
+        && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw)
     {
         const auto area = enemy.controller.attackBounds();
         if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -2061,7 +2068,8 @@ EnemyStateView CombatSession::enemyState() const noexcept
             ? bounds.left + bounds.width : bounds.left - 160.0F;
         skillBounds = Aabb {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
     }
-    if (enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
+    if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
+        && skill != ai::EnemySkill::WolfClaw)
     {
         const auto area = enemy.controller.attackBounds();
         if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;

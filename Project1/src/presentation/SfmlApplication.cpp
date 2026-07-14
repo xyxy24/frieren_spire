@@ -157,6 +157,7 @@ struct RenderResources
     const EnemyStateTextures& headless;
     const EnemyStateTextures& mimic;
     const EnemyStateTextures& bird;
+    const EnemyStateTextures& frostWolf;
     const EnemyStateTextures& lugner;
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkill;
     const EnemyStateTextures& linie;
@@ -200,7 +201,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             worldView.move({feedback.cameraOffset.x, feedback.cameraOffset.y});
             window.setView(worldView);
             drawCombat(window, *tower, resources.headless, resources.mimic, resources.bird,
-                resources.lugner, resources.lugnerSkill, resources.linie, resources.linieSkill,
+                resources.frostWolf, resources.lugner, resources.lugnerSkill,
+                resources.linie, resources.linieSkill,
                 resources.draht, resources.aura, resources.playerAnimator, resources.spellAnimator,
                 feedback);
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
@@ -271,6 +273,8 @@ int arcane::presentation::SfmlApplication::run()
         "assets/enemies/chest_mimic/");
     const EnemyStateTextures birdDemonTextures = loadEnemyStateTextures(
         "assets/enemies/bird_demon/");
+    const EnemyStateTextures frostWolfTextures = loadEnemyStateTextures(
+        "assets/enemies/frost_wolf/", true, false, true, true);
     const EnemyStateTextures lugnerTextures = loadEnemyStateTextures(
         "assets/enemies/lugner/");
     const std::array<std::optional<sf::Texture>, 3> lugnerSkillTextures {
@@ -302,7 +306,7 @@ int arcane::presentation::SfmlApplication::run()
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
     static_cast<void>(spellEffectAnimator.loadFromDirectory("assets/spells"));
     const RenderResources renderResources {headlessKnightTextures, chestMimicTextures,
-        birdDemonTextures, lugnerTextures, lugnerSkillTextures, linieTextures,
+        birdDemonTextures, frostWolfTextures, lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
         playerAnimator, spellCards, spellEffectAnimator};
     sf::Clock frameClock;
