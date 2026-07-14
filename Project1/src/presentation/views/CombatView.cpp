@@ -52,6 +52,8 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
+    const EnemyStateTextures& qualTextures,
+    const std::array<std::optional<sf::Texture>, 3>& qualSkillTextures,
     const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
     const EnemyStateTextures& linieTextures,
@@ -164,6 +166,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &birdTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf)
             stateTextures = &frostWolfTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
+            stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
             stateTextures = &lugnerTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Linie)
@@ -238,6 +242,8 @@ else enemyColor.a = alpha;
                 && enemy.attackActive;
             const bool linieCleave = enemy.archetype == arcane::game::EnemyArchetype::Linie
                 && enemy.attackActive;
+            const bool qualKillingMagic = enemy.archetype == arcane::game::EnemyArchetype::Qual
+                && enemy.attackActive;
             const sf::Texture* bloodTexture = nullptr;
             if (lugnerBlood)
             {
@@ -257,7 +263,28 @@ else enemyColor.a = alpha;
                 if (linieSkillTextures[cleaveFrame])
                     cleaveTexture = &*linieSkillTextures[cleaveFrame];
             }
-            if (cleaveTexture)
+            const sf::Texture* killingMagicTexture = nullptr;
+            if (qualKillingMagic)
+            {
+                const std::size_t frame = std::min<std::size_t>(2U,
+                    static_cast<std::size_t>(enemy.skillEffectProgress * 3.0F));
+                if (qualSkillTextures[frame])
+                    killingMagicTexture = &*qualSkillTextures[frame];
+            }
+            if (killingMagicTexture)
+            {
+                sf::Sprite effect(*killingMagicTexture);
+                const auto size = killingMagicTexture->getSize();
+                effect.setOrigin({static_cast<float>(size.x) * 0.5F,
+                    static_cast<float>(size.y) * 0.5F});
+                effect.setPosition({area.left + area.width * 0.5F,
+                    area.top + area.height * 0.5F});
+                effect.setScale({(enemy.facingDirection > 0.0F ? 1.0F : -1.0F)
+                        * area.width / static_cast<float>(size.x),
+                    area.height / static_cast<float>(size.y)});
+                target.draw(effect);
+            }
+            else if (cleaveTexture)
             {
                 sf::Sprite effect(*cleaveTexture);
                 const auto size = cleaveTexture->getSize();

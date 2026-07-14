@@ -1189,6 +1189,25 @@ bool secondActEnemiesExposeConfiguredContent()
             "Qual content values must be authoritative");
 }
 
+bool qualKillingMagicUsesRestrictedEffectHeight()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Qual, {260.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+
+    combat.update({}, 1.51F);
+    combat.update({}, 0.50F);
+    const auto area = combat.enemyState().skillEffectBounds;
+    return expect(area.has_value(), "Qual killing magic must expose its active effect area")
+        && expect(std::abs(area->width - 96.0F) < 0.01F,
+            "Qual killing magic must preserve its configured horizontal range")
+        && expect(std::abs(area->height - 34.0F) < 0.01F,
+            "Qual killing magic collision height must match its narrow visual effect")
+        && expect(std::abs(area->top - 565.0F) < 0.01F,
+            "Qual killing magic must sit ten pixels above body center");
+}
+
 bool lugnerBloodMagicUsesRaisedSpriteHeightArea()
 {
     arcane::game::CombatRequest request;
@@ -1525,6 +1544,7 @@ int main()
         && redMirrorDragonBreathRespectsPostHitInvulnerability()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
+        && qualKillingMagicUsesRestrictedEffectHeight()
         && lugnerBloodMagicUsesRaisedSpriteHeightArea()
         && chaosFlowerSleepAppliesStackBasedStun()
         && lateSecondActEnemiesExposeConfiguredContent()

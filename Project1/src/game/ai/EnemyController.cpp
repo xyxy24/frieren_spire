@@ -190,6 +190,16 @@ Aabb EnemyController::attackBounds() const noexcept
             ? position_.x + config_.width : position_.x - config_.attackRange;
         return {left, position_.y - 18.0F, config_.attackRange, 54.0F};
     }
+    if (config_.skill == EnemySkill::KillingMagic)
+    {
+        const float left = facingDirection_ > 0.0F
+            ? position_.x + config_.width : position_.x - config_.attackRange;
+        constexpr float EffectHeight = 34.0F;
+        constexpr float EffectVerticalOffset = -10.0F;
+        return {left, position_.y + (config_.height - EffectHeight) * 0.5F
+                + EffectVerticalOffset,
+            config_.attackRange, EffectHeight};
+    }
     const float left = facingDirection_ > 0.0F
         ? position_.x + config_.width : position_.x - config_.attackRange;
     return {left, position_.y, config_.attackRange, config_.height};
