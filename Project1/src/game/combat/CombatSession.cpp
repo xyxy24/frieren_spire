@@ -214,6 +214,7 @@ CombatSession::CombatSession(CombatRequest request)
 
 DamageResult CombatSession::resolvePlayerDamage(DamageRequest request) noexcept
 {
+    request.blocked = request.blocked || playerHitInvulnerabilityRemaining_ > 0.0F;
     const int beforeBarrier = barrierShield_;
     const int beforePersistent = persistentShield_;
     const int beforeShield = beforeBarrier + beforePersistent;
@@ -223,7 +224,12 @@ DamageResult CombatSession::resolvePlayerDamage(DamageRequest request) noexcept
         - (request.flatReduction - beforeShield));
     const int absorbed = request.blocked ? 0 : std::min(beforeShield, incoming);
     const auto result = playerDamageResolver_.resolve(playerHealth_, request);
-    if (result.appliedDamage > 0) actualHpLost_ = true;
+    if (result.appliedDamage > 0)
+    {
+        actualHpLost_ = true;
+        playerHitInvulnerabilityRemaining_ = PlayerHitInvulnerabilitySeconds;
+        ++playerHurtSequence_;
+    }
     const int barrierAbsorbed = std::min(beforeBarrier, absorbed);
     barrierShield_ -= barrierAbsorbed;
     persistentShield_ -= absorbed - barrierAbsorbed;
@@ -327,6 +333,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     manaLensCooldown_ = std::max(0.0F, manaLensCooldown_ - deltaSeconds);
     warriorAxeCooldown_ = std::max(0.0F, warriorAxeCooldown_ - deltaSeconds);
     goddessTabletDamageRemaining_ = std::max(0.0F, goddessTabletDamageRemaining_ - deltaSeconds);
+    playerHitInvulnerabilityRemaining_ = std::max(
+        0.0F, playerHitInvulnerabilityRemaining_ - deltaSeconds);
     blessingRemaining_ = std::max(0.0F, blessingRemaining_ - deltaSeconds);
     flowerFieldRemaining_ = std::max(0.0F, flowerFieldRemaining_ - deltaSeconds);
     if (burningFlowerRemaining_ > 0.0F)
@@ -1668,7 +1676,8 @@ PlayerStateView CombatSession::playerState() const noexcept
         attack_.cooldownRemaining(), attack_.sequence(), playerCastSequence_, spells_.view(),
         spells_.ultimateView(), player_.dashRemaining(), player_.dashCooldownRemaining(),
         player_.isShadowDashing(), player_.shadowDashChargeRemaining(),
-        player_.isStunned(), player_.stunRemaining(), blessingRemaining_,
+        player_.isStunned(), player_.stunRemaining(), playerHitInvulnerabilityRemaining_,
+        playerHurtSequence_, blessingRemaining_,
         relics_.vulnerableRemaining(), flowerFieldRemaining_, player_.flightRemaining(),
         barrierShield_ + persistentShield_};
 }

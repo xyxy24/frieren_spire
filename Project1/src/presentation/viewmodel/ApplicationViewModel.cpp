@@ -38,6 +38,11 @@ const LoadoutViewModel& ApplicationViewModel::loadout() const noexcept
     return loadout_;
 }
 
+const SpellAcquisitionViewModel& ApplicationViewModel::spellAcquisition() const noexcept
+{
+    return spellAcquisition_;
+}
+
 std::optional<RewardViewModel> ApplicationViewModel::reward() const noexcept
 {
     if (!model_) return std::nullopt;
@@ -81,6 +86,11 @@ void ApplicationViewModel::handleStart(const game::PlayerIntent& intent)
 void ApplicationViewModel::handlePlaying(
     const game::PlayerIntent& intent, const float deltaSeconds)
 {
+    if (spellAcquisition_.active())
+    {
+        spellAcquisition_.update(intent, deltaSeconds);
+        return;
+    }
     if (intent.pausePressed)
     {
         pauseMenuItem_ = PauseMenuItem::ReplayCurrentFloor;
@@ -94,8 +104,16 @@ void ApplicationViewModel::handlePlaying(
     const auto bossCount = model_->run().player().learnedBossSpells.size();
     model_->update(intent, deltaSeconds);
     const auto& player = model_->run().player();
-    if (player.learnedBossSpells.size() > bossCount) loadout_.selectNewestBoss(player);
-    else if (player.learnedSpells.size() > regularCount) loadout_.selectNewestRegular(player);
+    if (player.learnedBossSpells.size() > bossCount)
+    {
+        loadout_.selectNewestBoss(player);
+        spellAcquisition_.start(player.learnedBossSpells.back());
+    }
+    else if (player.learnedSpells.size() > regularCount)
+    {
+        loadout_.selectNewestRegular(player);
+        spellAcquisition_.start(player.learnedSpells.back());
+    }
 
     if (model_->run().phase() == game::run::RunPhase::Victory
         || model_->run().phase() == game::run::RunPhase::Defeat)
@@ -149,6 +167,7 @@ void ApplicationViewModel::startNewRun()
 {
     model_.emplace(seed_, config_);
     loadout_.reset();
+    spellAcquisition_.reset();
     victory_ = false;
 }
 
@@ -158,6 +177,7 @@ void ApplicationViewModel::startEventPreview()
     previewConfig.firstFloorTypeOverride = game::run::FloorType::Event;
     model_.emplace(seed_, std::move(previewConfig));
     loadout_.reset();
+    spellAcquisition_.reset();
     victory_ = false;
 }
 
@@ -168,6 +188,7 @@ void ApplicationViewModel::startMerchantPreview()
     previewConfig.initialPlayer.gold = std::max(previewConfig.initialPlayer.gold, 100);
     model_.emplace(seed_, std::move(previewConfig));
     loadout_.reset();
+    spellAcquisition_.reset();
     victory_ = false;
 }
 }

@@ -5,8 +5,10 @@
 #include "presentation/SpellCardArt.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
 #include "presentation/viewmodel/ApplicationViewModel.hpp"
+#include "presentation/viewmodel/CombatFeedbackViewModel.hpp"
 #include "presentation/views/CombatView.hpp"
 #include "presentation/views/ScreenViews.hpp"
+#include "presentation/views/SpellAcquisitionView.hpp"
 #include "presentation/views/UiPrimitives.hpp"
 
 #include <SFML/Graphics.hpp>
@@ -48,6 +50,11 @@ std::string makeWindowTitle(const ui::ApplicationViewModel& app)
         + " | HP " + std::to_string(player.currentHp) + "/" + std::to_string(player.maxHp)
         + " | Gold " + std::to_string(player.gold)
         + " | Boss " + std::to_string(run.context().bossesDefeated) + "/3 | ";
+
+    if (const auto acquisition = app.spellAcquisition().snapshot())
+        return title + std::string {acquisition->bossSpell ? "ULTIMATE SPELL ACQUIRED - "
+            : "SPELL ACQUIRED - "} + std::string {acquisition->content.summary.name}
+            + (acquisition->canDismiss ? " | Enter Continue" : " | Unlocking...");
 
     const auto& loadout = app.loadout();
     if (loadout.open())
@@ -164,7 +171,7 @@ struct RenderResources
 
 void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewModel& app,
     const std::optional<arcane::presentation::PlayerVisualState>& playerVisualState,
-    const RenderResources& resources)
+    const RenderResources& resources, const ui::CombatFeedbackSnapshot& feedback)
 {
     sf::Color background {18, 20, 28};
     const auto application = app.snapshot();
@@ -188,11 +195,17 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             || phase == arcane::game::run::RunPhase::LootPending
             || phase == arcane::game::run::RunPhase::FloorComplete) && tower->combat())
         {
+            const sf::View interfaceView = window.getView();
+            sf::View worldView = interfaceView;
+            worldView.move({feedback.cameraOffset.x, feedback.cameraOffset.y});
+            window.setView(worldView);
             drawCombat(window, *tower, resources.headless, resources.mimic, resources.bird,
                 resources.lugner, resources.lugnerSkill, resources.linie, resources.linieSkill,
-                resources.draht, resources.aura, resources.playerAnimator, resources.spellAnimator);
+                resources.draht, resources.aura, resources.playerAnimator, resources.spellAnimator,
+                feedback);
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
             if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
+            window.setView(interfaceView);
         }
         if (phase == arcane::game::run::RunPhase::Reward)
         {
@@ -235,6 +248,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             drawLoadoutOverlay(window, model, resources.spellCards);
         }
         if (tower->combat()) drawCombatOverlay(window, *tower->combat(), resources.portraits);
+        if (const auto acquisition = app.spellAcquisition().snapshot())
+            drawSpellAcquisition(window, *acquisition, resources.spellCards);
     }
     window.display();
 }
@@ -291,6 +306,8 @@ int arcane::presentation::SfmlApplication::run()
         linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
         playerAnimator, spellCards, spellEffectAnimator};
     sf::Clock frameClock;
+    ui::CombatFeedbackViewModel combatFeedback;
+    std::optional<std::uint32_t> feedbackFloor;
 
     while (window.isOpen())
     {
@@ -301,10 +318,36 @@ int arcane::presentation::SfmlApplication::run()
         }
 
         const float deltaSeconds = std::min(frameClock.restart().asSeconds(), MaximumFrameTime);
-        app.update(inputMapper.sample(), deltaSeconds);
-        const auto presentationState = updatePresentationState(app, playerAnimator, deltaSeconds);
+        float simulationDeltaSeconds = deltaSeconds;
+        if (const auto* tower = app.model(); app.snapshot().screen == ui::ApplicationScreen::Playing
+            && tower && tower->combat()
+            && tower->run().phase() == arcane::game::run::RunPhase::InEncounter)
+            simulationDeltaSeconds = combatFeedback.combatDeltaSeconds(deltaSeconds);
+        app.update(inputMapper.sample(), simulationDeltaSeconds);
+        const auto application = app.snapshot();
+        if (const auto* tower = app.model(); application.screen == ui::ApplicationScreen::Playing
+            && tower && tower->combat())
+        {
+            const std::uint32_t floor = tower->run().context().floorIndex;
+            if (!feedbackFloor || *feedbackFloor != floor)
+            {
+                combatFeedback.reset();
+                feedbackFloor = floor;
+            }
+            const auto enemies = tower->combat()->enemyStates();
+            const float feedbackDelta = !app.loadout().open() ? deltaSeconds : 0.0F;
+            combatFeedback.update(tower->combat()->playerState(), enemies, feedbackDelta);
+        }
+        else
+        {
+            combatFeedback.reset();
+            feedbackFloor.reset();
+        }
+        const auto presentationState = updatePresentationState(
+            app, playerAnimator, simulationDeltaSeconds);
         updateWindowTitle(window, app);
-        renderApplicationFrame(window, app, presentationState, renderResources);
+        renderApplicationFrame(window, app, presentationState, renderResources,
+            combatFeedback.snapshot());
     }
 
     return 0;

@@ -431,6 +431,33 @@ bool collectibleSpellsEmitEffectPlaceholders()
     return true;
 }
 
+bool postHitInvulnerabilityBlocksOverlappingDamage()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemyAttackDamage = 0;
+    request.enemyContactDamage = 15;
+    request.enemies = {
+        {arcane::game::EnemyArchetype::HeadlessKnight, {195.0F, 576.0F}},
+        {arcane::game::EnemyArchetype::HeadlessKnight, {195.0F, 576.0F}}
+    };
+    arcane::game::CombatSession combat(request);
+    combat.update(arcane::game::PlayerIntent {}, 0.01F);
+    const auto afterHit = combat.playerState();
+    if (!expect(afterHit.currentHealth == 85,
+            "overlapping enemies must only damage the player once during the post-hit window")
+        || !expect(afterHit.hurtSequence == 1U,
+            "only applied HP damage may advance the authoritative hurt sequence")
+        || !expect(afterHit.hitInvulnerabilityRemaining > 0.58F,
+            "applied HP damage must start the configured post-hit invulnerability")) return false;
+
+    combat.update(arcane::game::PlayerIntent {}, 0.30F);
+    if (!expect(combat.playerState().currentHealth == 85,
+            "incoming damage inside the post-hit window must remain blocked")) return false;
+    combat.update(arcane::game::PlayerIntent {}, 0.31F);
+    return expect(combat.playerState().hitInvulnerabilityRemaining <= 0.001F,
+        "post-hit invulnerability must expire using combat delta time");
+}
+
 bool everySpellEffectKeepsItsCompleteVisualTimeline()
 {
     struct Expectation
@@ -1074,7 +1101,7 @@ bool defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
             "Aura victory must not resolve until the post-battle dialogue ends");
 }
 
-bool redMirrorDragonBreathTicksThreeTimes()
+bool redMirrorDragonBreathRespectsPostHitInvulnerability()
 {
     arcane::game::CombatRequest request;
     request.playerSpawn = {160.0F, 576.0F};
@@ -1089,8 +1116,8 @@ bool redMirrorDragonBreathTicksThreeTimes()
     combat.update({}, 1.01F);
     combat.update({}, 1.0F);
     combat.update({}, 1.0F);
-    return expect(combat.playerState().currentHealth == 55,
-        "dragon flame breath must deal fifteen damage every half second for one and a half seconds");
+    return expect(combat.playerState().currentHealth == 70,
+        "half-second breath ticks inside the 0.6-second post-hit window must be blocked");
 }
 
 bool enemyDirectionLocksWhenWindupBegins()
@@ -1339,6 +1366,7 @@ int main()
         && damageResolverCentralizesModifiersAndBlocking()
         && oneAttackHitsOnlyOnce()
         && playerViewSequencesOnlyAdvanceForSuccessfulActions()
+        && postHitInvulnerabilityBlocksOverlappingDamage()
         && repeatedAttacksProduceVictoryResult()
         && enemyAttackHasWindupAndHitsOnce()
         && zeroHealthProducesDefeatResult()
@@ -1372,7 +1400,7 @@ int main()
         && auraOpensWithTwoHeadlessKnights()
         && auraDominationUsesUpdatedCooldownAndStun()
         && defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
-        && redMirrorDragonBreathTicksThreeTimes()
+        && redMirrorDragonBreathRespectsPostHitInvulnerability()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
         && lugnerBloodMagicUsesRaisedSpriteHeightArea()

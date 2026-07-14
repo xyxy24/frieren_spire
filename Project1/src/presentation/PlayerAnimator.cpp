@@ -72,8 +72,10 @@ void PlayerAnimator::update(const PlayerVisualState& player, const float deltaSe
 
     const bool attackStarted = player.attackSequence > observedAttackSequence_;
     const bool castStarted = player.castSequence > observedCastSequence_;
+    const bool hurtStarted = player.hurtSequence > observedHurtSequence_;
     observedAttackSequence_ = player.attackSequence;
     observedCastSequence_ = player.castSequence;
+    observedHurtSequence_ = player.hurtSequence;
 
     if (attackStarted)
     {
@@ -84,6 +86,13 @@ void PlayerAnimator::update(const PlayerVisualState& player, const float deltaSe
     {
         actionAnimation_ = PlayerAnimation::Cast;
         actionSeconds_ = 0.0F;
+    }
+    if (hurtStarted)
+    {
+        actionAnimation_ = PlayerAnimation::Hit;
+        actionSeconds_ = 0.0F;
+        select(PlayerAnimation::Hit);
+        animationSeconds_ = 0.0F;
     }
 
     if (actionAnimation_)
@@ -99,7 +108,7 @@ void PlayerAnimator::update(const PlayerVisualState& player, const float deltaSe
         desired = PlayerAnimation::ShadowDash;
     else if (player.dashRemaining > 0.0F)
         desired = PlayerAnimation::Dash;
-    else if (player.stunned)
+    else if (player.stunned || actionAnimation_ == PlayerAnimation::Hit)
         desired = PlayerAnimation::Hit;
     else if (actionAnimation_)
         desired = *actionAnimation_;
@@ -113,7 +122,7 @@ void PlayerAnimator::update(const PlayerVisualState& player, const float deltaSe
 }
 
 bool PlayerAnimator::draw(sf::RenderTarget& target, const sf::Vector2f bottomCenter,
-    const float facingDirection) const
+    const float facingDirection, const sf::Color tint) const
 {
     const Clip& clip = clips_[indexOf(animation_)];
     if (!clip.texture) return false;
@@ -124,6 +133,7 @@ bool PlayerAnimator::draw(sf::RenderTarget& target, const sf::Vector2f bottomCen
     sprite.setOrigin({AnchorX, BaselineY});
     sprite.setPosition(bottomCenter);
     sprite.setScale({facingDirection < 0.0F ? -1.0F : 1.0F, 1.0F});
+    sprite.setColor(tint);
     target.draw(sprite);
     return true;
 }
@@ -136,6 +146,7 @@ void PlayerAnimator::reset() noexcept
     actionSeconds_ = 0.0F;
     observedAttackSequence_ = 0U;
     observedCastSequence_ = 0U;
+    observedHurtSequence_ = 0U;
 }
 
 PlayerAnimation PlayerAnimator::animation() const noexcept { return animation_; }

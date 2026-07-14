@@ -36,7 +36,7 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
     const arcane::game::PlayerStateView& player)
 {
     return {player.position, player.velocity, player.currentHealth, player.grounded,
-        player.facingDirection, player.attackSequence, player.castSequence,
+        player.facingDirection, player.attackSequence, player.castSequence, player.hurtSequence,
         player.dashRemaining, player.shadowDashing, player.stunned};
 }
 
@@ -44,7 +44,7 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
     const arcane::game::PlayerController& player, const int currentHealth)
 {
     return {player.position(), player.velocity(), currentHealth, player.isGrounded(),
-        player.facingDirection(), 0U, 0U, player.dashRemaining(),
+        player.facingDirection(), 0U, 0U, 0U, player.dashRemaining(),
         player.isShadowDashing(), player.isStunned()};
 }
 
@@ -57,7 +57,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& drahtTextures,
     const EnemyStateTextures& auraTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
-    const arcane::presentation::SpellEffectAnimator& spellEffectAnimator)
+    const arcane::presentation::SpellEffectAnimator& spellEffectAnimator,
+    const arcane::presentation::viewmodel::CombatFeedbackSnapshot& feedback)
 {
     const arcane::game::CombatSession* combat = tower.combat();
     if (!combat) return;
@@ -72,7 +73,12 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         : player.dashRemaining > 0.0F ? sf::Color {100, 220, 245}
         : player.stunned ? sf::Color {112, 180, 235}
         : player.attackActive ? sf::Color {255, 231, 153} : sf::Color {232, 232, 242};
-    drawPlayer(target, playerAnimator, makePlayerVisualState(player), playerFallback);
+    sf::Color playerTint = feedback.playerFlashRatio > 0.0F
+        ? sf::Color {255, 132, 132} : sf::Color::White;
+    if (feedback.playerFlashRatio <= 0.0F && player.hitInvulnerabilityRemaining > 0.0F
+        && static_cast<int>(player.hitInvulnerabilityRemaining * 24.0F) % 2 == 0)
+        playerTint.a = 105;
+    drawPlayer(target, playerAnimator, makePlayerVisualState(player), playerFallback, playerTint);
 
     for (const arcane::game::SpellEffectView effect : combat->spellEffects())
     {
@@ -129,8 +135,14 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             target.draw(rangeShape);
     }
 
-    for (const arcane::game::EnemyStateView enemy : combat->enemyStates())
+    const auto enemies = combat->enemyStates();
+    for (std::size_t enemyIndex = 0U; enemyIndex < enemies.size(); ++enemyIndex)
     {
+        const arcane::game::EnemyStateView enemy = enemies[enemyIndex];
+        const bool hitFlashing = enemyIndex < feedback.enemyFlashRatios.size()
+            && feedback.enemyFlashRatios[enemyIndex] > 0.0F;
+        const float impactOffset = enemyIndex < feedback.enemyImpactOffsets.size()
+            ? feedback.enemyImpactOffsets[enemyIndex] : 0.0F;
         const bool showDefeatedAura = !enemy.alive
             && enemy.archetype == arcane::game::EnemyArchetype::Aura
             && combat->dialogueLine().has_value();
@@ -176,19 +188,21 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             const auto textureSize = texture->getSize();
             sprite.setOrigin({static_cast<float>(textureSize.x) * 0.5F,
                 static_cast<float>(textureSize.y)});
-            sprite.setPosition({enemy.position.x + enemy.width * 0.5F,
+            sprite.setPosition({enemy.position.x + enemy.width * 0.5F + impactOffset,
                 enemy.position.y + enemy.height});
             sprite.setScale({enemy.facingDirection > 0.0F ? -1.0F : 1.0F, 1.0F});
+            if (hitFlashing) sprite.setColor(sf::Color {255, 166, 166});
             target.draw(sprite);
         }
         else
         {
             sf::RectangleShape enemyShape({enemy.width, enemy.height});
-            enemyShape.setPosition({enemy.position.x, enemy.position.y});
+            enemyShape.setPosition({enemy.position.x + impactOffset, enemy.position.y});
         sf::Color enemyColor = primaryBoss
             ? sf::Color {129, 68, 172} : sf::Color {176, 70, 78};
         if (enemy.windingUp) enemyColor = sf::Color {242, 154, 69};
         if (enemy.attackActive) enemyColor = sf::Color {248, 222, 105};
+        if (hitFlashing) enemyColor = sf::Color {255, 238, 225};
         enemyShape.setFillColor(enemyColor);
         enemyShape.setOutlineColor(sf::Color {245, 176, 129});
         enemyShape.setOutlineThickness(primaryBoss ? 6.0F : 3.0F);
@@ -276,6 +290,34 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         attackShape.setOutlineColor(sf::Color {255, 218, 145});
         attackShape.setOutlineThickness(2.0F);
         target.draw(attackShape);
+    }
+    for (const auto& burst : feedback.impactBursts)
+    {
+        const float ratio = burst.lifetime > 0.0F
+            ? std::clamp(burst.remaining / burst.lifetime, 0.0F, 1.0F) : 0.0F;
+        const float progress = 1.0F - ratio;
+        const float radius = (burst.lethal ? 12.0F : 7.0F)
+            + (burst.lethal ? 34.0F : 20.0F) * progress;
+        sf::CircleShape ring(radius, 16U);
+        ring.setOrigin({radius, radius});
+        ring.setPosition({burst.position.x, burst.position.y});
+        ring.setFillColor(sf::Color::Transparent);
+        sf::Color color = burst.playerTarget
+            ? sf::Color {255, 90, 110} : sf::Color {255, 225, 145};
+        color.a = static_cast<std::uint8_t>(230.0F * ratio);
+        ring.setOutlineColor(color);
+        ring.setOutlineThickness(burst.lethal ? 5.0F : 3.0F);
+        target.draw(ring);
+    }
+    for (const auto& number : feedback.damageNumbers)
+    {
+        const float ratio = number.lifetime > 0.0F
+            ? std::clamp(number.remaining / number.lifetime, 0.0F, 1.0F) : 0.0F;
+        sf::Color color = number.playerTarget
+            ? sf::Color {255, 104, 112} : sf::Color {255, 224, 112};
+        color.a = static_cast<std::uint8_t>(255.0F * ratio);
+        drawPixelText(target, "-" + std::to_string(number.amount),
+            {number.position.x, number.position.y}, number.playerTarget ? 1.25F : 1.05F, color);
     }
     if (const auto dialogue = combat->dialogueLine(); false && dialogue)
     {
@@ -416,4 +458,3 @@ void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSessi
     drawPixelText(target, "ENTER", {1146.0F, 663.0F}, 0.9F, sf::Color {190, 184, 205});
 }
 }
-

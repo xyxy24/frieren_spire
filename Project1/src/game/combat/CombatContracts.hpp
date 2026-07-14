@@ -80,6 +80,8 @@ struct PlayerStateView
     float shadowDashChargeRemaining {0.0F};
     bool stunned {false};
     float stunRemaining {0.0F};
+    float hitInvulnerabilityRemaining {0.0F};
+    std::uint64_t hurtSequence {};
     float blessingRemaining {0.0F};
     float vulnerableRemaining {0.0F};
     float flowerFieldRemaining {0.0F};

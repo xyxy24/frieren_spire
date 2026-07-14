@@ -2,6 +2,7 @@
 
 #include "app/run/TowerSession.hpp"
 #include "presentation/viewmodel/LoadoutViewModel.hpp"
+#include "presentation/viewmodel/SpellAcquisitionViewModel.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -29,6 +30,7 @@ public:
     [[nodiscard]] ApplicationSnapshot snapshot() const noexcept;
     [[nodiscard]] const app::TowerSession* model() const noexcept;
     [[nodiscard]] const LoadoutViewModel& loadout() const noexcept;
+    [[nodiscard]] const SpellAcquisitionViewModel& spellAcquisition() const noexcept;
     [[nodiscard]] std::optional<RewardViewModel> reward() const noexcept;
     [[nodiscard]] std::optional<MerchantViewModel> merchant() const;
     [[nodiscard]] std::optional<EquippedSlotsViewModel> equippedSlots() const noexcept;
@@ -46,6 +48,7 @@ private:
     app::TowerSessionConfig config_;
     std::optional<app::TowerSession> model_;
     LoadoutViewModel loadout_;
+    SpellAcquisitionViewModel spellAcquisition_;
     ApplicationScreen screen_ {ApplicationScreen::Start};
     PauseMenuItem pauseMenuItem_ {PauseMenuItem::ReplayCurrentFloor};
     bool victory_ {};

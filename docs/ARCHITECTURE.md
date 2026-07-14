@@ -49,6 +49,8 @@ flowchart TB
 | `SfmlApplication`（View） | 窗口主循环、绘制、动画和输入采样 | 保存页面选择或修改玩法规则 |
 | `ApplicationViewModel` | 管理 Start/Playing/Pause/Result，解释顶层命令并拥有当前 Model | SFML 绘制与战斗数值计算 |
 | `LoadoutViewModel` | 管理 Tab 开关、页签、光标和装备命令，生成构筑快照 | 持有已学魔法、遗物或装备的权威数据 |
+| `CombatFeedbackViewModel` | 比较连续权威快照，生成短生命周期的闪白、伤害数字和确定性镜头偏移 | 修改 HP、判定无敌或反向影响战斗模拟 |
+| `SpellAcquisitionViewModel` | 在奖励已经结算后管理充能、解锁、展示和确认时序，并在演出期间消费顶层输入 | 发放奖励、装备魔法或调用 SFML 绘制 API |
 | `TowerSession`（Model） | 把战斗结果、奖励、楼梯和下一层串成可执行流程，并提供装备命令 | 保存 UI 页签/光标或绘制 SFML 图形 |
 | `RunController` | 创建/结束本局，持有本局种子、玩家构筑与 Boss 进度 | 绘制 HUD |
 | `FloorController` | 生成、加载、激活、结算和卸载一层 | 直接决定魔法伤害 |
@@ -65,9 +67,9 @@ flowchart TB
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
 
-当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）与 `views/CombatView`（战斗场景、敌人贴图、Boss 对话）；`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。
+当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）、`views/CombatView`（战斗场景、敌人贴图、Boss 对话）与 `views/SpellAcquisitionView`（程序化法阵、粒子、闪光和卡面获取演出）；`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。
 
-`ApplicationViewModel` 与 `LoadoutViewModel` 是有状态 ViewModel；`ApplicationSnapshot`、`LoadoutSnapshot`、`RewardViewModel`、`MerchantViewModel` 和装备槽投影是 View 的只读绑定对象。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。事件、战斗 HUD 和特殊楼层面板目前仍读取 Model 的只读快照，后续按同一边界迁移。
+`ApplicationViewModel`、`LoadoutViewModel` 与 `SpellAcquisitionViewModel` 是有状态 ViewModel；`ApplicationSnapshot`、`LoadoutSnapshot`、`RewardViewModel`、`MerchantViewModel`、`SpellAcquisitionSnapshot` 和装备槽投影是 View 的只读绑定对象。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。获取演出 ViewModel 只在检测到已学列表增长后启动，保存内容 ID 和表现时间；奖励已经由 Model 原子结算，演出不能重复发放或自动装备。`CombatFeedbackViewModel` 是仅持有表现寿命的 ViewModel：它读取相邻两帧 `PlayerStateView/EnemyStateView` 的权威 HP 差值，产出目标闪白、飘字、命中扩散环、纯视觉击退、确定性镜头偏移和短命中停顿请求，并在楼层切换时重置。事件、战斗 HUD 和特殊楼层面板目前仍读取 Model 的只读快照，后续按同一边界迁移。
 
 ## 5. 状态所有权
 
@@ -116,7 +118,7 @@ stateDiagram-v2
     Result --> MainMenu
 ```
 
-`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。`LoadoutOverlay` 不是 Model 的流程状态，而是 `LoadoutViewModel` 可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的覆盖层；打开时由它消费 UI 输入，Model 的玩法时间不推进。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页；装备通过显式 Model 命令提交，遗物页只绑定本局遗物快照。
+`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。选择奖励会先由 Model 转入 `FloorComplete` 并写入已学列表，再由 `SpellAcquisitionViewModel` 启动不属于 Model 流程状态的获取覆盖层；该层消费全部顶层输入但不回滚已结算奖励。`LoadoutOverlay` 同样不是 Model 的流程状态，而是 `LoadoutViewModel` 可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的覆盖层；打开时由它消费 UI 输入，Model 的玩法时间不推进。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页；装备通过显式 Model 命令提交，遗物页只绑定本局遗物快照。
 
 ## 7. 战斗与时间
 
@@ -133,6 +135,10 @@ stateDiagram-v2
 已使用集中式 `DamageResolver`：输入伤害来源、攻击序列、基础伤害、来源/目标倍率、固定减伤与阻挡状态，输出一次不可变的 `DamageResult`。结果包含解析伤害、实际 HP 损失、前后 HP、致死、阻挡和重复序列状态。表现层根据结果播放数字、音效和硬直，不自行重新计算。
 
 基础攻击、三个普通魔法槽、终极槽、敌人技能、敌人碰撞与主动生命消耗均通过该入口。Resolver 按伤害来源分别记录最后结算序列，相同来源和序列不会重复扣血，不同魔法槽之间保持隔离。`RelicRuntime` 在战斗开始时从本局遗物快照建立限时状态和开场触发，并只在明确的来源或目标倍率阶段修正伤害；UI 不重新计算这些效果。
+
+玩家方的所有敌对伤害再经过 `CombatSession::resolvePlayerDamage`：入口先合并攻击自身的阻挡标记与权威受击无敌计时器，只有 `DamageResult::appliedDamage > 0` 才递增 `PlayerStateView::hurtSequence` 并启动 `0.60 秒`窗口。完全由护盾吸收或其他无敌挡下的请求不会启动窗口。计时器与伤害判定属于 Model；`PlayerAnimator` 只用受击序列重播 Hit 动画，`CombatFeedbackViewModel` 只用 HP 差值生成视觉反馈，二者都不能延长无敌时间。
+
+命中停顿不写入 Model，也不改变已经产生的 `DamageResult`。`CombatFeedbackViewModel` 按一次权威 HP 差值选择轻/中/重停顿参数，同一帧只保留最长值；SFML 应用壳在活动战斗中通过 `combatDeltaSeconds()` 将 Model 和角色动画的 delta 暂时置零，同时仍用真实 delta 更新反馈 ViewModel。由于被冻结时间不在后续帧补算，攻击序列、持续伤害、AI、无敌计时和技能冷却都不会因表现停顿发生重复结算或时间跳跃。敌人的 7 px 命中位移只修改绘制位置，不修改 `EnemyController` 碰撞体或 B 负责的 AI 行为。
 
 当前原型由 `EnemyController` 产出带递增序列号的攻击有效帧。技能冷却是与 `Chase` 并行推进的独立计时器，开场初始化为定义 CD 的一半；进入 `Windup` 时锁定朝向，只有回到 `Chase` 后才能重新面向玩家；`Windup/Active` 结束后立即回到追击并启动完整 CD。追击停止点按双方 AABB 水平边缘间距计算，有碰撞伤害者为 20 px，无碰撞伤害者为 42 px；技能触发距离另按“玩家宽度至少一半进入技能区域”计算，二者不得共用一个中心距离。`CombatSession` 负责多敌人序列隔离、扣除 HP 并调用玩家受击反应。非位移技能可通过 `EnemyStateView::skillEffectBounds` 向表现层提供只读矩形区域，表现层不自行推导射程；支配是明确不公开范围框的例外。
 
@@ -174,7 +180,7 @@ stateDiagram-v2
 - `CombatRequest` 输入遭遇 ID、种子、玩家出生点、敌人实例列表、场地边界、玩家初始 HP 和金币基础奖励。敌人列表为空时仍支持旧单敌人字段，供小型领域测试使用；正式普通楼层传入三个敌人实例，Boss 楼层传入一个。
 - `CombatResult` 只报告胜负、原遭遇 ID、击杀数、应发金币和战斗结束后的玩家 HP；它不直接修改 B 拥有的本局资源或楼层进度。
 - `PlayerStateView` 和 `EnemyStateView` 是表现/UI 可读取的快照。`CombatSession::enemyStates()` 返回每个敌人的类型、位置、碰撞尺寸、HP 和技能阶段，UI 据此在普通敌人头顶绘制独立血条；Boss 继续使用右上角血条。
-- `PlayerStateView` 额外公开权威速度、基础攻击序列号和成功施法序列号。SFML `PlayerAnimator` 只用这些只读字段选择或触发动画；一次性动画不得反向延长攻击有效帧、施法冷却、冲刺时间、无敌时间或受击控制。玩家精灵统一为 `128×96` 帧并以 `(64, 92)` 脚底锚点对齐 `42×64` 权威碰撞体，向左朝向通过表现层水平镜像实现。
+- `PlayerStateView` 额外公开权威速度、基础攻击序列号、成功施法序列号、受击序列号与受击无敌剩余时间。SFML `PlayerAnimator` 只用这些只读字段选择或触发动画；一次性动画不得反向延长攻击有效帧、施法冷却、冲刺时间、无敌时间或受击控制。玩家精灵统一为 `128×96` 帧并以 `(64, 92)` 脚底锚点对齐 `42×64` 权威碰撞体，向左朝向通过表现层水平镜像实现。
 - `SpellEffectAnimator` 在表现层持有 32 套法术图集纹理和 33 个当前法术 ID 的布局映射。图集帧尺寸、锚点与播放速度来自经审核的 `assets/spells/processed/manifest.json`，运行时代码不读取或修改领域数值；CMake 将标准化图集复制到可执行文件旁的 `assets/spells/`。每个映射显式选择固定中心、施法者脚底、目标地面、前方端点、地面铺设、牵引线、单光束、三重光束、追踪弹组或多火柱布局，并只允许等比缩放图集。瞬发效果的生命周期不得短于 `frameCount / framesPerSecond`，持续效果必须完整播放入场帧、循环中段和退场帧；二次触发的魔像碎裂与镜阵响应也遵守同一规则。当前朝向型法术读取玩家的只读朝向进行水平镜像，正式拆分弹体与命中阶段时再由 `SpellVisualEvent` 携带施法瞬间朝向。
 - `EnemyStateView` 还公开锁定后的朝向。SFML 表现层可按敌人类型和 `windingUp/attackActive` 选择贴图并水平翻转，但贴图尺寸、透明区域和视觉偏移不得反向改变领域碰撞箱。当前无头骑士使用 `64×64`，宝箱怪和鸟形魔物使用 `54×54` 的 idle/windup/attack PNG；三者均以脚底中心对齐权威碰撞箱。资源由 CMake 复制到可执行文件旁的 `assets/`。
 - 每次基础攻击都有递增序列号，命中目标后记录序列号，保证活动帧跨越多个更新时不会重复结算。
