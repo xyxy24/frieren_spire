@@ -106,20 +106,30 @@ if(BUILD_TESTING)
     )
     target_link_libraries(tower_session_tests PRIVATE arcane_core)
 
+    add_executable(sfml_input_mapper_tests
+        tests/sfml_input_mapper_tests.cpp
+        Project1/src/platform/SfmlInputMapper.cpp
+    )
+    target_include_directories(sfml_input_mapper_tests PRIVATE Project1/src)
+    target_link_libraries(sfml_input_mapper_tests PRIVATE SFML::Window SFML::System)
+
     if(MSVC)
         target_compile_options(arcane_core_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
         target_compile_options(combat_session_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
         target_compile_options(run_flow_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
         target_compile_options(tower_session_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+        target_compile_options(sfml_input_mapper_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
     else()
         target_compile_options(arcane_core_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(combat_session_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(run_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(tower_session_tests PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(sfml_input_mapper_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     add_test(NAME player_controller COMMAND arcane_core_tests)
     add_test(NAME combat_session COMMAND combat_session_tests)
     add_test(NAME run_flow COMMAND run_flow_tests)
     add_test(NAME tower_session COMMAND tower_session_tests)
+    add_test(NAME sfml_input_mapper COMMAND sfml_input_mapper_tests)
 endif()

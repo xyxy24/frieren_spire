@@ -31,6 +31,12 @@ anchor; ground effects such as Gravity Well declare a bottom-center anchor expli
 Self auras also use a bottom-body anchor where appropriate so the effect remains stable while
 the player sprite changes animation.
 
+Generated poses are not guaranteed to be evenly spaced across a contact sheet. Sources such as
+Mana Strike and Golden Binding therefore use reviewed `panel_edges` in `Process-SpellVfx.py`;
+dividing those sheets into equal-width columns cuts one pose across adjacent runtime frames.
+After processing, every foreground alpha bound must remain inside its frame cell rather than
+touching a left or right cell edge.
+
 AI outputs remain source key poses. Keep gameplay AABBs authoritative and do not infer collision,
 damage timing, or projectile speed from transparent texture bounds. Presentation size is an
 independent per-spell choice: an atlas may extend beyond, repeat across, or occupy only part of an

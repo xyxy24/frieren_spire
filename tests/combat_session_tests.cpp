@@ -409,7 +409,8 @@ bool collectibleSpellsEmitEffectPlaceholders()
 {
     constexpr std::array ids {
         1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1008U, 1009U, 1011U, 1016U,
-        1017U, 1018U, 1019U, 1020U, 1021U, 1022U, 1023U, 1024U, 1025U, 1026U
+        1017U, 1018U, 1019U, 1020U, 1021U, 1022U, 1023U, 1024U, 1025U, 1026U,
+        1027U, 1028U, 1029U, 1030U
     };
     for (const std::uint32_t id : ids)
     {
@@ -428,6 +429,102 @@ bool collectibleSpellsEmitEffectPlaceholders()
             "every collectible spell must emit a non-empty effect placeholder")) return false;
     }
     return true;
+}
+
+bool everySpellEffectKeepsItsCompleteVisualTimeline()
+{
+    struct Expectation
+    {
+        std::uint32_t id;
+        float minimumDuration;
+        bool boss;
+    };
+    constexpr std::array expectations {
+        Expectation {1001U, 4.0F, false}, Expectation {1002U, 5.0F, false},
+        Expectation {1003U, 8.0F / 16.0F, false}, Expectation {1004U, 8.0F / 16.0F, false},
+        Expectation {1005U, 6.0F / 18.0F, false}, Expectation {1006U, 3.0F, false},
+        Expectation {1008U, 8.0F / 16.0F, false}, Expectation {1009U, 6.0F / 16.0F, false},
+        Expectation {1011U, 4.0F, false}, Expectation {1016U, 4.0F, false},
+        Expectation {1017U, 8.0F / 16.0F, false}, Expectation {1018U, 8.0F / 16.0F, false},
+        Expectation {1019U, 8.0F / 16.0F, false}, Expectation {1020U, 8.0F / 14.0F, false},
+        Expectation {1021U, 1.0F, false}, Expectation {1022U, 5.0F, false},
+        Expectation {1023U, 2.5F, false}, Expectation {1024U, 10.0F / 16.0F, false},
+        Expectation {1025U, 8.0F / 14.0F, false}, Expectation {1026U, 4.0F, false},
+        Expectation {1027U, 6.0F / 20.0F, false}, Expectation {1028U, 5.0F, false},
+        Expectation {1029U, 8.0F / 16.0F, false}, Expectation {1030U, 2.5F, false},
+        Expectation {2001U, 8.0F / 16.0F, true}, Expectation {2002U, 10.0F / 14.0F, true},
+        Expectation {2003U, 10.0F / 16.0F, true}, Expectation {2006U, 10.0F / 14.0F, true},
+        Expectation {2007U, 0.8F, true}, Expectation {2009U, 3.0F, true},
+        Expectation {2010U, 2.0F, true}, Expectation {2011U, 3.0F, true},
+        Expectation {2012U, 8.0F, true}
+    };
+
+    for (const auto expectation : expectations)
+    {
+        auto request = adjacentEnemyRequest();
+        request.enemyMaximumHealth = 100000;
+        request.enemyContactDamage = 0;
+        request.enemyAttackDamage = 0;
+        if (expectation.boss) request.equippedUltimateSpellId = expectation.id;
+        else request.equippedSpellIds[0] = expectation.id;
+        arcane::game::CombatSession combat(request);
+        arcane::game::PlayerIntent cast;
+        if (expectation.boss) cast.ultimateSpellPressed = true;
+        else cast.spellPressed[0] = true;
+        combat.update(cast, 0.01F);
+
+        const auto effects = combat.spellEffects();
+        const auto found = std::find_if(effects.begin(), effects.end(), [&](const auto& effect) {
+            return effect.spellId == expectation.id;
+        });
+        if (!expect(found != effects.end(),
+                "every implemented spell must create a visual timeline")
+            || !expect(found->duration + 0.001F >= expectation.minimumDuration,
+                "a spell visual timeline must be long enough to reach its final frame")) return false;
+    }
+    return true;
+}
+
+bool secondarySpellEffectsKeepTheirCompleteVisualTimelines()
+{
+    auto golemRequest = adjacentEnemyRequest();
+    golemRequest.enemyMaximumHealth = 100000;
+    golemRequest.enemyContactDamage = 0;
+    golemRequest.enemyAttackDamage = 0;
+    golemRequest.equippedSpellIds[0] = 1022U;
+    arcane::game::CombatSession golem(golemRequest);
+    arcane::game::PlayerIntent summon;
+    summon.spellPressed[0] = true;
+    golem.update(summon, 0.01F);
+    bool foundGolemOutro = false;
+    for (int frame = 0; frame < 600 && !foundGolemOutro; ++frame)
+    {
+        golem.update({}, 0.01F);
+        const auto effects = golem.spellEffects();
+        foundGolemOutro = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == 1022U && std::abs(effect.duration - 1.0F) < 0.001F;
+        });
+    }
+    if (!expect(foundGolemOutro,
+            "Stone Golem shatter must keep enough time for its outro frames")) return false;
+
+    auto mirrorRequest = adjacentEnemyRequest();
+    mirrorRequest.enemyMaximumHealth = 100000;
+    mirrorRequest.enemyContactDamage = 0;
+    mirrorRequest.enemyAttackDamage = 0;
+    mirrorRequest.equippedSpellIds[0] = 1004U;
+    mirrorRequest.equippedUltimateSpellId = 2012U;
+    arcane::game::CombatSession mirror(mirrorRequest);
+    arcane::game::PlayerIntent summonMirrors;
+    summonMirrors.ultimateSpellPressed = true;
+    mirror.update(summonMirrors, 0.01F);
+    arcane::game::PlayerIntent triggerMirrors;
+    triggerMirrors.spellPressed[0] = true;
+    mirror.update(triggerMirrors, 0.01F);
+    const auto mirrorEffects = mirror.spellEffects();
+    return expect(std::any_of(mirrorEffects.begin(), mirrorEffects.end(), [](const auto& effect) {
+            return effect.spellId == 2012U && std::abs(effect.duration - 0.75F) < 0.001F;
+        }), "Mirror Array response must play its intro, active and outro frames");
 }
 
 bool newCombatSpellsApplyTheirCoreInteractions()
@@ -1252,6 +1349,8 @@ int main()
         && regularSpellCatalogHasDefinitionsAndAuthoritativeRanges()
         && innateActionsExposeSpellEffectPlaceholders()
         && collectibleSpellsEmitEffectPlaceholders()
+        && everySpellEffectKeepsItsCompleteVisualTimeline()
+        && secondarySpellEffectsKeepTheirCompleteVisualTimelines()
         && newCombatSpellsApplyTheirCoreInteractions()
         && lightningStaffEnhancesExactlyThreeBasicAttacks()
         && ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()

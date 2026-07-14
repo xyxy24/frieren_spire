@@ -4,14 +4,43 @@
 
 namespace arcane::platform
 {
-namespace
+void SfmlInputMapper::handleEvent(const sf::Event& event)
 {
-bool pressedOnce(const bool current, bool& previous)
-{
-    const bool pressed = current && !previous;
-    previous = current;
-    return pressed;
-}
+    const auto* keyPressed = event.getIf<sf::Event::KeyPressed>();
+    if (keyPressed == nullptr) return;
+
+    switch (keyPressed->code)
+    {
+    case sf::Keyboard::Key::Space: pendingIntent_.jumpPressed = true; break;
+    case sf::Keyboard::Key::J: pendingIntent_.attackPressed = true; break;
+    case sf::Keyboard::Key::K: pendingIntent_.dashPressed = true; break;
+    case sf::Keyboard::Key::U: pendingIntent_.spellPressed[0] = true; break;
+    case sf::Keyboard::Key::I: pendingIntent_.spellPressed[1] = true; break;
+    case sf::Keyboard::Key::O: pendingIntent_.spellPressed[2] = true; break;
+    case sf::Keyboard::Key::E:
+        pendingIntent_.interactPressed = true;
+        pendingIntent_.menuPageNextPressed = true;
+        break;
+    case sf::Keyboard::Key::Tab: pendingIntent_.toggleLoadoutPressed = true; break;
+    case sf::Keyboard::Key::Q: pendingIntent_.menuPagePreviousPressed = true; break;
+    case sf::Keyboard::Key::A:
+    case sf::Keyboard::Key::Left: pendingIntent_.menuPreviousPressed = true; break;
+    case sf::Keyboard::Key::D:
+    case sf::Keyboard::Key::Right: pendingIntent_.menuNextPressed = true; break;
+    case sf::Keyboard::Key::W:
+    case sf::Keyboard::Key::Up: pendingIntent_.menuUpPressed = true; break;
+    case sf::Keyboard::Key::S:
+    case sf::Keyboard::Key::Down: pendingIntent_.menuDownPressed = true; break;
+    case sf::Keyboard::Key::Escape: pendingIntent_.pausePressed = true; break;
+    case sf::Keyboard::Key::Enter: pendingIntent_.menuConfirmPressed = true; break;
+    case sf::Keyboard::Key::R:
+        pendingIntent_.ultimateSpellPressed = true;
+        pendingIntent_.menuSecondaryPressed = true;
+        break;
+    case sf::Keyboard::Key::F2: pendingIntent_.debugEventPreviewPressed = true; break;
+    case sf::Keyboard::Key::F3: pendingIntent_.debugMerchantPreviewPressed = true; break;
+    default: break;
+    }
 }
 
 game::PlayerIntent SfmlInputMapper::sample()
@@ -21,50 +50,15 @@ game::PlayerIntent SfmlInputMapper::sample()
     const bool moveRight = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)
         || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right);
 
-    const bool jump = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
-    const bool attack = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::J);
-    const bool dash = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::K);
-    const bool spell0 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::U);
-    const bool spell1 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::I);
-    const bool spell2 = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::O);
-    const bool interact = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E);
-    const bool toggleLoadout = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Tab);
-    const bool menuPageLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q);
-    const bool menuPageRight = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::E);
     const bool menuUp = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)
         || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up);
     const bool menuDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)
         || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down);
-    const bool pause = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape);
-    const bool confirm = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter);
-    const bool secondary = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R);
-    const bool debugEventPreview = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F2);
-    const bool debugMerchantPreview = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F3);
 
-    game::PlayerIntent intent;
+    game::PlayerIntent intent = pendingIntent_;
+    pendingIntent_ = {};
     intent.moveAxis = static_cast<float>(moveRight) - static_cast<float>(moveLeft);
     intent.verticalMoveAxis = static_cast<float>(menuDown) - static_cast<float>(menuUp);
-    intent.jumpPressed = pressedOnce(jump, previousJump_);
-    intent.attackPressed = pressedOnce(attack, previousAttack_);
-    intent.dashPressed = pressedOnce(dash, previousDash_);
-    intent.spellPressed[0] = pressedOnce(spell0, previousSpell0_);
-    intent.spellPressed[1] = pressedOnce(spell1, previousSpell1_);
-    intent.spellPressed[2] = pressedOnce(spell2, previousSpell2_);
-    intent.interactPressed = pressedOnce(interact, previousInteract_);
-    intent.toggleLoadoutPressed = pressedOnce(toggleLoadout, previousToggleLoadout_);
-    intent.menuPreviousPressed = pressedOnce(moveLeft, previousMenuLeft_);
-    intent.menuNextPressed = pressedOnce(moveRight, previousMenuRight_);
-    intent.menuPagePreviousPressed = pressedOnce(menuPageLeft, previousMenuPageLeft_);
-    intent.menuPageNextPressed = pressedOnce(menuPageRight, previousMenuPageRight_);
-    intent.menuUpPressed = pressedOnce(menuUp, previousMenuUp_);
-    intent.menuDownPressed = pressedOnce(menuDown, previousMenuDown_);
-    intent.pausePressed = pressedOnce(pause, previousPause_);
-    intent.menuConfirmPressed = pressedOnce(confirm, previousConfirm_);
-    const bool secondaryPressed = pressedOnce(secondary, previousSecondary_);
-    intent.ultimateSpellPressed = secondaryPressed;
-    intent.menuSecondaryPressed = secondaryPressed;
-    intent.debugEventPreviewPressed = pressedOnce(debugEventPreview, previousDebugEventPreview_);
-    intent.debugMerchantPreviewPressed = pressedOnce(debugMerchantPreview, previousDebugMerchantPreview_);
     return intent;
 }
 }

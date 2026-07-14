@@ -12,6 +12,55 @@ namespace
 constexpr std::array SpellDamageSources {
     DamageSource::PlayerSpell0, DamageSource::PlayerSpell1, DamageSource::PlayerSpell2
 };
+
+constexpr float fullClipDuration(const std::uint32_t frameCount, const float framesPerSecond) noexcept
+{
+    return static_cast<float>(frameCount) / framesPerSecond;
+}
+
+constexpr float spellVisualDuration(const spells::SpellEffect effect) noexcept
+{
+    using spells::SpellEffect;
+    switch (effect)
+    {
+    case SpellEffect::DirectDamage: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::FlowerField: return 4.0F;
+    case SpellEffect::GoddessBlessing: return 5.0F;
+    case SpellEffect::BloodMagic: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::FrostLance: return fullClipDuration(6U, 18.0F);
+    case SpellEffect::FlameBurst: return 3.0F;
+    case SpellEffect::MagicThread: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::StoneShot: return fullClipDuration(6U, 16.0F);
+    case SpellEffect::InnateDash: return PlayerController::DashDurationSeconds;
+    case SpellEffect::Phantom: return 4.0F;
+    case SpellEffect::ManaTrace: return 4.0F;
+    case SpellEffect::BossZoltraak: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::GoddessSpears: return fullClipDuration(10U, 14.0F);
+    case SpellEffect::SeveringSlash: return fullClipDuration(10U, 16.0F);
+    case SpellEffect::Mimic: return fullClipDuration(10U, 14.0F);
+    case SpellEffect::DestructionLightning: return 0.8F;
+    case SpellEffect::HellfireStorm: return 3.0F;
+    case SpellEffect::JudgmentBeam: return 2.0F;
+    case SpellEffect::EarthPillars: return 3.0F;
+    case SpellEffect::MirrorArray: return 8.0F;
+    case SpellEffect::MultiZoltraak: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::Dispel: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::ManaStrike: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::GoldenBinding: return fullClipDuration(8U, 14.0F);
+    case SpellEffect::FloatSlam: return 1.0F;
+    case SpellEffect::StoneGolem: return 5.0F;
+    case SpellEffect::Flight: return 2.5F;
+    case SpellEffect::SpatialShatter: return fullClipDuration(10U, 16.0F);
+    case SpellEffect::Seal: return fullClipDuration(8U, 14.0F);
+    case SpellEffect::LightningStaff: return 4.0F;
+    case SpellEffect::HomingVolley: return fullClipDuration(6U, 20.0F);
+    case SpellEffect::DefensiveBarrier: return 5.0F;
+    case SpellEffect::WindPressure: return fullClipDuration(8U, 16.0F);
+    case SpellEffect::GravityWell: return 2.5F;
+    }
+    return 0.0F;
+}
+
 constexpr std::array AuraPreBattleDialogue {
     CombatDialogueLineView {"AURA", "LUGNER'S PRESENCE IS GONE. IT SEEMS HE WAS KILLED.", "aura-initial"},
     CombatDialogueLineView {"FRIEREN", "NOT ONLY LUGNER. I DEFEATED ALL OF YOUR EXECUTIONERS.", "frieren-pre"},
@@ -726,7 +775,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (target.health.isAlive() && intersects(blast, target.controller.bounds()))
                     static_cast<void>(target.damageResolver.resolve(target.health,
                         {golemSource_, golemSequence_ * 16U + 2U, 24, golemMultiplier_}));
-            activeSpellEffects_.push_back({1022U, blast, 0.5F, 0.5F});
+            activeSpellEffects_.push_back({1022U, blast, 1.0F, 1.0F});
         }
     }
 
@@ -890,30 +939,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     {
         if (!cast.cast || !definition) return;
         ++playerCastSequence_;
-        const auto visualDuration = [](const spells::SpellEffect effect) {
-            switch (effect)
-            {
-            case spells::SpellEffect::FlowerField: return 4.0F;
-            case spells::SpellEffect::GoddessBlessing: return 5.0F;
-            case spells::SpellEffect::FlameBurst: return 3.0F;
-            case spells::SpellEffect::Phantom: return 4.0F;
-            case spells::SpellEffect::ManaTrace: return 4.0F;
-            case spells::SpellEffect::FloatSlam: return 1.0F;
-            case spells::SpellEffect::StoneGolem: return 5.0F;
-            case spells::SpellEffect::Flight: return 2.5F;
-            case spells::SpellEffect::LightningStaff: return 4.0F;
-            case spells::SpellEffect::DefensiveBarrier: return 5.0F;
-            case spells::SpellEffect::GravityWell: return 2.5F;
-            case spells::SpellEffect::GoddessSpears: return 0.6F;
-            case spells::SpellEffect::DestructionLightning: return 0.8F;
-            case spells::SpellEffect::HellfireStorm: return 3.0F;
-            case spells::SpellEffect::JudgmentBeam: return 2.0F;
-            case spells::SpellEffect::EarthPillars: return 3.0F;
-            case spells::SpellEffect::MirrorArray: return 8.0F;
-            default: return 0.35F;
-            }
-        };
-        float duration = visualDuration(cast.effect);
+        float duration = spellVisualDuration(cast.effect);
         const bool extendPersistent = relics_.has(relics::SteelPetalBookmarkId)
             && (cast.effect == spells::SpellEffect::FlowerField
                 || cast.effect == spells::SpellEffect::Phantom
@@ -1474,7 +1500,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             std::erase_if(activeSpellEffects_, [](const auto& effect) {
                 return effect.spellId == 2012U;
             });
-            activeSpellEffects_.push_back({2012U, cast.effectBounds, 0.5F, 0.5F});
+            activeSpellEffects_.push_back({2012U, cast.effectBounds, 0.75F, 0.75F});
             mirrorCopies_ = 0U;
         }
     }

@@ -38,7 +38,14 @@ SOURCES: dict[str, VfxSource] = {
     "zoltraak-muzzle": VfxSource(6, 64, 64, 15, False),
     "flame-burst": VfxSource(8, 192, 128, 16, False),
     "wind-pressure": VfxSource(8, 192, 128, 16, False, "magenta"),
-    "mana-strike": VfxSource(8, 192, 128, 16, False),
+    "mana-strike": VfxSource(
+        8,
+        192,
+        128,
+        16,
+        False,
+        panel_edges=(0, 190, 398, 656, 972, 1284, 1608, 1875, 2172),
+    ),
     "mana-trace-ring": VfxSource(8, 192, 192, 14, False),
     "dispel-ring": VfxSource(8, 192, 192, 16, False),
     "spatial-shatter": VfxSource(10, 192, 192, 16, False),
@@ -56,7 +63,15 @@ SOURCES: dict[str, VfxSource] = {
         8, 128, 128, 14, False, anchor_x=64, anchor_y=112, align_bottom=True
     ),
     "magic-thread": VfxSource(8, 96, 96, 16, False),
-    "golden-binding": VfxSource(8, 96, 96, 14, False, "green-gold"),
+    "golden-binding": VfxSource(
+        8,
+        96,
+        96,
+        14,
+        False,
+        "green-gold",
+        panel_edges=(0, 258, 622, 822, 1122, 1378, 1628, 1918, 2172),
+    ),
     "sealing-magic": VfxSource(8, 96, 96, 14, False),
     "float-slam": VfxSource(
         8, 192, 192, 14, False, anchor_x=96, anchor_y=176, align_bottom=True

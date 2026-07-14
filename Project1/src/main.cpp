@@ -155,6 +155,7 @@ std::array<std::uint8_t, 7> glyphRows(const char value)
 void drawPixelText(sf::RenderTarget& target, const std::string_view text, const sf::Vector2f origin,
     const float scale = 2.0F, const sf::Color color = sf::Color {235, 235, 245})
 {
+    sf::VertexArray vertices(sf::PrimitiveType::Triangles);
     sf::Vector2f cursor = origin;
     for (const char character : text)
     {
@@ -164,14 +165,20 @@ void drawPixelText(sf::RenderTarget& target, const std::string_view text, const 
             for (std::size_t column = 0U; column < 5U; ++column)
                 if ((rows[row] & (1U << (4U - column))) != 0U)
                 {
-                    sf::RectangleShape pixel({scale, scale});
-                    pixel.setPosition({cursor.x + static_cast<float>(column) * scale,
-                        cursor.y + static_cast<float>(row) * scale});
-                    pixel.setFillColor(color);
-                    target.draw(pixel);
+                    const float left = cursor.x + static_cast<float>(column) * scale;
+                    const float top = cursor.y + static_cast<float>(row) * scale;
+                    const float right = left + scale;
+                    const float bottom = top + scale;
+                    vertices.append({{left, top}, color});
+                    vertices.append({{right, top}, color});
+                    vertices.append({{right, bottom}, color});
+                    vertices.append({{left, top}, color});
+                    vertices.append({{right, bottom}, color});
+                    vertices.append({{left, bottom}, color});
                 }
         cursor.x += 6.0F * scale;
     }
+    target.draw(vertices);
 }
 
 std::string wrapPixelText(const std::string_view text, const std::size_t maximumCharacters)
@@ -1247,6 +1254,7 @@ int main()
 {
     sf::RenderWindow window(sf::VideoMode({WindowWidth, WindowHeight}), "Arcane Spire");
     window.setVerticalSyncEnabled(true);
+    window.setKeyRepeatEnabled(false);
 
     arcane::platform::SfmlInputMapper inputMapper;
     arcane::app::TowerSessionConfig config;
@@ -1292,6 +1300,7 @@ int main()
     {
         while (const auto event = window.pollEvent())
         {
+            inputMapper.handleEvent(*event);
             if (event->is<sf::Event::Closed>()) window.close();
         }
 
