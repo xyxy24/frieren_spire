@@ -109,3 +109,11 @@
 - Source: team-provided classroom prototype artwork.
 - Purpose: Revolte's idle, upper/lower slash, heavy strike, parry, dash and defeat poses, plus
   the three dialogue-stage portraits used before battle, at phase two and after defeat.
+
+## Denken character and tornado effects
+
+- Files: `enemies/denken/*.png`.
+- Added by: project team, 2026-07-15.
+- Source: team-provided classroom prototype artwork.
+- Purpose: Denken's idle, tornado summon and cremation-magic poses, plus the normal and evolved
+  tornado effects.

@@ -103,6 +103,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& drahtTextures,
     const EnemyStateTextures& auraTextures,
     const EnemyStateTextures& revolteTextures,
+    const EnemyStateTextures& denkenTextures,
+    const std::array<std::optional<sf::Texture>, 2>& tornadoTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator,
@@ -146,6 +148,18 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 effect.bounds.height / static_cast<float>(size.y)});
             fog.setColor(sf::Color {255, 255, 255, 205});
             target.draw(fog);
+            continue;
+        }
+        if ((effect.spellId == 9002U || effect.spellId == 9003U)
+            && tornadoTextures[effect.spellId == 9002U ? 0U : 1U])
+        {
+            const sf::Texture& texture = *tornadoTextures[effect.spellId == 9002U ? 0U : 1U];
+            sf::Sprite tornado(texture);
+            const auto size = texture.getSize();
+            tornado.setPosition({effect.bounds.left, effect.bounds.top});
+            tornado.setScale({effect.bounds.width / static_cast<float>(size.x),
+                effect.bounds.height / static_cast<float>(size.y)});
+            target.draw(tornado);
             continue;
         }
         const std::optional<sf::Texture>* projectileTexture = nullptr;
@@ -267,6 +281,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &auraTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte)
             stateTextures = &revolteTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Denken)
+            stateTextures = &denkenTextures;
         const sf::Texture* texture = nullptr;
         if (stateTextures)
         {
@@ -294,6 +310,9 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Denken
+                && enemy.specialAttackActive && stateTextures->skillWindups[1])
+                texture = &*stateTextures->skillWindups[1];
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 4 && enemy.attackActive && stateTextures->dash)
                 texture = &*stateTextures->dash;

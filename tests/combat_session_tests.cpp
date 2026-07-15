@@ -1457,6 +1457,24 @@ bool revolteLocksAtFiveAndHealsForSecondPhase()
         "second-phase dash must travel 144 pixels as soon as its cooldown is ready");
 }
 
+bool denkenExposesCremationPoseWhenTornadoEvolves()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {300.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Denken, {700.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 4.51F);
+    combat.update({}, 0.50F);
+    combat.update({}, 2.90F);
+    combat.update({}, 0.11F);
+    const auto effects = combat.spellEffects();
+    return expect(combat.enemyState().specialAttackActive,
+            "Denken must expose the cremation-magic pose when a tornado evolves")
+        && expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == 9003U;
+            }), "Denken's tornado must switch to its evolved visual after three seconds");
+}
+
 bool revolteParryActivatesWithoutWindup()
 {
     arcane::game::CombatRequest request;
@@ -1588,6 +1606,7 @@ int main()
         && lugnerBloodMagicUsesRaisedSpriteHeightArea()
         && chaosFlowerSleepReducesOutgoingDamageWithoutWindup()
         && lateSecondActEnemiesExposeConfiguredContent()
+        && denkenExposesCremationPoseWhenTornadoEvolves()
         && laufenTeleportsBehindAndImmediatelySideKicks()
         && swordRelicsModifyCollisionDamage()
         && expandedSpellAndRelicCatalogIsComplete()

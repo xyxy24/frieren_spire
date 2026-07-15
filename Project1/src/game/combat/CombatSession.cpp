@@ -538,7 +538,16 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     {
         const float activeDelta = std::min(deltaSeconds, tornado.remaining);
         tornado.remaining -= activeDelta;
+        const bool evolvesNow = tornado.evolutionRemaining > 0.0F
+            && tornado.evolutionRemaining - activeDelta <= 0.0F;
         tornado.evolutionRemaining -= activeDelta;
+        if (evolvesNow)
+        {
+            const auto caster = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+                return enemy.archetype == EnemyArchetype::Denken && enemy.health.isAlive();
+            });
+            if (caster != enemies_.end()) caster->specialActive = 0.6F;
+        }
         const float tornadoCenter = tornado.bounds.left + tornado.bounds.width * 0.5F;
         const float currentPlayerCenter = player_.position().x + PlayerController::Width * 0.5F;
         tornado.bounds.left += std::clamp(currentPlayerCenter - tornadoCenter,
@@ -929,6 +938,11 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (enemy.archetype == EnemyArchetype::Denken)
         {
             enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialActive > 0.0F)
+            {
+                enemy.specialActive = std::max(0.0F, enemy.specialActive - deltaSeconds);
+                continue;
+            }
             if (enemy.specialWindup > 0.0F)
             {
                 enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);

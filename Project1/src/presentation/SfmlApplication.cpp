@@ -187,6 +187,8 @@ struct RenderResources
     const EnemyStateTextures& draht;
     const EnemyStateTextures& aura;
     const EnemyStateTextures& revolte;
+    const EnemyStateTextures& denken;
+    const std::array<std::optional<sf::Texture>, 2>& tornado;
     const DialoguePortraitTextures& portraits;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
@@ -232,7 +234,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
-                resources.draht, resources.aura, resources.revolte, resources.playerAnimator,
+                resources.draht, resources.aura, resources.revolte,
+                resources.denken, resources.tornado, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.spellAnimator, feedback);
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
             if (const auto loot = tower->lootDropBounds())
@@ -373,6 +376,13 @@ int arcane::presentation::SfmlApplication::run()
         revolteTextures.skillAttacks[index] = loadTexture(index == 0U
             ? "assets/enemies/revolte/attack.png"
             : "assets/enemies/revolte/attack" + std::to_string(index + 1U) + ".png");
+    EnemyStateTextures denkenTextures = loadEnemyStateTextures(
+        "assets/enemies/denken/", false, false, false);
+    denkenTextures.skillWindups[1] = loadTexture("assets/enemies/denken/windup2.png");
+    const std::array<std::optional<sf::Texture>, 2> tornadoTextures {
+        loadTexture("assets/enemies/denken/tornado.png"),
+        loadTexture("assets/enemies/denken/tornado2.png")
+    };
     const DialoguePortraitTextures dialoguePortraits {
         loadTexture("assets/portraits/frieren/idle.png"),
         loadTexture("assets/portraits/aura/initial.png"),
@@ -397,7 +407,8 @@ int arcane::presentation::SfmlApplication::run()
         heimonTextures, heimonSkillTextures, heimonFogTexture,
         demonWarriorTextures, largeBirdDemonTextures, slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
-        linieSkillTextures, drahtTextures, auraTextures, revolteTextures, dialoguePortraits,
+        linieSkillTextures, drahtTextures, auraTextures, revolteTextures,
+        denkenTextures, tornadoTextures, dialoguePortraits,
         lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,
         spellEffectAnimator};
     sf::Clock frameClock;

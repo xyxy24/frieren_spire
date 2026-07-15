@@ -67,6 +67,8 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
     const EnemyStateTextures& drahtTextures, const EnemyStateTextures& auraTextures,
     const EnemyStateTextures& revolteTextures,
+    const EnemyStateTextures& denkenTextures,
+    const std::array<std::optional<sf::Texture>, 2>& tornadoTextures,
     const PlayerAnimator& playerAnimator, const ShadeChargeAnimator& shadeChargeAnimator,
     const SpellEffectAnimator& spellEffectAnimator,
     const viewmodel::CombatFeedbackSnapshot& feedback);
