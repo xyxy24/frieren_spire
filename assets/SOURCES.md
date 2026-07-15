@@ -157,6 +157,13 @@
 - Source: team-provided classroom prototype artwork.
 - Purpose: one-, two- and three-head idle, shared windup and claw-attack poses.
 
+## Richter character and earth-pillar artwork
+
+- Files: `enemies/richter/*.png`.
+- Added by: project team, 2026-07-15.
+- Source: team-provided classroom prototype artwork.
+- Purpose: Richter's idle and earth-magic windup poses, plus the three-stage summoned pillar.
+
 ## Three-act environment backgrounds and battle platforms
 
 - Files: runtime textures under `environments/processed/`; generation sources, chroma-key

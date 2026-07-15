@@ -99,6 +99,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const std::array<std::optional<sf::Texture>, 2>& gargoyleSkillTextures,
     const EnemyStateTextures& swordDemonTextures,
     const EnemyStateTextures& threeHeadedDemonTextures,
+    const EnemyStateTextures& richterTextures,
+    const std::array<std::optional<sf::Texture>, 3>& pillarTextures,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -142,6 +144,22 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
 
     for (const arcane::game::SpellEffectView effect : combat->spellEffects())
     {
+        if (effect.spellId == 9001U)
+        {
+            const float elapsed = effect.duration - effect.remaining;
+            const std::size_t frame = elapsed < 0.12F ? 0U : (elapsed < 0.24F ? 1U : 2U);
+            if (pillarTextures[frame])
+            {
+                const sf::Texture& texture = *pillarTextures[frame];
+                sf::Sprite pillar(texture);
+                const auto size = texture.getSize();
+                pillar.setPosition({effect.bounds.left, effect.bounds.top});
+                pillar.setScale({effect.bounds.width / static_cast<float>(size.x),
+                    effect.bounds.height / static_cast<float>(size.y)});
+                target.draw(pillar);
+                continue;
+            }
+        }
         if (effect.spellId == 9100U && heimonFogTexture)
         {
             sf::Sprite fog(*heimonFogTexture);
@@ -304,6 +322,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &swordDemonTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::ThreeHeadedDemon)
             stateTextures = &threeHeadedDemonTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Richter)
+            stateTextures = &richterTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)

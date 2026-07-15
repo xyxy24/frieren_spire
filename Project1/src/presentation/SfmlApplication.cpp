@@ -182,6 +182,8 @@ struct RenderResources
     const std::array<std::optional<sf::Texture>, 2>& gargoyleSkill;
     const EnemyStateTextures& swordDemon;
     const EnemyStateTextures& threeHeadedDemon;
+    const EnemyStateTextures& richter;
+    const std::array<std::optional<sf::Texture>, 3>& pillar;
     const std::optional<sf::Texture>& slash;
     const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
@@ -239,6 +241,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.gargoyle, resources.gargoyleSkill,
                 resources.swordDemon,
                 resources.threeHeadedDemon,
+                resources.richter, resources.pillar,
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
@@ -373,6 +376,13 @@ int arcane::presentation::SfmlApplication::run()
         threeHeadedDemonTextures.skillAttacks[index] = loadTexture(
             "assets/enemies/three_headed_demon/attack" + suffix);
     }
+    const EnemyStateTextures richterTextures = loadEnemyStateTextures(
+        "assets/enemies/richter/", false, false, false);
+    const std::array<std::optional<sf::Texture>, 3> pillarTextures {
+        loadTexture("assets/enemies/richter/skill1.png"),
+        loadTexture("assets/enemies/richter/skill2.png"),
+        loadTexture("assets/enemies/richter/skill3.png")
+    };
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -440,6 +450,7 @@ int arcane::presentation::SfmlApplication::run()
         demonWarriorTextures, largeBirdDemonTextures,
         gargoyleTextures, gargoyleSkillTextures, swordDemonTextures,
         threeHeadedDemonTextures,
+        richterTextures, pillarTextures,
         slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,

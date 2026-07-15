@@ -1602,6 +1602,25 @@ bool newLateActEnemiesExposeFogProjectileAndFlightRules()
             "Large Bird Demon must start 144 pixels above the ground");
 }
 
+bool richterUsesSixSecondEarthMagicCooldown()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {300.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Richter, {700.0F, 0.0F}}};
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 3.01F);
+    if (!expect(combat.enemyState().specialWindingUp,
+        "Richter must begin the first earth-magic windup after half of the six-second cooldown"))
+        return false;
+    combat.update({}, 0.50F);
+    const auto effects = combat.spellEffects();
+    return expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == 9001U && effect.bounds.width == 64.0F
+                && effect.bounds.height == 108.0F && effect.duration == 4.0F;
+        }), "Richter must expose the four-second summoned pillar entity");
+}
+
 bool gargoyleActivatesBeforeFiringAnAngledLaser()
 {
     arcane::game::CombatRequest request;
@@ -1750,6 +1769,7 @@ int main()
         && chaosFlowerSleepReducesOutgoingDamageWithoutWindup()
         && lateSecondActEnemiesExposeConfiguredContent()
         && denkenExposesCremationPoseWhenTornadoEvolves()
+        && richterUsesSixSecondEarthMagicCooldown()
         && laufenTeleportsBehindAndImmediatelySideKicks()
         && swordRelicsModifyCollisionDamage()
         && expandedSpellAndRelicCatalogIsComplete()

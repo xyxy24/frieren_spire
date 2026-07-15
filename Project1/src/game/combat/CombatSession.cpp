@@ -165,7 +165,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
             42.0F, 64.0F, 3.0F, false, false, EnemySkill::SideKick};
     case EnemyArchetype::Richter:
         return EnemyConfig {120.0F, 84.0F, 84.0F, 0.5F, 0.6F, 0.0F, 0.0F,
-            42.0F, 72.0F, 7.0F, false, false, EnemySkill::EarthMagic};
+            42.0F, 72.0F, 6.0F, false, false, EnemySkill::EarthMagic};
     case EnemyArchetype::Denken:
         return EnemyConfig {100.0F, 120.0F, 120.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 64.0F, 9.0F, false, false, EnemySkill::TornadoMagic};
@@ -262,7 +262,7 @@ CombatSession::CombatSession(CombatRequest request)
         if (spawn.archetype == EnemyArchetype::Laufen)
             enemies_.back().specialCooldown = 2.5F;
         if (spawn.archetype == EnemyArchetype::Richter)
-            enemies_.back().specialCooldown = 3.5F;
+            enemies_.back().specialCooldown = 3.0F;
         if (spawn.archetype == EnemyArchetype::Denken)
             enemies_.back().specialCooldown = 4.5F;
         if (spawn.archetype == EnemyArchetype::Heimon)
@@ -1145,7 +1145,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                             if (blessingRemaining_ > 0.0F) onBlessingPreventedControl();
                             else player_.applyLaunch(650.0F, playerControlDuration(0.28F));
                         }
-                        enemy.specialCooldown = 7.0F;
+                        enemy.specialCooldown = 6.0F;
                     }
                 }
                 continue;
