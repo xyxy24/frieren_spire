@@ -1376,10 +1376,13 @@ bool laufenTeleportsBehindAndImmediatelySideKicks()
     combat.update({}, 2.51F);
     combat.update({}, 0.50F);
     const auto enemy = combat.enemyState();
-    return expect(std::abs(enemy.position.x - 234.0F) < 0.01F,
+    if (!expect(std::abs(enemy.position.x - 234.0F) < 0.01F,
             "Laufen must prefer the position twenty-four pixels behind the player")
-        && expect(combat.playerState().currentHealth == 85,
-            "speed magic must force an immediate side kick");
+        || !expect(combat.playerState().currentHealth == 85,
+            "speed magic must force an immediate side kick")) return false;
+    combat.update({}, 0.30F);
+    return expect(combat.playerState().currentHealth == 85,
+        "Laufen side kick must only deal damage once when its windup ends");
 }
 
 bool swordRelicsModifyCollisionDamage()

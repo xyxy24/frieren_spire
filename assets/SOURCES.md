@@ -183,6 +183,13 @@
 - Source: team-provided classroom prototype artwork.
 - Purpose: Richter's idle and earth-magic windup poses, plus the three-stage summoned pillar.
 
+## Laufen character artwork
+
+- Files: `enemies/laufen/*.png`.
+- Added by: project team, 2026-07-15.
+- Source: team-provided classroom prototype artwork.
+- Purpose: Laufen's idle, speed-magic windup, side-kick windup and side-kick attack poses.
+
 ## Three-act environment backgrounds and battle platforms
 
 - Files: runtime textures under `environments/processed/`; generation sources, chroma-key

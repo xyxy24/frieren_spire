@@ -2100,7 +2100,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             && ((config.skill != ai::EnemySkill::Slash
                     && config.skill != ai::EnemySkill::WhirlwindSlash
                     && config.skill != ai::EnemySkill::WolfClaw
-                    && config.skill != ai::EnemySkill::LeafBlade) || skillJustActivated)
+                    && config.skill != ai::EnemySkill::LeafBlade
+                    && config.skill != ai::EnemySkill::SideKick) || skillJustActivated)
             && intersects(playerBounds(), enemy.controller.attackBounds()))
         {
             int damage = 20;

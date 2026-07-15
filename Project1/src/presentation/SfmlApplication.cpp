@@ -184,6 +184,7 @@ struct RenderResources
     const EnemyStateTextures& threeHeadedDemon;
     const EnemyStateTextures& richter;
     const std::array<std::optional<sf::Texture>, 3>& pillar;
+    const EnemyStateTextures& laufen;
     const std::optional<sf::Texture>& slash;
     const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
@@ -243,6 +244,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.swordDemon,
                 resources.threeHeadedDemon,
                 resources.richter, resources.pillar,
+                resources.laufen,
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
@@ -384,6 +386,9 @@ int arcane::presentation::SfmlApplication::run()
         loadTexture("assets/enemies/richter/skill2.png"),
         loadTexture("assets/enemies/richter/skill3.png")
     };
+    EnemyStateTextures laufenTextures = loadEnemyStateTextures(
+        "assets/enemies/laufen/");
+    laufenTextures.preJump = loadTexture("assets/enemies/laufen/windup_attack.png");
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -454,6 +459,7 @@ int arcane::presentation::SfmlApplication::run()
         gargoyleTextures, gargoyleSkillTextures, swordDemonTextures,
         threeHeadedDemonTextures,
         richterTextures, pillarTextures,
+        laufenTextures,
         slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,

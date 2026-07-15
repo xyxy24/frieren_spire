@@ -104,6 +104,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& threeHeadedDemonTextures,
     const EnemyStateTextures& richterTextures,
     const std::array<std::optional<sf::Texture>, 3>& pillarTextures,
+    const EnemyStateTextures& laufenTextures,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -328,6 +329,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &threeHeadedDemonTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Richter)
             stateTextures = &richterTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen)
+            stateTextures = &laufenTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -386,6 +389,12 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 else if (stateTextures->idleVariants[form])
                     texture = &*stateTextures->idleVariants[form];
             }
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen
+                && enemy.specialWindingUp && stateTextures->windup)
+                texture = &*stateTextures->windup;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen
+                && enemy.windingUp && stateTextures->preJump)
+                texture = &*stateTextures->preJump;
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;
