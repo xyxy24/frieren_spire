@@ -12,6 +12,9 @@ namespace
 constexpr std::array SpellDamageSources {
     DamageSource::PlayerSpell0, DamageSource::PlayerSpell1, DamageSource::PlayerSpell2
 };
+constexpr float FrostLanceSlowSeconds = 2.0F;
+constexpr float FrostLanceChillSeconds = 5.5F;
+constexpr float FrostLanceFreezeSeconds = 0.65F;
 
 constexpr bool isPlayerMagic(const DamageSource source) noexcept
 {
@@ -421,7 +424,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (result_->outcome == CombatOutcome::Victory)
         {
             attack_.update(deltaSeconds);
-            player_.update(intent, deltaSeconds, request_.worldBounds);
+            player_.update(intent, deltaSeconds, request_.worldBounds,
+                request_.oneWayPlatforms);
         }
         return;
     }
@@ -526,7 +530,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         playerIntent.jumpPressed = false;
         playerIntent.dashPressed = false;
     }
-    player_.update(playerIntent, deltaSeconds, request_.worldBounds);
+    player_.update(playerIntent, deltaSeconds, request_.worldBounds,
+        request_.oneWayPlatforms);
     for (auto& pillar : activePillars_)
     {
         pillar.remaining = std::max(0.0F, pillar.remaining - deltaSeconds);
@@ -642,6 +647,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         auto& enemy = enemies_[enemyIndex];
         if (!enemy.health.isAlive()) continue;
         enemy.frostSlowRemaining = std::max(0.0F, enemy.frostSlowRemaining - deltaSeconds);
+        enemy.frostChillRemaining = std::max(0.0F,
+            enemy.frostChillRemaining - deltaSeconds);
         enemy.controlRemaining = std::max(0.0F, enemy.controlRemaining - deltaSeconds);
         enemy.exposedRemaining = std::max(0.0F, enemy.exposedRemaining - deltaSeconds);
         enemy.markedRemaining = std::max(0.0F, enemy.markedRemaining - deltaSeconds);
@@ -1291,9 +1298,11 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             for (auto& enemy : enemies_)
                 if (enemy.health.isAlive() && intersects(cast.effectBounds, enemy.controller.bounds()))
                 {
-                    const bool alreadySlowed = enemy.frostSlowRemaining > 0.0F || enemy.slowed;
-                    enemy.frostSlowRemaining = 2.0F;
-                    if (alreadySlowed) enemy.frozenRemaining = 0.65F * relicControlMultiplier(enemy);
+                    const bool canFreeze = enemy.frostChillRemaining > 0.0F || enemy.slowed;
+                    enemy.frostSlowRemaining = FrostLanceSlowSeconds;
+                    enemy.frostChillRemaining = FrostLanceChillSeconds;
+                    if (canFreeze) enemy.frozenRemaining = FrostLanceFreezeSeconds
+                        * relicControlMultiplier(enemy);
                 }
         }
         else if (cast.effect == spells::SpellEffect::FlameBurst)
@@ -1308,6 +1317,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     static_cast<void>(resolveEnemyDamage(enemy,
                             {source, cast.sequence * 16U + 14U, 10, multiplier}));
                     enemy.frostSlowRemaining = 0.0F;
+                    enemy.frostChillRemaining = 0.0F;
                     enemy.frozenRemaining = 0.0F;
                     enemy.burnRemaining = 3.0F;
                     enemy.burnTickAccumulator = 0.0F;

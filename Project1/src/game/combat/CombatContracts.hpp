@@ -38,6 +38,7 @@ struct CombatRequest
     Vec2 playerSpawn {160.0F, 576.0F};
     Vec2 enemySpawn {800.0F, 576.0F};
     WorldBounds worldBounds {0.0F, 1280.0F, 640.0F};
+    std::vector<Aabb> oneWayPlatforms;
     int playerMaximumHealth {100};
     int playerCurrentHealth {100};
     int enemyMaximumHealth {100};

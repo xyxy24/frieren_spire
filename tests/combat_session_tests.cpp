@@ -627,6 +627,55 @@ bool lightningStaffEnhancesExactlyThreeBasicAttacks()
         "Lightning Staff must add three seven-damage hits and one twelve-damage burst");
 }
 
+bool frostLanceCanFreezeAfterItsOwnBaseCooldown()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemyArchetype = arcane::game::EnemyArchetype::ChestMimic;
+    request.enemySpawn = {360.0F, 576.0F};
+    request.enemyMaximumHealth = 200;
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    request.equippedSpellIds[0] = 1005U;
+    request.equippedSpellIds[1] = 1021U;
+    arcane::game::CombatSession combat(request);
+
+    arcane::game::PlayerIntent frost;
+    frost.spellPressed[0] = true;
+    combat.update(frost, 0.01F);
+    const int healthAfterFirstLance = combat.enemyState().currentHealth;
+    combat.update({}, 0.01F);
+    if (!expect(healthAfterFirstLance == 176,
+            "the first Frost Lance should deal twenty-four damage")
+        || !expect(combat.enemyState().slowed,
+            "the first Frost Lance should apply its two-second movement slow"))
+        return false;
+
+    bool observedExpiredSlow = false;
+    for (int step = 0; step < 600
+        && combat.playerState().spellSlots[0].cooldownRemaining > 0.0F; ++step)
+    {
+        combat.update({}, 0.01F);
+        observedExpiredSlow = observedExpiredSlow || !combat.enemyState().slowed;
+    }
+    if (!expect(observedExpiredSlow,
+            "Frost Lance movement slow should still expire before the base cooldown")
+        || !expect(combat.playerState().spellSlots[0].cooldownRemaining <= 0.0F,
+            "Frost Lance should become available after its base cooldown"))
+        return false;
+
+    combat.update(frost, 0.01F);
+    if (!expect(combat.enemyState().currentHealth == 152,
+        "the second Frost Lance should hit while the hidden Chill window remains"))
+        return false;
+
+    arcane::game::PlayerIntent slam;
+    slam.spellPressed[1] = true;
+    combat.update(slam, 0.01F);
+    combat.update({}, 1.01F);
+    return expect(combat.enemyState().currentHealth == 116,
+        "the second Frost Lance must freeze and enable Float and Slam's twelve bonus damage");
+}
+
 bool combatSessionAppliesEquippedSpellDamage()
 {
     auto request = adjacentEnemyRequest();
@@ -1577,6 +1626,7 @@ int main()
         && secondarySpellEffectsKeepTheirCompleteVisualTimelines()
         && newCombatSpellsApplyTheirCoreInteractions()
         && lightningStaffEnhancesExactlyThreeBasicAttacks()
+        && frostLanceCanFreezeAfterItsOwnBaseCooldown()
         && ultimateSlotUsesSharedCooldownAndRejectsRegularSpells()
         && bossRewardDescriptionsExposeImplementedEffects()
         && selectedBossSpellCatalogIsDefinedAndOmitsRejectedChoices()

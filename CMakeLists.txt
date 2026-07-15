@@ -31,6 +31,7 @@ add_library(arcane_core STATIC
     Project1/src/game/run/DeterministicRng.cpp
     Project1/src/game/relics/RelicSystem.cpp
     Project1/src/game/spells/SpellSystem.cpp
+    Project1/src/game/floors/ArenaLayout.cpp
     Project1/src/game/floors/FloorController.cpp
     Project1/src/game/floors/FloorScheduler.cpp
     Project1/src/game/rewards/RewardSystem.cpp
@@ -58,6 +59,7 @@ add_executable(Project1
     Project1/src/presentation/ShadeChargeAnimator.cpp
     Project1/src/presentation/SpellCardArt.cpp
     Project1/src/presentation/SpellEffectAnimator.cpp
+    Project1/src/presentation/views/ArenaView.cpp
     Project1/src/presentation/views/UiPrimitives.cpp
     Project1/src/presentation/views/ScreenViews.cpp
     Project1/src/presentation/views/CombatView.cpp
@@ -121,6 +123,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(tower_session_tests PRIVATE arcane_core)
 
+    add_executable(arena_layout_tests
+        tests/arena_layout_tests.cpp
+    )
+    target_link_libraries(arena_layout_tests PRIVATE arcane_core)
+
     add_executable(sfml_input_mapper_tests
         tests/sfml_input_mapper_tests.cpp
         Project1/src/platform/SfmlInputMapper.cpp
@@ -133,12 +140,14 @@ if(BUILD_TESTING)
         target_compile_options(combat_session_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
         target_compile_options(run_flow_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
         target_compile_options(tower_session_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
+        target_compile_options(arena_layout_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
         target_compile_options(sfml_input_mapper_tests PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
     else()
         target_compile_options(arcane_core_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(combat_session_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(run_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(tower_session_tests PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(arena_layout_tests PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(sfml_input_mapper_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
@@ -146,5 +155,6 @@ if(BUILD_TESTING)
     add_test(NAME combat_session COMMAND combat_session_tests)
     add_test(NAME run_flow COMMAND run_flow_tests)
     add_test(NAME tower_session COMMAND tower_session_tests)
+    add_test(NAME arena_layout COMMAND arena_layout_tests)
     add_test(NAME sfml_input_mapper COMMAND sfml_input_mapper_tests)
 endif()

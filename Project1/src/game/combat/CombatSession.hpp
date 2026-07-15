@@ -76,6 +76,7 @@ private:
         float breathTickAccumulator {};
         std::uint64_t breathSequence {};
         float frostSlowRemaining {};
+        float frostChillRemaining {};
         float controlRemaining {};
         float burnRemaining {};
         float burnTickAccumulator {};

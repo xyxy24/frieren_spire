@@ -1,6 +1,7 @@
 #include "game/player/PlayerController.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace arcane::game
 {
@@ -9,7 +10,8 @@ PlayerController::PlayerController(const Vec2 spawnPosition)
 {
 }
 
-void PlayerController::update(const PlayerIntent& intent, const float deltaSeconds, const WorldBounds& bounds)
+void PlayerController::update(const PlayerIntent& intent, const float deltaSeconds,
+    const WorldBounds& bounds, const std::span<const Aabb> oneWayPlatforms)
 {
     if (deltaSeconds <= 0.0F)
     {
@@ -17,11 +19,32 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     }
 
     const float groundPosition = bounds.groundTop - Height;
-    const bool touchingGround = position_.y >= groundPosition - GroundTolerance && velocity_.y >= 0.0F;
+    const auto overlapsHorizontally = [this](const Aabb& platform) {
+        return position_.x + Width > platform.left
+            && position_.x < platform.left + platform.width;
+    };
+    float supportTop = bounds.groundTop;
+    bool supportedByOneWayPlatform = false;
+    bool touchingGround = position_.y >= groundPosition - GroundTolerance && velocity_.y >= 0.0F;
+    if (!touchingGround && velocity_.y >= 0.0F)
+    {
+        const float playerBottom = position_.y + Height;
+        for (const Aabb& platform : oneWayPlatforms)
+        {
+            if (overlapsHorizontally(platform)
+                && std::abs(playerBottom - platform.top) <= GroundTolerance)
+            {
+                supportTop = platform.top;
+                supportedByOneWayPlatform = true;
+                touchingGround = true;
+                break;
+            }
+        }
+    }
 
     if (touchingGround)
     {
-        position_.y = groundPosition;
+        position_.y = supportTop - Height;
         velocity_.y = 0.0F;
         grounded_ = true;
     }
@@ -78,10 +101,19 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
 
     if (stunRemaining_ <= 0.0F) velocity_.x = (consumedByDash ? 0.0F : moveAxis) * MoveSpeed;
 
+    bool droppingThroughOneWayPlatform = false;
     if (flightRemaining_ > 0.0F && stunRemaining_ <= 0.0F)
     {
         velocity_.y = std::clamp(intent.verticalMoveAxis, -1.0F, 1.0F) * MoveSpeed;
         grounded_ = false;
+    }
+    else if (intent.jumpPressed && intent.verticalMoveAxis > 0.5F
+        && !consumedByDash && grounded_ && supportedByOneWayPlatform
+        && stunRemaining_ <= 0.0F)
+    {
+        velocity_.y = DropThroughSpeed;
+        grounded_ = false;
+        droppingThroughOneWayPlatform = true;
     }
     else if (intent.jumpPressed && !consumedByDash && grounded_ && stunRemaining_ <= 0.0F)
     {
@@ -94,6 +126,7 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
         velocity_.y += Gravity * simulationSeconds;
     }
 
+    const float previousBottom = position_.y + Height;
     position_.x += velocity_.x * simulationSeconds;
     position_.y += velocity_.y * simulationSeconds;
 
@@ -101,11 +134,39 @@ void PlayerController::update(const PlayerIntent& intent, const float deltaSecon
     if (flightRemaining_ > 0.0F)
         position_.y = std::clamp(position_.y, 48.0F, groundPosition);
 
-    if (position_.y >= groundPosition && velocity_.y >= 0.0F)
+    bool landed = false;
+    float landingTop = bounds.groundTop;
+    const float currentBottom = position_.y + Height;
+    if (flightRemaining_ <= 0.0F && velocity_.y >= 0.0F)
     {
-        position_.y = groundPosition;
+        if (previousBottom <= bounds.groundTop + GroundTolerance
+            && currentBottom >= bounds.groundTop)
+            landed = true;
+        if (!droppingThroughOneWayPlatform)
+        {
+            for (const Aabb& platform : oneWayPlatforms)
+            {
+                if (overlapsHorizontally(platform)
+                    && previousBottom <= platform.top + GroundTolerance
+                    && currentBottom >= platform.top
+                    && (!landed || platform.top < landingTop))
+                {
+                    landingTop = platform.top;
+                    landed = true;
+                }
+            }
+        }
+    }
+
+    if (landed)
+    {
+        position_.y = landingTop - Height;
         velocity_.y = 0.0F;
         grounded_ = true;
+    }
+    else if (flightRemaining_ <= 0.0F)
+    {
+        grounded_ = false;
     }
 }
 

@@ -97,7 +97,7 @@ std::string makeWindowTitle(const ui::ApplicationViewModel& app)
                 return title + "EVENT RESULT - E Close";
             return title + "EVENT CHOICE - U I O Select | E Close";
         }
-        return title + "A/D Move, Space Jump, J Attack, K Dash, U/I/O Spells, R Ultimate, Tab Loadout";
+        return title + "A/D Move, Space Jump, S+Space Drop, J Attack, K Dash, U/I/O Spells, R Ultimate, Tab Loadout";
     case arcane::game::run::RunPhase::LootPending:
         return title + "ENEMY DROP - Move To Drop, E Inspect Reward | Tab Loadout";
     case arcane::game::run::RunPhase::Reward:
@@ -190,6 +190,7 @@ struct RenderResources
     const EnemyStateTextures& denken;
     const std::array<std::optional<sf::Texture>, 2>& tornado;
     const DialoguePortraitTextures& portraits;
+    const ArenaTextures& arena;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator;
@@ -235,7 +236,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
                 resources.draht, resources.aura, resources.revolte,
-                resources.denken, resources.tornado, resources.playerAnimator,
+                resources.denken, resources.tornado, resources.arena,
+                resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.spellAnimator, feedback);
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
             if (const auto loot = tower->lootDropBounds())
@@ -252,7 +254,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 || tower->currentFloorType() == arcane::game::run::FloorType::Event))
         {
             drawSpecialFloor(window, *tower, resources.playerAnimator,
-                resources.shadeChargeAnimator);
+                resources.shadeChargeAnimator, resources.arena);
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
             {
@@ -393,6 +395,7 @@ int arcane::presentation::SfmlApplication::run()
             loadTexture("assets/portraits/revolte/avatar2.png"),
             loadTexture("assets/portraits/revolte/avatar3.png")}
     };
+    const ArenaTextures arenaTextures = loadArenaTextures("assets/environments/processed");
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
     arcane::presentation::ShadeChargeAnimator shadeChargeAnimator;
@@ -409,7 +412,7 @@ int arcane::presentation::SfmlApplication::run()
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,
         denkenTextures, tornadoTextures, dialoguePortraits,
-        lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,
+        arenaTextures, lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,
         spellEffectAnimator};
     sf::Clock frameClock;
     ui::CombatFeedbackViewModel combatFeedback;

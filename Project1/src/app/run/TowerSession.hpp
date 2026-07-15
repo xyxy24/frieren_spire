@@ -5,6 +5,7 @@
 #include "game/contracts/PlayerIntent.hpp"
 #include "game/economy/MerchantSystem.hpp"
 #include "game/events/EventSystem.hpp"
+#include "game/floors/ArenaLayout.hpp"
 #include "game/floors/FloorScheduler.hpp"
 
 #include <array>
@@ -43,6 +44,7 @@ public:
     [[nodiscard]] const RunController& run() const noexcept;
     [[nodiscard]] const game::CombatSession* combat() const noexcept;
     [[nodiscard]] game::run::FloorType currentFloorType() const noexcept;
+    [[nodiscard]] const game::floors::ArenaLayout& arenaLayout() const;
     [[nodiscard]] std::optional<std::array<game::run::ContentId, 3>> rewardCandidates() const;
     [[nodiscard]] std::optional<game::Aabb> lootDropBounds() const noexcept;
     [[nodiscard]] bool equipRegularSpell(std::size_t slot, game::run::ContentId spell);
@@ -71,6 +73,7 @@ private:
     std::optional<game::Aabb> lootDropBounds_;
     std::optional<game::PlayerController> explorationPlayer_;
     game::run::FloorType currentFloorType_ {game::run::FloorType::Combat};
+    const game::floors::ArenaLayout* arenaLayout_ {};
     std::vector<game::economy::StockItem> merchantStock_;
     std::size_t selectedMerchantIndex_ {0};
     std::optional<game::events::EventTransaction> eventTransaction_;
