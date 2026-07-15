@@ -93,6 +93,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const std::array<std::optional<sf::Texture>, 2>& heimonSkillTextures,
     const std::optional<sf::Texture>& heimonFogTexture,
     const EnemyStateTextures& demonWarriorTextures,
+    const EnemyStateTextures& largeBirdDemonTextures,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -157,7 +158,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 static_cast<float>(size.y) * 0.5F});
             slash.setPosition({effect.bounds.left + effect.bounds.width * 0.5F,
                 effect.bounds.top + effect.bounds.height * 0.5F});
-            slash.setScale({(effect.facingDirection > 0.0F ? 1.0F : -1.0F)
+            slash.setScale({(effect.facingDirection > 0.0F ? -1.0F : 1.0F)
                     * effect.bounds.width / static_cast<float>(size.x),
                 effect.bounds.height / static_cast<float>(size.y)});
             target.draw(slash);
@@ -250,6 +251,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &heimonTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::DemonWarrior)
             stateTextures = &demonWarriorTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::LargeBirdDemon)
+            stateTextures = &largeBirdDemonTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)

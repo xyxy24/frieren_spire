@@ -177,6 +177,7 @@ struct RenderResources
     const std::array<std::optional<sf::Texture>, 2>& heimonSkill;
     const std::optional<sf::Texture>& heimonFog;
     const EnemyStateTextures& demonWarrior;
+    const EnemyStateTextures& largeBirdDemon;
     const std::optional<sf::Texture>& slash;
     const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
@@ -226,7 +227,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             drawCombat(window, *tower, resources.headless, resources.mimic, resources.bird,
                 resources.frostWolf, resources.chaosFlower, resources.qual, resources.qualSkill,
                 resources.heimon, resources.heimonSkill, resources.heimonFog,
-                resources.demonWarrior, resources.slash, resources.largeSlash,
+                resources.demonWarrior, resources.largeBirdDemon,
+                resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
                 resources.draht, resources.aura, resources.playerAnimator,
@@ -335,6 +337,8 @@ int arcane::presentation::SfmlApplication::run()
         loadTexture("assets/enemies/heimon/fog.png");
     const EnemyStateTextures demonWarriorTextures = loadEnemyStateTextures(
         "assets/enemies/demon_warrior/");
+    const EnemyStateTextures largeBirdDemonTextures = loadEnemyStateTextures(
+        "assets/enemies/large_bird_demon/");
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -375,7 +379,7 @@ int arcane::presentation::SfmlApplication::run()
     const RenderResources renderResources {headlessKnightTextures, chestMimicTextures,
         birdDemonTextures, frostWolfTextures, chaosFlowerTextures, qualTextures, qualSkillTextures,
         heimonTextures, heimonSkillTextures, heimonFogTexture,
-        demonWarriorTextures, slashTexture, largeSlashTexture,
+        demonWarriorTextures, largeBirdDemonTextures, slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
         lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,
