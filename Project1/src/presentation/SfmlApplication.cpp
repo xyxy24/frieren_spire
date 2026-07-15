@@ -366,8 +366,9 @@ int arcane::presentation::SfmlApplication::run()
         "assets/enemies/draht/");
     const EnemyStateTextures auraTextures = loadEnemyStateTextures(
         "assets/enemies/aura/", false, true, false);
-    EnemyStateTextures revolteTextures = loadEnemyStateTextures(
-        "assets/enemies/revolte/", false, false, true);
+    EnemyStateTextures revolteTextures;
+    revolteTextures.idle = loadTexture("assets/enemies/revolte/idle.png");
+    revolteTextures.attack = loadTexture("assets/enemies/revolte/attack.png");
     revolteTextures.die = loadTexture("assets/enemies/revolte/die.png");
     revolteTextures.parry = loadTexture("assets/enemies/revolte/parry.png");
     revolteTextures.dash = loadTexture("assets/enemies/revolte/dash.png");
