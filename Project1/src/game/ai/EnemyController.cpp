@@ -191,6 +191,13 @@ Aabb EnemyController::attackBounds() const noexcept
         return {position_.x - config_.attackRange, groundTop_ - 24.0F,
             config_.width + config_.attackRange * 2.0F, 24.0F};
     }
+    if (config_.skill == EnemySkill::Domination)
+    {
+        constexpr float EffectHeight = 180.0F;
+        const float left = facingDirection_ > 0.0F
+            ? position_.x + config_.width : position_.x - config_.attackRange;
+        return {left, groundTop_ - EffectHeight, config_.attackRange, EffectHeight};
+    }
     if (config_.skill == EnemySkill::Blood)
     {
         const float left = facingDirection_ > 0.0F

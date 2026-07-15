@@ -67,7 +67,7 @@ flowchart TB
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
 
-当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）、`views/CombatView`（战斗场景、敌人贴图、Boss 对话）与 `views/SpellAcquisitionView`（场景内光球、工程诊断窗、注册几何网络、星爆和信息落版）；`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。
+当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）、`views/CombatView`（战斗场景、敌人贴图、Boss 对话）与 `views/SpellAcquisitionView`（场景内光球、工程诊断窗、注册几何网络、星爆和信息落版）；`PlayerAnimator` 和 `EnemyAnimator` 仅根据只读战斗快照推进表现帧，`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。
 
 `ApplicationViewModel`、`LoadoutViewModel` 与 `SpellAcquisitionViewModel` 是有状态 ViewModel；`ApplicationSnapshot`、`LoadoutSnapshot`、`RewardViewModel`、`MerchantViewModel`、`SpellAcquisitionSnapshot` 和装备槽投影是 View 的只读绑定对象。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。获取演出 ViewModel 只在检测到已学列表增长后启动，保存内容 ID 和表现时间；奖励已经由 Model 原子结算，演出不能重复发放或自动装备。演出期间 Model 不推进，`PlayerAnimator` 由表现层覆盖为一次性的 `Pickup` 姿态并停在末帧，避免复用冻结前残留速度而显示跑步。`CombatFeedbackViewModel` 是仅持有表现寿命的 ViewModel：它读取相邻两帧 `PlayerStateView/EnemyStateView` 的权威 HP 差值，产出目标闪白、飘字、命中扩散环、纯视觉击退、确定性镜头偏移和短命中停顿请求，并在楼层切换时重置。事件、战斗 HUD 和特殊楼层面板目前仍读取 Model 的只读快照，后续按同一边界迁移。
 
@@ -140,7 +140,7 @@ stateDiagram-v2
 
 命中停顿不写入 Model，也不改变已经产生的 `DamageResult`。`CombatFeedbackViewModel` 按一次权威 HP 差值选择轻/中/重停顿参数，同一帧只保留最长值；SFML 应用壳在活动战斗中通过 `combatDeltaSeconds()` 将 Model 和角色动画的 delta 暂时置零，同时仍用真实 delta 更新反馈 ViewModel。由于被冻结时间不在后续帧补算，攻击序列、持续伤害、AI、无敌计时和技能冷却都不会因表现停顿发生重复结算或时间跳跃。敌人的 7 px 命中位移只修改绘制位置，不修改 `EnemyController` 碰撞体或 B 负责的 AI 行为。
 
-当前原型由 `EnemyController` 产出带递增序列号的攻击有效帧。技能冷却是与 `Chase` 并行推进的独立计时器，开场初始化为定义 CD 的一半；进入 `Windup` 时锁定朝向，只有回到 `Chase` 后才能重新面向玩家；`Windup/Active` 结束后立即回到追击并启动完整 CD。追击停止点按双方 AABB 水平边缘间距计算，有碰撞伤害者为 20 px，无碰撞伤害者为 42 px；技能触发距离另按“玩家宽度至少一半进入技能区域”计算，二者不得共用一个中心距离。`CombatSession` 负责多敌人序列隔离、扣除 HP 并调用玩家受击反应。非位移技能可通过 `EnemyStateView::skillEffectBounds` 向表现层提供只读矩形区域，表现层不自行推导射程；支配是明确不公开范围框的例外。
+当前原型由 `EnemyController` 产出带递增序列号的攻击有效帧。技能冷却是与 `Chase` 并行推进的独立计时器，开场初始化为定义 CD 的一半；进入 `Windup` 时锁定朝向，只有回到 `Chase` 后才能重新面向玩家；`Windup/Active` 结束后立即回到追击并启动完整 CD。追击停止点按双方 AABB 水平边缘间距计算，有碰撞伤害者为 20 px，无碰撞伤害者为 42 px；技能触发距离另按“玩家宽度至少一半进入技能区域”计算，二者不得共用一个中心距离。`CombatSession` 负责多敌人序列隔离、扣除 HP 并调用玩家受击反应。非位移技能可通过 `EnemyStateView::skillEffectBounds` 向表现层提供只读矩形区域，表现层不自行推导射程；阿乌拉支配也公开与结算一致的身前预警区。
 
 海蒙的固定雾区、敌人隐匿进度和可受伤性由 `CombatSession` 权威维护，View 只读取 `concealmentProgress` 调整透明度、隐藏血条并绘制雾区；完全隐匿同时关闭所有伤害与敌人碰撞伤害。雾区 AABB 在施法完成时写入 `EnemyRuntime`，此后不再由海蒙位置推导。魔族战士的移动斩击同样是战斗域拥有的临时实体，具有独立 AABB、方向、剩余距离和伤害序列，表现层只消费只读特效快照。大型鸟魔物的突袭目标在进入前摇时锁定，由 `EnemyController` 推进下降、触地和返航阶段。
 
@@ -152,7 +152,7 @@ stateDiagram-v2
 
 剑之乡专属遗物仍以稳定内容 ID 存入本局遗物集合，但不加入 `RelicMerchantCatalog`。勇者之剑通过 `DamageRequest::flatReduction` 修正 `EnemyContact`；真-勇者之剑只在 `DamageResult::appliedDamage > 0` 后产生一次范围反击，避免黑冲无敌、护盾或减伤令实际伤害归零时仍触发，也不得递归响应自身伤害。
 
-阿乌拉的“不死大军”是 `CombatSession` 拥有的 Boss 召唤计时器，而不是表现层生成对象：开场和每次 12 秒触发均创建两个拥有独立 AI、HP、伤害序列与血条的无头骑士 `EnemyRuntime`。支配继续通过敌人攻击序列结算，但基础伤害为 0，命中后提交 1.5 秒控制；黑冲无敌和负面状态免疫在应用控制前统一判断。
+阿乌拉的“不死大军”是 `CombatSession` 拥有的 Boss 召唤计时器，而不是表现层生成对象：开场和每次 12 秒触发均创建两个拥有独立 AI、HP、伤害序列与血条的无头骑士 `EnemyRuntime`。支配使用锁定朝向后的身前 `420×180 px` AABB、0.8 秒前摇和单次攻击序列结算，基础伤害为 0，命中后提交 1 秒控制；首次施放只绕过女神加护与普通控制抗性，空间相交、黑冲和法术无敌始终在应用控制前判断。表现层仅按 `skillEffectBounds` 缩放八帧预警特效，不复制判定公式。
 
 红镜龙原型当前处于延期状态，不得由楼层调度器生成。其爪击与吐焰实验代码暂时保留以便后续恢复，但不属于当前可玩内容或交付验收范围。Boss UI 仍根据 `EnemyArchetype` 判断主 Boss，不能仅凭楼层类型把召唤物也画成固定 Boss 血条。
 
@@ -189,7 +189,7 @@ stateDiagram-v2
 - `PlayerStateView` 额外公开权威速度、基础攻击序列号、成功施法序列号、受击序列号与受击无敌剩余时间。SFML `PlayerAnimator` 只用这些只读字段选择或触发动画；一次性动画不得反向延长攻击有效帧、施法冷却、冲刺时间、无敌时间或受击控制。玩家精灵统一为 `128×96` 帧并以 `(64, 92)` 脚底锚点对齐 `42×64` 权威碰撞体，向左朝向通过表现层水平镜像实现。
 - `ShadeChargeAnimator` 只读取投影到 `PlayerVisualState` 的 `shadowDashChargeRemaining` 与 `shadowDashing`：以最多 12 个确定性粒子模板绘制向胸口收束的黑紫轨迹，并在就绪时播放一次 0.3 秒暗环后停止绘制。它是黑冲充能进度的唯一画面提示，HUD 不再重复绘制独立充能条；它不拥有或修改 1.5 秒充能、无敌和标记规则，暂停、构筑与魔法获取覆盖层只冻结其表现时钟。
 - `SpellEffectAnimator` 在表现层持有 32 套法术图集纹理和 33 个当前法术 ID 的布局映射。图集帧尺寸、锚点与播放速度来自经审核的 `assets/spells/processed/manifest.json`，运行时代码不读取或修改领域数值；CMake 将标准化图集复制到可执行文件旁的 `assets/spells/`。每个映射显式选择固定中心、施法者脚底、目标地面、前方端点、地面铺设、牵引线、单光束、三重光束、追踪弹组或多火柱布局，并只允许等比缩放图集。瞬发效果的生命周期不得短于 `frameCount / framesPerSecond`，持续效果必须完整播放入场帧、循环中段和退场帧；二次触发的魔像碎裂与镜阵响应也遵守同一规则。当前朝向型法术读取玩家的只读朝向进行水平镜像，正式拆分弹体与命中阶段时再由 `SpellVisualEvent` 携带施法瞬间朝向。
-- `EnemyStateView` 还公开锁定后的朝向。SFML 表现层可按敌人类型和 `windingUp/attackActive` 选择贴图并水平翻转，但贴图尺寸、透明区域和视觉偏移不得反向改变领域碰撞箱。当前无头骑士使用 `64×64`，宝箱怪和鸟形魔物使用 `54×54` 的 idle/windup/attack PNG；三者均以脚底中心对齐权威碰撞箱。资源由 CMake 复制到可执行文件旁的 `assets/`。
+- `EnemyStateView` 还公开锁定后的朝向。SFML `EnemyAnimator` 按敌人类型和 `windingUp/attackActive` 选择四帧 idle/windup/attack 图集行并水平翻转；状态切换会从该行首帧开始，待机以 4 FPS 按 `0-1-2-3-2-1` 往返播放，前摇以 9 FPS 推进，短攻击以 30 FPS 播放。动画器比较相邻只读快照的水平位置，只在实际位移时为拥有 `walk.png` 的敌人播放 10 FPS 行走循环；当前无头骑士使用八帧重甲步态，停下即回到待机，表现检测不能写回 AI 速度或位置。离线处理按每帧可见高度独立缩放，攻击与前摇不得低于对应敌人待机高度的 90%，再以源格中心和旧姿势地面线对齐，并用三倍宽透明画布容纳武器和拖尾，避免横向攻击把角色本体缩小、原地漂移或在循环边界突跳；这些表现参数不得反向改变领域碰撞箱、攻击有效时间或伤害。特殊跳跃、召唤、登场和死亡姿势优先于通用图集。资源由 CMake 复制到可执行文件旁的 `assets/`。
 - 每次基础攻击都有递增序列号，命中目标后记录序列号，保证活动帧跨越多个更新时不会重复结算。
 - `Health`、攻击计时和 AABB 相交判断位于领域层；窗口、键盘和 SFML 图形类型不得进入这些接口。
 

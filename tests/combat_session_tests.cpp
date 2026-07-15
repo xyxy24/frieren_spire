@@ -1115,7 +1115,7 @@ bool auraOpensWithTwoHeadlessKnights()
             "Aura opening army must contain two headless knights");
 }
 
-bool auraDominationUsesUpdatedCooldownAndStun()
+bool auraDominationUsesTelegraphedFrontRange()
 {
     arcane::game::CombatRequest request;
     request.playerSpawn = {160.0F, 576.0F};
@@ -1134,21 +1134,59 @@ bool auraDominationUsesUpdatedCooldownAndStun()
     blessing.spellPressed[0] = true;
     combat.update(blessing, 0.01F);
     combat.update({}, 3.51F);
+    combat.update({}, 0.01F);
     if (!expect(combat.dialogueLine().has_value(),
         "Aura's first domination must pause combat for dialogue")) return false;
     const auto winding = combat.enemyState();
-    if (!expect(winding.windingUp && !winding.skillEffectBounds.has_value(),
-        "Aura domination must show windup without drawing a range rectangle")) return false;
+    if (!expect(winding.windingUp && winding.skillEffectBounds.has_value(),
+        "Aura domination must expose its telegraphed range during windup")) return false;
+    const auto area = *winding.skillEffectBounds;
+    if (!expect(area.width == 420.0F && area.height == 180.0F,
+            "Aura domination must use the configured 420 by 180 area")
+        || !expect(area.left + area.width <= winding.position.x,
+            "left-facing domination must remain entirely in front of Aura")) return false;
     const float cooldownDuringDialogue = winding.skillEffectProgress;
     combat.update({}, 100.0F);
     if (!expect(combat.enemyState().skillEffectProgress == cooldownDuringDialogue,
         "combat simulation must remain frozen while dialogue is active")) return false;
     advanceDialogue(combat);
-    combat.update({}, 0.50F);
+    combat.update({}, 0.80F);
     combat.update({}, 0.01F);
-    return expect(combat.playerState().stunRemaining > 0.9F
+    if (!expect(combat.playerState().stunRemaining > 0.9F
             && combat.playerState().stunRemaining <= 1.0F,
-        "first domination must hit at unlimited range through negative-status immunity");
+        "first domination must control a player who remains inside the telegraph")) return false;
+
+    arcane::game::CombatRequest dodgeRequest = request;
+    dodgeRequest.equippedSpellIds[0] = std::nullopt;
+    arcane::game::CombatSession dodge(dodgeRequest);
+    dodge.update({}, 2.40F);
+    advanceDialogue(dodge);
+    dodge.update({}, 3.51F);
+    dodge.update({}, 0.01F);
+    if (!expect(dodge.dialogueLine().has_value(),
+        "dodge scenario must reach the first domination dialogue")) return false;
+    advanceDialogue(dodge);
+    arcane::game::PlayerIntent escape;
+    escape.moveAxis = -1.0F;
+    dodge.update(escape, 0.65F);
+    dodge.update({}, 0.16F);
+    if (!expect(dodge.playerState().stunRemaining <= 0.0F,
+        "leaving the telegraphed rectangle during windup must avoid domination")) return false;
+
+    arcane::game::CombatSession shadowDash(dodgeRequest);
+    shadowDash.update({}, 2.40F);
+    advanceDialogue(shadowDash);
+    shadowDash.update({}, 3.51F);
+    shadowDash.update({}, 0.01F);
+    advanceDialogue(shadowDash);
+    shadowDash.update({}, 0.69F);
+    arcane::game::PlayerIntent dash;
+    dash.dashPressed = true;
+    shadowDash.update(dash, 0.01F);
+    shadowDash.update({}, 0.11F);
+    shadowDash.update({}, 0.20F);
+    return expect(shadowDash.playerState().stunRemaining <= 0.0F,
+        "a charged Shade Dash must avoid even the first domination impact");
 }
 
 bool defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
@@ -1738,7 +1776,7 @@ int main()
         && linieUsesGroundedMediumImpactArea()
         && displacementSkillTriggersWhenPlayerEdgeEntersExtendedRange()
         && auraOpensWithTwoHeadlessKnights()
-        && auraDominationUsesUpdatedCooldownAndStun()
+        && auraDominationUsesTelegraphedFrontRange()
         && defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
         && revolteLocksAtFiveAndHealsForSecondPhase()
         && revolteParryActivatesWithoutWindup()

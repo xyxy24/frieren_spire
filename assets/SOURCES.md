@@ -49,6 +49,25 @@
 - Original source/license: not yet recorded; classroom prototype use only until the team fills this in.
 - Purpose: Aura's intro, idle, domination-windup and defeated presentation, plus dialogue portraits for Aura and Frieren.
 
+## Enemy animation atlases
+
+- Files: `enemies/*/animation.png`, `enemies/headless_knight/walk.png`, `enemies/aura/domination.png`; generation sources and chroma-cleaned intermediates under
+  `../Project1/assets/enemies/generated-animation-sheets/`.
+- Added by: project team with OpenAI built-in image generation and deterministic local cleanup,
+  2026-07-15.
+- Original source/license: AI-generated classroom prototype material based on the team's existing
+  enemy placeholder identities; no external animation pack.
+- Prompt record: `../docs/ENEMY_ANIMATION_ART_DIRECTION.md` records the shared grid constraints and
+  per-enemy motion direction.
+- Processing: the image-generation skill's installed chroma-key helper removes the flat green or
+  magenta background. `scripts/PrepareEnemyAnimations.py` normalizes visible character height with
+  nearest-neighbor sampling, preserves the ground anchor, and validates that attack/walk frames do
+  not shrink below their configured size floor.
+- Purpose: four-frame idle, windup, and attack presentation for all thirteen currently textured
+  enemy archetypes, an eight-frame movement cycle for the Headless Knight, and an eight-frame
+  telegraph/impact effect for Aura's authoritative domination area. Enemy movement animation leaves
+  domain movement unchanged; domination visuals consume rather than recalculate its domain AABB.
+
 ## Player pixel-animation placeholders
 
 - Files: `../Project1/assets/player/generated/*.png` and derived

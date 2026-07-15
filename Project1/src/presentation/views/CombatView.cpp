@@ -22,9 +22,12 @@ std::optional<sf::Texture> loadTexture(const std::string& path)
 }
 
 EnemyStateTextures loadEnemyStateTextures(const std::string_view base, const bool loadJump,
-    const bool loadIntroAndDeath, const bool loadAttack, const bool loadPreJump)
+    const bool loadIntroAndDeath, const bool loadAttack, const bool loadPreJump,
+    const bool loadWalk)
 {
     EnemyStateTextures textures;
+    textures.animation = loadTexture(std::string {base} + "animation.png");
+    if (loadWalk) textures.walk = loadTexture(std::string {base} + "walk.png");
     if (loadIntroAndDeath) textures.initial = loadTexture(std::string {base} + "initial.png");
     textures.idle = loadTexture(std::string {base} + "idle.png");
     textures.windup = loadTexture(std::string {base} + "windup.png");
@@ -111,6 +114,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& denkenTextures,
     const std::array<std::optional<sf::Texture>, 2>& tornadoTextures,
     const ArenaTextures& arenaTextures,
+    const arcane::presentation::EnemyAnimator& enemyAnimator,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator,
@@ -319,6 +323,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         else if (enemy.archetype == arcane::game::EnemyArchetype::Denken)
             stateTextures = &denkenTextures;
         const sf::Texture* texture = nullptr;
+        std::optional<sf::IntRect> animationFrame;
+        bool usingWalkAnimation = false;
         if (stateTextures)
         {
             const auto dialogue = combat->dialogueLine();
@@ -377,23 +383,48 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 && enemy.attackActive && enemy.skillVariant >= 0 && enemy.skillVariant <= 2
                 && stateTextures->skillAttacks[static_cast<std::size_t>(enemy.skillVariant)])
                 texture = &*stateTextures->skillAttacks[static_cast<std::size_t>(enemy.skillVariant)];
-            else if (enemy.attackActive && stateTextures->attack) texture = &*stateTextures->attack;
-            else if (enemy.windingUp && stateTextures->windup) texture = &*stateTextures->windup;
-            else if (stateTextures->idle) texture = &*stateTextures->idle;
+            if (!texture && stateTextures->walk && enemyAnimator.isWalking(enemyIndex))
+            {
+                animationFrame = enemyAnimator.walkFrameRect(*stateTextures->walk, enemyIndex);
+                if (animationFrame)
+                {
+                    texture = &*stateTextures->walk;
+                    usingWalkAnimation = true;
+                }
+            }
+            if (!texture && stateTextures->animation)
+            {
+                animationFrame = enemyAnimator.frameRect(*stateTextures->animation, enemyIndex);
+                if (animationFrame) texture = &*stateTextures->animation;
+            }
+            if (!texture && enemy.attackActive && stateTextures->attack)
+                texture = &*stateTextures->attack;
+            else if (!texture && enemy.windingUp && stateTextures->windup)
+                texture = &*stateTextures->windup;
+            else if (!texture && stateTextures->idle)
+                texture = &*stateTextures->idle;
         }
         if (texture)
         {
             sf::Sprite sprite(*texture);
-            const auto textureSize = texture->getSize();
-            sprite.setOrigin({static_cast<float>(textureSize.x) * 0.5F,
-                static_cast<float>(textureSize.y)});
+            sf::Vector2f frameSize {static_cast<float>(texture->getSize().x),
+                static_cast<float>(texture->getSize().y)};
+            if (animationFrame)
+            {
+                sprite.setTextureRect(*animationFrame);
+                frameSize = {static_cast<float>(animationFrame->size.x),
+                    static_cast<float>(animationFrame->size.y)};
+            }
+            sprite.setOrigin({frameSize.x * 0.5F, frameSize.y});
             sprite.setPosition({enemy.position.x + enemy.width * 0.5F + impactOffset,
                 enemy.position.y + enemy.height});
             if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 4 && (enemy.windingUp || enemy.attackActive))
                 sprite.move({0.0F, 10.0F});
             float horizontalScale = enemy.facingDirection > 0.0F ? -1.0F : 1.0F;
-            if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf)
+            if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
+                || (enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight
+                    && usingWalkAnimation))
                 horizontalScale = -horizontalScale;
             sprite.setScale({horizontalScale, 1.0F});
 auto alpha = static_cast<std::uint8_t>(255.0F * (1.0F - std::clamp(enemy.concealmentProgress, 0.0F, 1.0F)));
@@ -431,6 +462,16 @@ else enemyColor.a = alpha;
                 && enemy.attackActive;
             const bool heimonAttack = enemy.archetype == arcane::game::EnemyArchetype::Heimon
                 && enemy.attackActive && !enemy.specialAttackActive;
+            const bool auraDomination = enemy.archetype == arcane::game::EnemyArchetype::Aura
+                && (enemy.windingUp || enemy.attackActive);
+            std::optional<sf::IntRect> dominationFrame;
+            const sf::Texture* dominationTexture = nullptr;
+            if (auraDomination && stateTextures && stateTextures->domination)
+            {
+                dominationFrame = enemyAnimator.dominationFrameRect(
+                    *stateTextures->domination, enemyIndex);
+                if (dominationFrame) dominationTexture = &*stateTextures->domination;
+            }
             const sf::Texture* bloodTexture = nullptr;
             if (lugnerBlood)
             {
@@ -466,7 +507,21 @@ else enemyColor.a = alpha;
                 if (heimonSkillTextures[frame])
                     fogAttackTexture = &*heimonSkillTextures[frame];
             }
-            if (fogAttackTexture)
+            if (dominationTexture && dominationFrame)
+            {
+                sf::Sprite effect(*dominationTexture, *dominationFrame);
+                const sf::Vector2f size {
+                    static_cast<float>(dominationFrame->size.x),
+                    static_cast<float>(dominationFrame->size.y)};
+                effect.setOrigin({size.x * 0.5F, size.y * 0.5F});
+                effect.setPosition({area.left + area.width * 0.5F,
+                    area.top + area.height * 0.5F});
+                effect.setScale({area.width / size.x, area.height / size.y});
+                effect.setColor(enemy.attackActive
+                    ? sf::Color::White : sf::Color {255, 255, 255, 205});
+                target.draw(effect);
+            }
+            else if (fogAttackTexture)
             {
                 sf::Sprite effect(*fogAttackTexture);
                 const auto size = fogAttackTexture->getSize();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/run/TowerSession.hpp"
+#include "presentation/EnemyAnimator.hpp"
 #include "presentation/PlayerAnimator.hpp"
 #include "presentation/ShadeChargeAnimator.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
@@ -18,6 +19,9 @@ namespace arcane::presentation::views
 {
 struct EnemyStateTextures
 {
+    std::optional<sf::Texture> animation;
+    std::optional<sf::Texture> walk;
+    std::optional<sf::Texture> domination;
     std::optional<sf::Texture> initial;
     std::optional<sf::Texture> idle;
     std::optional<sf::Texture> windup;
@@ -46,7 +50,7 @@ struct DialoguePortraitTextures
 [[nodiscard]] std::optional<sf::Texture> loadTexture(const std::string& path);
 [[nodiscard]] EnemyStateTextures loadEnemyStateTextures(std::string_view base,
     bool loadJump = false, bool loadIntroAndDeath = false, bool loadAttack = true,
-    bool loadPreJump = false);
+    bool loadPreJump = false, bool loadWalk = false);
 [[nodiscard]] PlayerVisualState makePlayerVisualState(const game::PlayerStateView& player);
 [[nodiscard]] PlayerVisualState makePlayerVisualState(
     const game::PlayerController& player, int currentHealth);
@@ -76,7 +80,8 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& denkenTextures,
     const std::array<std::optional<sf::Texture>, 2>& tornadoTextures,
     const ArenaTextures& arenaTextures,
-    const PlayerAnimator& playerAnimator, const ShadeChargeAnimator& shadeChargeAnimator,
+    const EnemyAnimator& enemyAnimator, const PlayerAnimator& playerAnimator,
+    const ShadeChargeAnimator& shadeChargeAnimator,
     const SpellEffectAnimator& spellEffectAnimator,
     const viewmodel::CombatFeedbackSnapshot& feedback);
 void drawCombatOverlay(sf::RenderTarget& target, const game::CombatSession& combat,
