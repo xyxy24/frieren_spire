@@ -125,6 +125,21 @@ constexpr std::array RevolteSecondPhaseDialogue {
 constexpr std::array RevolteDefeatDialogue {
     CombatDialogueLineView {"REVOLTE", "YOU WIN, ELF.", "revolte-3"}
 };
+constexpr std::array WaterMirrorPreBattleDialogue {
+    CombatDialogueLineView {"FRIEREN", "SO THIS IS THE TOP. THAT WAS EASIER THAN I EXPECTED.", "frieren"},
+    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "water-mirror"},
+    CombatDialogueLineView {"FRIEREN", "COPIES THAT REPRODUCE EVEN INDIVIDUAL ABILITIES... INTERESTING.", "frieren"},
+    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "water-mirror"}
+};
+constexpr std::array WaterMirrorSecondPhaseDialogue {
+    CombatDialogueLineView {"FRIEREN", "IS THAT... A COPY OF ME?", "frieren"},
+    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "water-mirror"},
+    CombatDialogueLineView {"FRIEREN", "THEN LET US SEE WHAT IT CAN DO.", "frieren"}
+};
+constexpr std::array WaterMirrorDefeatDialogue {
+    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "water-mirror"},
+    CombatDialogueLineView {"FRIEREN", "WHEW. THAT WAS NOT EASY.", "frieren"}
+};
 }
 
 ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
@@ -196,6 +211,18 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
     case EnemyArchetype::RedMirrorDragon:
         return EnemyConfig {96.0F, 72.0F, 72.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             128.0F, 84.0F, 7.0F, true, false, EnemySkill::DragonClaw};
+    case EnemyArchetype::WaterMirrorDemon:
+        return EnemyConfig {0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
+            54.0F, 72.0F, 999.0F, false, false, EnemySkill::BossAttack};
+    case EnemyArchetype::StarkCopy:
+        return EnemyConfig {200.0F, 54.0F, 54.0F, 0.4F, 0.6F, 0.0F, 0.0F,
+            54.0F, 72.0F, 4.0F, false, false, EnemySkill::BossAttack};
+    case EnemyArchetype::FernCopy:
+        return EnemyConfig {120.0F, 256.0F, 256.0F, 0.4F, 0.6F, 0.0F, 0.0F,
+            54.0F, 72.0F, 6.0F, false, false, EnemySkill::BossAttack};
+    case EnemyArchetype::FrierenCopy:
+        return EnemyConfig {100.0F, 256.0F, 256.0F, 0.3F, 0.6F, 0.0F, 0.0F,
+            54.0F, 72.0F, 3.0F, false, true, EnemySkill::BossAttack};
     case EnemyArchetype::Boss:
         return EnemyConfig {125.0F, 72.0F, 90.0F, 0.55F, 0.16F, 0.0F, 20.0F,
             48.0F, 64.0F, 1.3F, true, false, EnemySkill::BossAttack};
@@ -212,14 +239,15 @@ CombatSession::CombatSession(CombatRequest request)
     if (relics_.has(relics::SeriePageId)) spells_.setUltimateCooldown(15.3F);
     auto spawns = request_.enemies;
     if (spawns.empty()) spawns.push_back({request_.enemyArchetype, request_.enemySpawn});
-    enemies_.reserve(spawns.size());
+    enemies_.reserve(spawns.size() + 3U);
     for (const auto& spawn : spawns)
     {
         const auto config = enemyConfigFor(spawn.archetype);
         Vec2 position = spawn.position;
         if (!request_.enemies.empty() || spawn.archetype == EnemyArchetype::Aura
             || spawn.archetype == EnemyArchetype::Revolte
-            || spawn.archetype == EnemyArchetype::RedMirrorDragon)
+            || spawn.archetype == EnemyArchetype::RedMirrorDragon
+            || spawn.archetype == EnemyArchetype::WaterMirrorDemon)
             position.y = request_.worldBounds.groundTop - config.height;
         if (config.flying) position.y = request_.worldBounds.groundTop
             - (spawn.archetype == EnemyArchetype::LargeBirdDemon ? 144.0F : 132.0F) - config.height;
@@ -247,6 +275,10 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::Aura: return 225;
             case EnemyArchetype::Revolte: return 300;
             case EnemyArchetype::RedMirrorDragon: return 300;
+            case EnemyArchetype::WaterMirrorDemon: return 200;
+            case EnemyArchetype::StarkCopy: return 300;
+            case EnemyArchetype::FernCopy: return 180;
+            case EnemyArchetype::FrierenCopy: return 350;
             case EnemyArchetype::Boss: return request_.enemyMaximumHealth;
             }
             return 1;
@@ -281,6 +313,27 @@ CombatSession::CombatSession(CombatRequest request)
             enemies_.back().specialCooldown = 2.0F;
             enemies_.back().secondaryCooldown = 1.5F;
         }
+        if (spawn.archetype == EnemyArchetype::StarkCopy)
+            enemies_.back().revolteCooldowns = {4.0F, 2.0F, 0.0F, 0.0F, 0.0F};
+        if (spawn.archetype == EnemyArchetype::FernCopy)
+            enemies_.back().specialCooldown = 3.0F;
+        if (spawn.archetype == EnemyArchetype::FrierenCopy)
+            enemies_.back().revolteCooldowns = {4.0F, 4.0F, 1.5F, 0.0F, 0.0F};
+    }
+    const auto waterMirror = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.archetype == EnemyArchetype::WaterMirrorDemon;
+    });
+    if (waterMirror != enemies_.end())
+    {
+        const auto spawnCopy = [&](const EnemyArchetype archetype, const float x, const int hp) {
+            const auto config = enemyConfigFor(archetype);
+            const Vec2 position {x, request_.worldBounds.groundTop - config.height};
+            enemies_.push_back({archetype, ai::EnemyController(position, config), Health(hp, hp)});
+        };
+        spawnCopy(EnemyArchetype::StarkCopy, 720.0F, 300);
+        spawnCopy(EnemyArchetype::FernCopy, 980.0F, 180);
+        enemies_[enemies_.size() - 2U].revolteCooldowns = {4.0F, 2.0F, 0.0F, 0.0F, 0.0F};
+        enemies_.back().specialCooldown = 3.0F;
     }
     const auto aura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Aura;
@@ -305,7 +358,8 @@ CombatSession::CombatSession(CombatRequest request)
     if (!playerHealth_.isAlive()) finish(CombatOutcome::Defeat);
     if (std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Aura
-            || enemy.archetype == EnemyArchetype::Revolte;
+            || enemy.archetype == EnemyArchetype::Revolte
+            || enemy.archetype == EnemyArchetype::WaterMirrorDemon;
     })) bossIntroRemaining_ = 2.4F;
 }
 
@@ -353,6 +407,8 @@ DamageResult CombatSession::resolveEnemyDamage(EnemyRuntime& enemy,
     if (enemy.concealmentProgress >= 1.0F) request.blocked = true;
     if (enemy.archetype == EnemyArchetype::Revolte && enemy.revolteTransitionPending)
         request.blocked = true;
+    if (enemy.archetype == EnemyArchetype::WaterMirrorDemon)
+        request.blocked = true;
     const bool parryingMagic = enemy.archetype == EnemyArchetype::Revolte
         && enemy.revolteSkill == 3 && enemy.specialActive > 0.0F
         && isPlayerMagic(request.source);
@@ -382,6 +438,11 @@ DamageResult CombatSession::resolveEnemyDamage(EnemyRuntime& enemy,
     }
 
     const auto result = enemy.damageResolver.resolve(enemy.health, request);
+    if (enemy.archetype == EnemyArchetype::StarkCopy && result.appliedDamage > 0)
+    {
+        enemy.revolteCooldowns[0] = std::max(0.0F, enemy.revolteCooldowns[0] - 1.0F);
+        enemy.revolteCooldowns[1] = std::max(0.0F, enemy.revolteCooldowns[1] - 1.0F);
+    }
     if (parryingMagic && result.appliedDamage > 0)
     {
         enemy.revolteCounterDashPending = true;
@@ -465,8 +526,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const bool revolte = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
                 return enemy.archetype == EnemyArchetype::Revolte;
             });
-            beginDialogue(revolte ? DialogueScript::RevoltePreBattle
-                                  : DialogueScript::AuraPreBattle);
+            const bool waterMirror = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+                return enemy.archetype == EnemyArchetype::WaterMirrorDemon;
+            });
+            beginDialogue(waterMirror ? DialogueScript::WaterMirrorPreBattle
+                : (revolte ? DialogueScript::RevoltePreBattle
+                           : DialogueScript::AuraPreBattle));
         }
         return;
     }
@@ -642,7 +707,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     std::erase_if(activeTornadoes_, [](const auto& tornado) { return tornado.remaining <= 0.0F; });
     for (auto& projectile : activeEnemyProjectiles_)
     {
-        const float travel = std::min(projectile.remainingDistance, 200.0F * deltaSeconds);
+        const float travel = std::min(projectile.remainingDistance, projectile.speed * deltaSeconds);
         projectile.bounds.left += projectile.direction * travel;
         projectile.remainingDistance -= travel;
         if (intersects(projectile.bounds, playerBounds()))
@@ -663,6 +728,36 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     for (auto& beam : activeEnemyBeams_)
         beam.remaining = std::max(0.0F, beam.remaining - deltaSeconds);
     std::erase_if(activeEnemyBeams_, [](const auto& beam) { return beam.remaining <= 0.0F; });
+    for (auto& lightning : pendingEnemyLightning_)
+    {
+        lightning.delayRemaining -= deltaSeconds;
+        if (lightning.delayRemaining <= 0.0F && lightning.delayRemaining + deltaSeconds > 0.0F)
+        {
+            activeSpellEffects_.push_back({9300U, lightning.bounds, 0.6F, 0.6F});
+            if (intersects(lightning.bounds, playerBounds()))
+                static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                    lightning.sequence, 20, 1.0F, relics_.incomingDamageMultiplier(), 0,
+                    player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F}));
+        }
+    }
+    std::erase_if(pendingEnemyLightning_, [](const auto& lightning) {
+        return lightning.delayRemaining <= 0.0F;
+    });
+    for (auto& fire : activeEnemyGroundFire_)
+    {
+        const float activeDelta = std::min(deltaSeconds, fire.remaining);
+        fire.remaining -= activeDelta;
+        fire.tickAccumulator += activeDelta;
+        while (fire.tickAccumulator >= 0.5F)
+        {
+            fire.tickAccumulator -= 0.5F;
+            if (intersects(fire.bounds, playerBounds()))
+                static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                    ++fire.sequence, 5, 1.0F, relics_.incomingDamageMultiplier(), 0,
+                    player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F}));
+        }
+    }
+    std::erase_if(activeEnemyGroundFire_, [](const auto& fire) { return fire.remaining <= 0.0F; });
     if (player_.flightRemaining() <= 0.0F) flightBoostAvailable_ = false;
     if (wasDashing && !player_.isDashing()) postDashComboRemaining_ = 0.4F;
     if (intent.dashPressed && !wasDashing && player_.isDashing())
@@ -934,6 +1029,199 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 enemy.specialWindup = 0.5F;
                 continue;
             }
+        }
+        if (enemy.archetype == EnemyArchetype::StarkCopy)
+        {
+            for (std::size_t skill = 0U; skill < 2U; ++skill)
+                enemy.revolteCooldowns[skill] = std::max(
+                    0.0F, enemy.revolteCooldowns[skill] - deltaSeconds);
+            if (enemy.specialActive > 0.0F)
+            {
+                const float activeDelta = std::min(deltaSeconds, enemy.specialActive);
+                if (enemy.manualSkill == 0)
+                {
+                    enemy.specialElapsed += activeDelta;
+                    auto position = enemy.controller.position();
+                    position.x += enemy.specialDirection * 180.0F * activeDelta;
+                    constexpr float gravity = 1600.0F;
+                    const float height = std::max(0.0F, 840.0F * enemy.specialElapsed
+                        - 0.5F * gravity * enemy.specialElapsed * enemy.specialElapsed);
+                    position.y = request_.worldBounds.groundTop - bounds.height - height;
+                    enemy.controller.setPosition(position, request_.worldBounds);
+                }
+                enemy.specialActive -= activeDelta;
+                if (enemy.specialActive <= 0.0F)
+                {
+                    if (enemy.manualSkill == 0)
+                    {
+                        const auto landed = enemy.controller.bounds();
+                        const Aabb impact {landed.left + landed.width * 0.5F - 144.0F,
+                            request_.worldBounds.groundTop - 96.0F, 288.0F, 96.0F};
+                        if (intersects(impact, playerBounds()))
+                            static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                                ++environmentalSequence_, 20, 1.0F,
+                                relics_.incomingDamageMultiplier()}));
+                        const float left = enemy.specialDirection > 0.0F
+                            ? landed.left + landed.width : landed.left - 32.0F;
+                        activeEnemyProjectiles_.push_back({{left,
+                            request_.worldBounds.groundTop - 96.0F, 32.0F, 96.0F},
+                            enemy.specialDirection, 300.0F, 300.0F,
+                            ++environmentalSequence_, 20, 220.0F});
+                    }
+                    enemy.manualSkill = -1;
+                }
+                continue;
+            }
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    if (enemy.manualSkill == 0)
+                    {
+                        enemy.specialElapsed = 0.0F;
+                        enemy.specialActive = 1.05F;
+                        enemy.revolteCooldowns[0] = 8.0F;
+                    }
+                    else
+                    {
+                        const auto caster = enemy.controller.bounds();
+                        const Aabb slash {enemy.specialDirection > 0.0F
+                                ? caster.left + caster.width : caster.left - 54.0F,
+                            caster.top, 54.0F, caster.height};
+                        if (intersects(slash, playerBounds()))
+                            static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                                ++environmentalSequence_, 20, 1.0F,
+                                relics_.incomingDamageMultiplier()}));
+                        enemy.specialActive = 0.6F;
+                        enemy.revolteCooldowns[1] = 4.0F;
+                    }
+                }
+                continue;
+            }
+            const float distance = std::abs(playerCenter
+                - (bounds.left + bounds.width * 0.5F));
+            if (enemy.revolteCooldowns[0] <= 0.0F)
+            {
+                enemy.manualSkill = 0;
+                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialWindup = 0.8F;
+                continue;
+            }
+            if (enemy.revolteCooldowns[1] <= 0.0F
+                && distance <= bounds.width * 0.5F + 54.0F + PlayerController::Width * 0.5F)
+            {
+                enemy.manualSkill = 1;
+                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialWindup = 0.4F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::FernCopy)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialActive > 0.0F)
+            {
+                enemy.specialActive = std::max(0.0F, enemy.specialActive - deltaSeconds);
+                continue;
+            }
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto caster = enemy.controller.bounds();
+                    const Vec2 start {caster.left + caster.width * 0.5F,
+                        caster.top + caster.height * 0.4F};
+                    const auto target = playerBounds();
+                    const float dx = target.left + target.width * 0.5F - start.x;
+                    const float dy = target.top + target.height * 0.5F - start.y;
+                    const float length = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
+                    const Vec2 end {start.x + dx / length * 256.0F,
+                        start.y + dy / length * 256.0F};
+                    const auto sequence = ++environmentalSequence_;
+                    activeEnemyBeams_.push_back({start, end, 0.6F, sequence});
+                    if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
+                        static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                            sequence, 15, 1.0F, relics_.incomingDamageMultiplier()}));
+                    ++enemy.summonCount;
+                    const std::uint64_t roll = request_.seed
+                        ^ (static_cast<std::uint64_t>(enemy.summonCount) * 0x9e3779b97f4a7c15ULL);
+                    if ((roll & 3ULL) != 0ULL) enemy.specialWindup = 0.4F;
+                    else enemy.specialCooldown = 6.0F;
+                    enemy.specialActive = 0.6F;
+                }
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F)
+            {
+                enemy.specialWindup = 0.4F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::FrierenCopy)
+        {
+            for (std::size_t skill = 0U; skill < 3U; ++skill)
+                enemy.revolteCooldowns[skill] = std::max(
+                    0.0F, enemy.revolteCooldowns[skill] - deltaSeconds);
+            if (enemy.specialActive > 0.0F)
+            {
+                enemy.specialActive = std::max(0.0F, enemy.specialActive - deltaSeconds);
+                continue;
+            }
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto target = playerBounds();
+                    if (enemy.manualSkill == 0)
+                    {
+                        const Aabb strike {target.left + target.width * 0.5F - 42.0F,
+                            request_.worldBounds.groundTop - 180.0F, 84.0F, 180.0F};
+                        for (std::uint32_t index = 0U; index < 5U; ++index)
+                            pendingEnemyLightning_.push_back({strike,
+                                0.4F + 0.8F * static_cast<float>(index),
+                                ++environmentalSequence_});
+                        enemy.revolteCooldowns[0] = 8.0F;
+                    }
+                    else if (enemy.manualSkill == 1)
+                    {
+                        activeEnemyGroundFire_.push_back({{request_.worldBounds.left,
+                            request_.worldBounds.groundTop - 24.0F,
+                            request_.worldBounds.right - request_.worldBounds.left, 24.0F},
+                            5.0F, 0.0F, (++environmentalSequence_) << 16U});
+                        enemy.revolteCooldowns[1] = 8.0F;
+                    }
+                    else
+                    {
+                        const auto caster = enemy.controller.bounds();
+                        const Vec2 start {caster.left + caster.width * 0.5F,
+                            caster.top + caster.height * 0.4F};
+                        const float dx = target.left + target.width * 0.5F - start.x;
+                        const float dy = target.top + target.height * 0.5F - start.y;
+                        const float length = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
+                        const Vec2 end {start.x + dx / length * 256.0F,
+                            start.y + dy / length * 256.0F};
+                        const auto sequence = ++environmentalSequence_;
+                        activeEnemyBeams_.push_back({start, end, 0.6F, sequence});
+                        if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
+                            static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                                sequence, 15, 1.0F, relics_.incomingDamageMultiplier()}));
+                        enemy.revolteCooldowns[2] = 3.0F;
+                    }
+                    enemy.specialActive = 0.6F;
+                }
+                continue;
+            }
+            for (int skill = 0; skill < 3; ++skill)
+                if (enemy.revolteCooldowns[static_cast<std::size_t>(skill)] <= 0.0F)
+                {
+                    enemy.manualSkill = skill;
+                    enemy.specialWindup = skill == 2 ? 0.3F : 0.5F;
+                    break;
+                }
+            if (enemy.specialWindup > 0.0F) continue;
         }
         if (enemy.archetype == EnemyArchetype::Revolte)
         {
@@ -1245,13 +1533,19 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const Aabb target = phantomRemaining_ > 0.0F ? phantomBounds_
                 : (golemRemaining_ > 0.0F ? golemBounds_ : playerBounds());
             const float speedMultiplier = flowerSlowed ? 0.65F
-                : (enemy.frostSlowRemaining > 0.0F ? 0.65F : 1.0F);
+                : (enemy.frostSlowRemaining > 0.0F ? 0.65F
+                    : (enemy.archetype == EnemyArchetype::StarkCopy
+                        && enemy.health.current() < 150 ? 1.2F : 1.0F));
             const bool manualSkill = enemy.archetype == EnemyArchetype::Richter
                 || enemy.archetype == EnemyArchetype::Denken
                 || enemy.archetype == EnemyArchetype::Revolte
                 || enemy.archetype == EnemyArchetype::Gargoyle
                 || enemy.archetype == EnemyArchetype::ThreeHeadedDemon
-                || enemy.archetype == EnemyArchetype::SwordDemon;
+                || enemy.archetype == EnemyArchetype::SwordDemon
+                || enemy.archetype == EnemyArchetype::WaterMirrorDemon
+                || enemy.archetype == EnemyArchetype::StarkCopy
+                || enemy.archetype == EnemyArchetype::FernCopy
+                || enemy.archetype == EnemyArchetype::FrierenCopy;
             enemy.controller.update(target, deltaSeconds, request_.worldBounds, speedMultiplier,
                 enemy.skillSealRemaining <= 0.0F && !manualSkill);
             if (enemy.archetype == EnemyArchetype::Aura
@@ -2059,6 +2353,43 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         }
     }
 
+    auto waterMirror = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.archetype == EnemyArchetype::WaterMirrorDemon;
+    });
+    if (waterMirror != enemies_.end() && waterMirror->health.isAlive())
+    {
+        const bool starkAlive = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::StarkCopy && enemy.health.isAlive();
+        });
+        const bool fernAlive = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::FernCopy && enemy.health.isAlive();
+        });
+        const bool frierenPresent = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::FrierenCopy;
+        });
+        if (!waterMirrorSecondPhase_ && !starkAlive && !fernAlive)
+        {
+            waterMirrorSecondPhase_ = true;
+            static_cast<void>(waterMirror->health.damage(waterMirror->health.current() / 2));
+            const auto config = enemyConfigFor(EnemyArchetype::FrierenCopy);
+            Vec2 position {820.0F,
+                request_.worldBounds.groundTop - 48.0F - config.height};
+            enemies_.push_back({EnemyArchetype::FrierenCopy,
+                ai::EnemyController(position, config), Health(350, 350)});
+            enemies_.back().revolteCooldowns = {4.0F, 4.0F, 1.5F, 0.0F, 0.0F};
+            beginDialogue(DialogueScript::WaterMirrorSecondPhase);
+            return;
+        }
+        const bool frierenAlive = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::FrierenCopy && enemy.health.isAlive();
+        });
+        if (waterMirrorSecondPhase_ && frierenPresent && !frierenAlive)
+        {
+            static_cast<void>(waterMirror->health.damage(waterMirror->health.current()));
+            waterMirror->controller.markDead();
+        }
+    }
+
     for (std::size_t enemyIndex = 0U; enemyIndex < enemies_.size(); ++enemyIndex)
     {
         auto& enemy = enemies_[enemyIndex];
@@ -2183,6 +2514,9 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         const bool revolteEncounter = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
             return enemy.archetype == EnemyArchetype::Revolte;
         });
+        const bool waterMirrorEncounter = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+            return enemy.archetype == EnemyArchetype::WaterMirrorDemon;
+        });
         if (auraEncounter && !auraDefeatDialogueShown_)
         {
             auraDefeatDialogueShown_ = true;
@@ -2194,6 +2528,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             revolteDefeatDialogueShown_ = true;
             outcomeAfterDialogue_ = CombatOutcome::Victory;
             beginDialogue(DialogueScript::RevolteDefeat);
+        }
+        else if (waterMirrorEncounter && !waterMirrorDefeatDialogueShown_)
+        {
+            waterMirrorDefeatDialogueShown_ = true;
+            outcomeAfterDialogue_ = CombatOutcome::Victory;
+            beginDialogue(DialogueScript::WaterMirrorDefeat);
         }
         else finish(CombatOutcome::Victory);
     }
@@ -2281,7 +2621,8 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
 {
     std::vector<SpellEffectView> views;
     views.reserve(activeSpellEffects_.size() + activePillars_.size() + activeTornadoes_.size()
-        + activeEnemyProjectiles_.size() + activeEnemyBeams_.size() + enemies_.size());
+        + activeEnemyProjectiles_.size() + activeEnemyBeams_.size()
+        + pendingEnemyLightning_.size() + activeEnemyGroundFire_.size() + enemies_.size());
     for (const auto& effect : activeSpellEffects_)
         views.push_back({effect.spellId, effect.bounds, effect.remaining, effect.duration});
     for (const auto& pillar : activePillars_)
@@ -2291,8 +2632,8 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
             tornado.bounds, tornado.remaining, 7.0F});
     for (const auto& projectile : activeEnemyProjectiles_)
         views.push_back({projectile.bounds.width >= 54.0F ? 9102U : 9101U,
-            projectile.bounds, projectile.remainingDistance / 200.0F,
-            projectile.totalDistance / 200.0F, projectile.direction});
+            projectile.bounds, projectile.remainingDistance / projectile.speed,
+            projectile.totalDistance / projectile.speed, projectile.direction});
     for (const auto& beam : activeEnemyBeams_)
     {
         const float dx = beam.end.x - beam.start.x;
@@ -2302,6 +2643,10 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
         views.push_back({9200U, {beam.start.x, beam.start.y - 9.0F, length, 18.0F},
             beam.remaining, 0.6F, dx >= 0.0F ? 1.0F : -1.0F, angle});
     }
+    for (const auto& lightning : pendingEnemyLightning_)
+        views.push_back({9300U, lightning.bounds, lightning.delayRemaining, 0.4F});
+    for (const auto& fire : activeEnemyGroundFire_)
+        views.push_back({9301U, fire.bounds, fire.remaining, 5.0F});
     for (const auto& enemy : enemies_)
         if (enemy.archetype == EnemyArchetype::Heimon && enemy.health.isAlive()
             && enemy.fogCreated)
@@ -2374,6 +2719,9 @@ std::optional<CombatDialogueLineView> CombatSession::dialogueLine() const noexce
     case DialogueScript::RevoltePreBattle: return RevoltePreBattleDialogue[dialogueLineIndex_];
     case DialogueScript::RevolteSecondPhase: return RevolteSecondPhaseDialogue[dialogueLineIndex_];
     case DialogueScript::RevolteDefeat: return RevolteDefeatDialogue[dialogueLineIndex_];
+    case DialogueScript::WaterMirrorPreBattle: return WaterMirrorPreBattleDialogue[dialogueLineIndex_];
+    case DialogueScript::WaterMirrorSecondPhase: return WaterMirrorSecondPhaseDialogue[dialogueLineIndex_];
+    case DialogueScript::WaterMirrorDefeat: return WaterMirrorDefeatDialogue[dialogueLineIndex_];
     case DialogueScript::None: return std::nullopt;
     }
     return std::nullopt;
@@ -2384,7 +2732,11 @@ std::optional<BossIntroView> CombatSession::bossIntro() const noexcept
     const bool revolte = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Revolte;
     });
-    return BossIntroView {revolte ? "REVOLTE" : "GUILLOTINE AURA",
+    const bool waterMirror = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
+        return enemy.archetype == EnemyArchetype::WaterMirrorDemon;
+    });
+    return BossIntroView {waterMirror ? "WATER MIRROR DEMON"
+            : (revolte ? "REVOLTE" : "GUILLOTINE AURA"),
         bossIntroRemaining_, 2.4F};
 }
 void CombatSession::beginDialogue(const DialogueScript script) noexcept
@@ -2403,6 +2755,9 @@ void CombatSession::advanceDialogue() noexcept
     case DialogueScript::RevoltePreBattle: lineCount = RevoltePreBattleDialogue.size(); break;
     case DialogueScript::RevolteSecondPhase: lineCount = RevolteSecondPhaseDialogue.size(); break;
     case DialogueScript::RevolteDefeat: lineCount = RevolteDefeatDialogue.size(); break;
+    case DialogueScript::WaterMirrorPreBattle: lineCount = WaterMirrorPreBattleDialogue.size(); break;
+    case DialogueScript::WaterMirrorSecondPhase: lineCount = WaterMirrorSecondPhaseDialogue.size(); break;
+    case DialogueScript::WaterMirrorDefeat: lineCount = WaterMirrorDefeatDialogue.size(); break;
     case DialogueScript::None: return;
     }
     ++dialogueLineIndex_;

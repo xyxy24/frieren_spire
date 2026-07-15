@@ -302,12 +302,14 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             ? feedback.enemyImpactOffsets[enemyIndex] : 0.0F;
         const bool showDefeatedBoss = !enemy.alive
             && (enemy.archetype == arcane::game::EnemyArchetype::Aura
-                || enemy.archetype == arcane::game::EnemyArchetype::Revolte)
+                || enemy.archetype == arcane::game::EnemyArchetype::Revolte
+                || enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon)
             && combat->dialogueLine().has_value();
         if (!enemy.alive && !showDefeatedBoss) continue;
         const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
             || enemy.archetype == arcane::game::EnemyArchetype::Revolte
             || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
+            || enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon
             || enemy.archetype == arcane::game::EnemyArchetype::Boss;
         const EnemyStateTextures* stateTextures = nullptr;
         if (enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight)

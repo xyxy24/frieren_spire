@@ -445,11 +445,14 @@ void TowerSession::startNextFloor()
     if (currentFloorType_ == game::run::FloorType::Boss
         && run_.context().bossesDefeated == 1U && config_.bossEnemyHealth == 225)
         request.enemyMaximumHealth = 300;
+    if (currentFloorType_ == game::run::FloorType::Boss
+        && run_.context().bossesDefeated == 2U && config_.bossEnemyHealth == 225)
+        request.enemyMaximumHealth = 200;
     request.enemyArchetype = currentFloorType_ == game::run::FloorType::Boss
         ? (config_.bossEnemyHealth == 225
             ? (run_.context().bossesDefeated == 0U ? game::EnemyArchetype::Aura
                 : (run_.context().bossesDefeated == 1U ? game::EnemyArchetype::Revolte
-                    : game::EnemyArchetype::Boss))
+                    : game::EnemyArchetype::WaterMirrorDemon))
             : game::EnemyArchetype::Boss)
         : (config_.normalEnemyHealth > 0 ? game::EnemyArchetype::HeadlessKnight
             : (run_.context().floorIndex % 2U == 0U

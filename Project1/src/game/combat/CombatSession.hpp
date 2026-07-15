@@ -147,6 +147,7 @@ private:
         float totalDistance {};
         std::uint64_t sequence {};
         int damage {20};
+        float speed {200.0F};
     };
     struct ActiveEnemyBeam
     {
@@ -155,12 +156,26 @@ private:
         float remaining {0.6F};
         std::uint64_t sequence {};
     };
+    struct PendingEnemyLightning
+    {
+        Aabb bounds;
+        float delayRemaining {0.4F};
+        std::uint64_t sequence {};
+    };
+    struct ActiveEnemyGroundFire
+    {
+        Aabb bounds;
+        float remaining {5.0F};
+        float tickAccumulator {};
+        std::uint64_t sequence {};
+    };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
     void finish(CombatOutcome outcome) noexcept;
     enum class DialogueScript : std::uint8_t {
         None, AuraPreBattle, AuraFirstDomination, AuraDefeat,
-        RevoltePreBattle, RevolteSecondPhase, RevolteDefeat
+        RevoltePreBattle, RevolteSecondPhase, RevolteDefeat,
+        WaterMirrorPreBattle, WaterMirrorSecondPhase, WaterMirrorDefeat
     };
     void beginDialogue(DialogueScript script) noexcept;
     void advanceDialogue() noexcept;
@@ -244,6 +259,8 @@ private:
     std::vector<ActiveTornado> activeTornadoes_;
     std::vector<ActiveEnemyProjectile> activeEnemyProjectiles_;
     std::vector<ActiveEnemyBeam> activeEnemyBeams_;
+    std::vector<PendingEnemyLightning> pendingEnemyLightning_;
+    std::vector<ActiveEnemyGroundFire> activeEnemyGroundFire_;
     std::uint64_t environmentalSequence_ {};
     std::optional<CombatResult> result_;
     DialogueScript dialogueScript_ {DialogueScript::None};
@@ -252,6 +269,8 @@ private:
     bool auraFirstDominationAvailable_ {true};
     bool auraDefeatDialogueShown_ {};
     bool revolteDefeatDialogueShown_ {};
+    bool waterMirrorSecondPhase_ {};
+    bool waterMirrorDefeatDialogueShown_ {};
     std::optional<CombatOutcome> outcomeAfterDialogue_;
     float bossIntroRemaining_ {};
 };

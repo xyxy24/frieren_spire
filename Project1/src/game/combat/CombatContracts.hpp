@@ -23,7 +23,7 @@ enum class EnemyArchetype : std::uint8_t {
     ChestMimic, HeadlessKnight, BirdDemon, Lugner, Linie, Draht,
     ChaosFlower, FrostWolf, Qual, Laufen, Richter, Denken,
     Heimon, DemonWarrior, LargeBirdDemon, Gargoyle, ThreeHeadedDemon, SwordDemon,
-    Aura, Revolte, RedMirrorDragon, Boss
+    Aura, Revolte, RedMirrorDragon, WaterMirrorDemon, StarkCopy, FernCopy, FrierenCopy, Boss
 };
 
 struct EnemySpawn
