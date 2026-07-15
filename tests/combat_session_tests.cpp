@@ -1638,6 +1638,9 @@ bool threeHeadedDemonHealsToThePreviousStateThreshold()
     request.enemies = {{arcane::game::EnemyArchetype::ThreeHeadedDemon, {205.0F, 0.0F}}};
     request.enemyContactDamage = 0;
     arcane::game::CombatSession combat(request);
+    if (!expect(combat.enemyState().width == 84.0F
+            && combat.enemyState().height == 64.0F,
+        "Three-Headed Demon must use its revised 84 by 64 collision box")) return false;
     for (int attackIndex = 0; attackIndex < 5; ++attackIndex)
     {
         arcane::game::PlayerIntent attack;

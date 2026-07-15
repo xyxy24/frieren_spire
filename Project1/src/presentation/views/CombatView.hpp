@@ -30,6 +30,7 @@ struct EnemyStateTextures
     std::array<std::optional<sf::Texture>, 3> skillAttacks;
     std::optional<sf::Texture> parry;
     std::optional<sf::Texture> dash;
+    std::array<std::optional<sf::Texture>, 3> idleVariants;
 };
 
 struct DialoguePortraitTextures
@@ -63,6 +64,7 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& gargoyleTextures,
     const std::array<std::optional<sf::Texture>, 2>& gargoyleSkillTextures,
     const EnemyStateTextures& swordDemonTextures,
+    const EnemyStateTextures& threeHeadedDemonTextures,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,

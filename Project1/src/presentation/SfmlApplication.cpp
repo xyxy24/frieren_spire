@@ -181,6 +181,7 @@ struct RenderResources
     const EnemyStateTextures& gargoyle;
     const std::array<std::optional<sf::Texture>, 2>& gargoyleSkill;
     const EnemyStateTextures& swordDemon;
+    const EnemyStateTextures& threeHeadedDemon;
     const std::optional<sf::Texture>& slash;
     const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
@@ -237,6 +238,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.demonWarrior, resources.largeBirdDemon,
                 resources.gargoyle, resources.gargoyleSkill,
                 resources.swordDemon,
+                resources.threeHeadedDemon,
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
@@ -360,6 +362,17 @@ int arcane::presentation::SfmlApplication::run()
     EnemyStateTextures swordDemonTextures = loadEnemyStateTextures(
         "assets/enemies/sword_demon/");
     swordDemonTextures.dash = loadTexture("assets/enemies/sword_demon/dash.png");
+    EnemyStateTextures threeHeadedDemonTextures;
+    for (std::size_t index = 0U; index < threeHeadedDemonTextures.idleVariants.size(); ++index)
+    {
+        const std::string suffix = std::to_string(index + 1U) + ".png";
+        threeHeadedDemonTextures.idleVariants[index] = loadTexture(
+            "assets/enemies/three_headed_demon/idle" + suffix);
+        threeHeadedDemonTextures.skillWindups[index] = loadTexture(
+            "assets/enemies/three_headed_demon/windup" + suffix);
+        threeHeadedDemonTextures.skillAttacks[index] = loadTexture(
+            "assets/enemies/three_headed_demon/attack" + suffix);
+    }
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -426,6 +439,7 @@ int arcane::presentation::SfmlApplication::run()
         heimonTextures, heimonSkillTextures, heimonFogTexture,
         demonWarriorTextures, largeBirdDemonTextures,
         gargoyleTextures, gargoyleSkillTextures, swordDemonTextures,
+        threeHeadedDemonTextures,
         slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,

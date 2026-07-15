@@ -150,6 +150,13 @@
 - Source: team-provided classroom prototype artwork.
 - Purpose: Sword Demon's idle, slash windup, slash attack and flash-step poses.
 
+## Three-Headed Demon form artwork
+
+- Files: `enemies/three_headed_demon/*.png`.
+- Added by: project team, 2026-07-15.
+- Source: team-provided classroom prototype artwork.
+- Purpose: one-, two- and three-head idle, shared windup and claw-attack poses.
+
 ## Three-act environment backgrounds and battle platforms
 
 - Files: runtime textures under `environments/processed/`; generation sources, chroma-key

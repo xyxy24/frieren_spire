@@ -98,6 +98,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& gargoyleTextures,
     const std::array<std::optional<sf::Texture>, 2>& gargoyleSkillTextures,
     const EnemyStateTextures& swordDemonTextures,
+    const EnemyStateTextures& threeHeadedDemonTextures,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -301,6 +302,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &gargoyleTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::SwordDemon)
             stateTextures = &swordDemonTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::ThreeHeadedDemon)
+            stateTextures = &threeHeadedDemonTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -345,6 +348,18 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             else if (enemy.archetype == arcane::game::EnemyArchetype::SwordDemon
                 && enemy.skillVariant == 0 && enemy.attackActive && stateTextures->dash)
                 texture = &*stateTextures->dash;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::ThreeHeadedDemon)
+            {
+                const std::size_t form = enemy.currentHealth >= 120 ? 2U
+                    : (enemy.currentHealth >= 60 ? 1U : 0U);
+                if (enemy.windingUp && stateTextures->skillWindups[form])
+                    texture = &*stateTextures->skillWindups[form];
+                else if (enemy.attackActive && enemy.skillVariant == 1
+                    && stateTextures->skillAttacks[form])
+                    texture = &*stateTextures->skillAttacks[form];
+                else if (stateTextures->idleVariants[form])
+                    texture = &*stateTextures->idleVariants[form];
+            }
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;

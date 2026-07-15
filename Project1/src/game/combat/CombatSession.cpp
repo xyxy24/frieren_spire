@@ -183,7 +183,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
             42.0F, 42.0F, 4.0F, false, false, EnemySkill::BossAttack};
     case EnemyArchetype::ThreeHeadedDemon:
         return EnemyConfig {120.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
-            64.0F, 84.0F, 4.0F, true, false, EnemySkill::BossAttack};
+            84.0F, 64.0F, 4.0F, true, false, EnemySkill::BossAttack};
     case EnemyArchetype::SwordDemon:
         return EnemyConfig {160.0F, 180.0F, 54.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 72.0F, 3.0F, false, false, EnemySkill::BossAttack};
