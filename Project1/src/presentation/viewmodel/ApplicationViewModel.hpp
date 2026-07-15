@@ -43,6 +43,7 @@ private:
     void startNewRun();
     void startEventPreview();
     void startMerchantPreview();
+    void startSpellAcquisitionPreview();
 
     game::run::Seed seed_;
     app::TowerSessionConfig config_;

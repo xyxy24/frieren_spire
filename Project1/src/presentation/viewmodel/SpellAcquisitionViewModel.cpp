@@ -1,7 +1,6 @@
 #include "presentation/viewmodel/SpellAcquisitionViewModel.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 namespace arcane::presentation::viewmodel
 {
@@ -40,7 +39,13 @@ void SpellAcquisitionViewModel::update(
 {
     if (!spellId_) return;
     elapsedSeconds_ += std::max(0.0F, deltaSeconds);
-    if (elapsedSeconds_ >= MinimumDisplaySeconds * durationScale()
+    if (elapsedSeconds_ >= SkipUnlockSeconds
+        && elapsedSeconds_ < MinimumDisplaySeconds && intent.jumpPressed)
+    {
+        elapsedSeconds_ = MinimumDisplaySeconds;
+        return;
+    }
+    if (elapsedSeconds_ >= MinimumDisplaySeconds
         && intent.menuConfirmPressed) reset();
 }
 
@@ -52,26 +57,17 @@ bool SpellAcquisitionViewModel::active() const noexcept
 std::optional<SpellAcquisitionSnapshot> SpellAcquisitionViewModel::snapshot() const noexcept
 {
     if (!spellId_) return std::nullopt;
-    const float scale = durationScale();
-    const float chargeEnd = ChargeSeconds * scale;
-    const float unlockEnd = chargeEnd + UnlockSeconds * scale;
-    const float flashCenter = chargeEnd + 0.10F * scale;
-    const float flashHalfWidth = 0.16F * scale;
-    const float flashRatio = std::clamp(
-        1.0F - std::abs(elapsedSeconds_ - flashCenter) / flashHalfWidth, 0.0F, 1.0F);
     return SpellAcquisitionSnapshot {
         makeContentDetailViewModel(*spellId_),
         elapsedSeconds_,
-        normalizedProgress(elapsedSeconds_, 0.0F, chargeEnd),
-        normalizedProgress(elapsedSeconds_, chargeEnd, UnlockSeconds * scale),
-        normalizedProgress(elapsedSeconds_, unlockEnd, RevealSeconds * scale),
-        flashRatio,
-        elapsedSeconds_ >= MinimumDisplaySeconds * scale,
+        elapsedSeconds_ * PlaybackRate,
+        normalizedProgress(elapsedSeconds_, 0.0F, RegistrationSeconds),
+        normalizedProgress(elapsedSeconds_, CirculationStartSeconds, CirculationSeconds),
+        normalizedProgress(elapsedSeconds_, RegistrationSeconds, BurstSeconds),
+        normalizedProgress(elapsedSeconds_, RegistrationSeconds + RevealDelaySeconds,
+            RevealSeconds),
+        elapsedSeconds_ >= SkipUnlockSeconds && elapsedSeconds_ < MinimumDisplaySeconds,
+        elapsedSeconds_ >= MinimumDisplaySeconds,
         bossSpell_};
-}
-
-float SpellAcquisitionViewModel::durationScale() const noexcept
-{
-    return bossSpell_ ? BossDurationScale : 1.0F;
 }
 }

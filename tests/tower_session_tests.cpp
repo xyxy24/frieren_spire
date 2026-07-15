@@ -415,6 +415,19 @@ bool startMenuMerchantPreviewOpensAnInteractiveShop()
         "merchant preview must expose the real spatial shop interaction page");
 }
 
+bool startMenuSpellPreviewOpensTheRegistrationPresentation()
+{
+    ui::ApplicationViewModel app(911U);
+    arcane::game::PlayerIntent preview;
+    preview.debugSpellAcquisitionPreviewPressed = true;
+    app.update(preview, 0.01F);
+    const auto acquisition = app.spellAcquisition().snapshot();
+    return expect(app.snapshot().screen == ui::ApplicationScreen::Playing
+            && app.model() && acquisition
+            && acquisition->content.summary.id == 1001U,
+        "F4 preview must start a real run under the spell-registration presentation");
+}
+
 bool defeatResultCanStartANewRun()
 {
     auto config = fastFlowConfig();
@@ -588,12 +601,13 @@ bool applicationViewModelSelectsNewRewardWithoutAutoEquipping()
         return false;
 
     arcane::game::PlayerIntent idle;
-    app.update(idle, 2.0F);
+    app.update(idle, ui::SpellAcquisitionViewModel::MinimumDisplaySeconds);
     const auto revealed = app.spellAcquisition().snapshot();
-    if (!expect(revealed && revealed->chargeProgress == 1.0F
-                && revealed->unlockProgress == 1.0F && revealed->revealProgress == 1.0F
-                && revealed->canDismiss,
-            "the acquisition timeline must deterministically reach its confirmable reveal"))
+    if (!expect(revealed && revealed->registrationProgress == 1.0F
+                && revealed->circulationProgress == 1.0F
+                && revealed->burstProgress == 1.0F
+                && revealed->revealProgress == 1.0F && revealed->canDismiss,
+            "the spell-registration timeline must deterministically finish its reveal"))
         return false;
     app.update(confirm, 0.01F);
     if (!expect(!app.spellAcquisition().active(),
@@ -608,22 +622,62 @@ bool applicationViewModelSelectsNewRewardWithoutAutoEquipping()
         "view must receive the selected reward through the loadout snapshot");
 }
 
-bool bossSpellAcquisitionUsesTheLongerCeremony()
+bool spellAcquisitionReproducesRegistrationCadence()
 {
     ui::SpellAcquisitionViewModel acquisition;
     acquisition.start(2001U);
     arcane::game::PlayerIntent confirm;
     confirm.menuConfirmPressed = true;
-    acquisition.update(confirm, ui::SpellAcquisitionViewModel::MinimumDisplaySeconds + 0.05F);
-    if (!expect(acquisition.active() && acquisition.snapshot()->bossSpell
-            && !acquisition.snapshot()->canDismiss,
-        "boss spells must use the longer ultimate acquisition ceremony")) return false;
-    acquisition.update({}, 0.40F);
+    acquisition.update(confirm,
+        ui::SpellAcquisitionViewModel::CirculationStartSeconds - 0.01F);
+    const auto analysis = acquisition.snapshot();
+    if (!expect(analysis && analysis->bossSpell
+            && analysis->registrationProgress > 0.0F
+            && analysis->circulationProgress == 0.0F
+            && analysis->burstProgress == 0.0F && !analysis->canDismiss,
+        "the registration must begin with diagnostics before the circulation network"))
+        return false;
+    if (!expect(analysis->referenceElapsedSeconds > analysis->elapsedSeconds
+            && ui::SpellAcquisitionViewModel::MinimumDisplaySeconds < 6.0F,
+        "the complete reference sequence must play at the accelerated reward pace"))
+        return false;
+    acquisition.update({}, 0.02F);
+    const auto circulating = acquisition.snapshot();
+    if (!expect(circulating && circulating->circulationProgress > 0.0F
+            && circulating->burstProgress == 0.0F,
+        "crossing reference frame 384 must begin the expanding circulation network"))
+        return false;
+    acquisition.update({}, ui::SpellAcquisitionViewModel::RegistrationSeconds
+        - ui::SpellAcquisitionViewModel::CirculationStartSeconds);
+    const auto bursting = acquisition.snapshot();
+    if (!expect(bursting && bursting->registrationProgress == 1.0F
+            && bursting->burstProgress > 0.0F && bursting->revealProgress == 0.0F,
+        "finishing the 713-frame registration must begin the closing starburst"))
+        return false;
+    acquisition.update({}, ui::SpellAcquisitionViewModel::MinimumDisplaySeconds);
     if (!expect(acquisition.snapshot()->canDismiss,
-            "boss acquisition must eventually become confirmable")) return false;
+            "the registration must become confirmable after its final information reveal"))
+        return false;
     acquisition.update(confirm, 0.0F);
-    return expect(!acquisition.active(),
-        "boss acquisition must close after its longer minimum display time");
+    if (!expect(!acquisition.active(),
+            "the spell-registration presentation must close after its minimum display time"))
+        return false;
+
+    ui::SpellAcquisitionViewModel skippable;
+    skippable.start(1001U);
+    arcane::game::PlayerIntent skip;
+    skip.jumpPressed = true;
+    skippable.update(skip, ui::SpellAcquisitionViewModel::SkipUnlockSeconds - 0.01F);
+    if (!expect(skippable.snapshot() && !skippable.snapshot()->canDismiss,
+            "the skip action must have a short accidental-input lockout"))
+        return false;
+    skippable.update(skip, 0.02F);
+    const auto skipped = skippable.snapshot();
+    return expect(skipped && skipped->registrationProgress == 1.0F
+            && skipped->circulationProgress == 1.0F
+            && skipped->burstProgress == 1.0F
+            && skipped->revealProgress == 1.0F && skipped->canDismiss,
+        "Space must skip only the animation and preserve the complete result page");
 }
 
 bool viewModelsProjectAuthoritativeContentWithoutRenderingRules()
@@ -683,7 +737,7 @@ int main()
     const bool passed = combatRewardLoadoutAndStairsFormOneFlow()
         && loadoutSeparatesSpellAndRelicPages()
         && applicationViewModelSelectsNewRewardWithoutAutoEquipping()
-        && bossSpellAcquisitionUsesTheLongerCeremony()
+        && spellAcquisitionReproducesRegistrationCadence()
         && combatFeedbackTracksAuthoritativeHealthDeltas()
         && contactDefeatEndsTheTowerFlow()
         && thirdBossEndsInVictory()
@@ -693,6 +747,7 @@ int main()
         && pauseCanContinueOrRestartFloorSnapshot()
         && startMenuEventPreviewOpensAnInteractiveEventFloor()
         && startMenuMerchantPreviewOpensAnInteractiveShop()
+        && startMenuSpellPreviewOpensTheRegistrationPresentation()
         && defeatResultCanStartANewRun()
         && heldSpellCannotBypassLootInteraction()
         && loadoutEquipsAndCastsUnlockedUltimateSpell()

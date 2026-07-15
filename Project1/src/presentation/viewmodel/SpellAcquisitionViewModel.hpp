@@ -11,10 +11,12 @@ struct SpellAcquisitionSnapshot
 {
     ContentDetailViewModel content;
     float elapsedSeconds {};
-    float chargeProgress {};
-    float unlockProgress {};
+    float referenceElapsedSeconds {};
+    float registrationProgress {};
+    float circulationProgress {};
+    float burstProgress {};
     float revealProgress {};
-    float flashRatio {};
+    bool canSkip {};
     bool canDismiss {};
     bool bossSpell {};
 };
@@ -22,11 +24,18 @@ struct SpellAcquisitionSnapshot
 class SpellAcquisitionViewModel
 {
 public:
-    static constexpr float ChargeSeconds = 0.72F;
-    static constexpr float UnlockSeconds = 0.58F;
-    static constexpr float RevealSeconds = 0.48F;
-    static constexpr float MinimumDisplaySeconds = 1.85F;
-    static constexpr float BossDurationScale = 1.18F;
+    // Preserve every reference stage while compressing the roughly 17-second
+    // classroom-study sequence to a pace suitable for a repeated roguelike reward.
+    static constexpr float PlaybackRate = 3.0F;
+    static constexpr float RegistrationSeconds = (713.0F / 60.0F) / PlaybackRate;
+    static constexpr float CirculationStartSeconds = (384.0F / 60.0F) / PlaybackRate;
+    static constexpr float CirculationSeconds = (329.0F / 60.0F) / PlaybackRate;
+    static constexpr float BurstSeconds = (190.0F / 60.0F) / PlaybackRate;
+    static constexpr float RevealDelaySeconds = (125.0F / 60.0F) / PlaybackRate;
+    static constexpr float RevealSeconds = 3.0F / PlaybackRate;
+    static constexpr float MinimumDisplaySeconds = RegistrationSeconds
+        + RevealDelaySeconds + RevealSeconds;
+    static constexpr float SkipUnlockSeconds = 0.35F;
 
     void start(game::run::ContentId spellId) noexcept;
     void reset() noexcept;
@@ -36,8 +45,6 @@ public:
     [[nodiscard]] std::optional<SpellAcquisitionSnapshot> snapshot() const noexcept;
 
 private:
-    [[nodiscard]] float durationScale() const noexcept;
-
     std::optional<game::run::ContentId> spellId_;
     float elapsedSeconds_ {};
     bool bossSpell_ {};

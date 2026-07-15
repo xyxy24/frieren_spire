@@ -58,12 +58,22 @@ bool ignoresReleaseEvents()
     return expect(!mapper.sample().menuConfirmPressed,
         "releasing a key must not create a one-shot action");
 }
+
+bool mapsSpellAcquisitionPreview()
+{
+    arcane::platform::SfmlInputMapper mapper;
+    mapper.handleEvent(keyPressed(sf::Keyboard::Key::F4));
+    const auto intent = mapper.sample();
+    return expect(intent.debugSpellAcquisitionPreviewPressed,
+        "F4 must expose the spell-acquisition presentation preview");
+}
 }
 
 int main()
 {
     const bool passed = buffersShortSpellPressUntilNextSample()
         && preservesSharedPhysicalKeyBindings()
+        && mapsSpellAcquisitionPreview()
         && ignoresReleaseEvents();
 
     if (!passed) return 1;

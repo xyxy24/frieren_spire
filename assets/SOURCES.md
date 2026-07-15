@@ -75,3 +75,15 @@
   gravity-field, self-aura, charge-state, shield, tether, binding, sealing, target-telegraph,
   ground-impact, decoy, golem, mirror-summon, field-conversion, blood, spatial-slash, firestorm,
   and mimic VFX for the course build.
+
+## Spell registration presentation reference
+
+- Files: no external binary asset is copied; the reference is reimplemented procedurally in
+  `../Project1/src/presentation/views/SpellAcquisitionView.cpp`.
+- Added by: project team with Codex-assisted local code and resource analysis, 2026-07-15.
+- Original reference: the spell-acquisition sequence shown in Bilibili video `BV178411U7uA`
+  and its matching implementation in the team's local classroom copy of `Alice in Cradle
+  0.29a`: `EfSpellRegisteration`, the magic-device path in `NelTreasureBoxDrawer`, and the
+  `magic_device_opening` / `magic_device_closing` particle definitions.
+- Purpose: classroom-only study reference for the spell reward acquisition presentation; no
+  executable code, texture, audio, or packed Unity resource from the reference game is shipped.

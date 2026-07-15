@@ -48,7 +48,8 @@ class PlayerAnimator
 {
 public:
     [[nodiscard]] bool loadFromDirectory(const std::filesystem::path& directory);
-    void update(const PlayerVisualState& player, float deltaSeconds) noexcept;
+    void update(const PlayerVisualState& player, float deltaSeconds,
+        std::optional<PlayerAnimation> presentationOverride = std::nullopt) noexcept;
     [[nodiscard]] bool draw(sf::RenderTarget& target, sf::Vector2f bottomCenter,
         float facingDirection, sf::Color tint = sf::Color::White) const;
     void reset() noexcept;

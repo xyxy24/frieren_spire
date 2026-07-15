@@ -26,5 +26,6 @@ struct PlayerIntent
     bool menuSecondaryPressed {false};
     bool debugEventPreviewPressed {false};
     bool debugMerchantPreviewPressed {false};
+    bool debugSpellAcquisitionPreviewPressed {false};
 };
 }

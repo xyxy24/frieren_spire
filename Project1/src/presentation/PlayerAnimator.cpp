@@ -66,7 +66,8 @@ bool PlayerAnimator::loadFromDirectory(const std::filesystem::path& directory)
     return loadedAll;
 }
 
-void PlayerAnimator::update(const PlayerVisualState& player, const float deltaSeconds) noexcept
+void PlayerAnimator::update(const PlayerVisualState& player, const float deltaSeconds,
+    const std::optional<PlayerAnimation> presentationOverride) noexcept
 {
     const float elapsed = std::max(0.0F, deltaSeconds);
 
@@ -76,6 +77,15 @@ void PlayerAnimator::update(const PlayerVisualState& player, const float deltaSe
     observedAttackSequence_ = player.attackSequence;
     observedCastSequence_ = player.castSequence;
     observedHurtSequence_ = player.hurtSequence;
+
+    if (presentationOverride)
+    {
+        actionAnimation_.reset();
+        actionSeconds_ = 0.0F;
+        select(*presentationOverride);
+        animationSeconds_ += elapsed;
+        return;
+    }
 
     if (attackStarted)
     {

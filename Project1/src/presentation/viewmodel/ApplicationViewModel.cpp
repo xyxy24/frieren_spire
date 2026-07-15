@@ -66,7 +66,12 @@ std::optional<EquippedSlotsViewModel> ApplicationViewModel::equippedSlots() cons
 
 void ApplicationViewModel::handleStart(const game::PlayerIntent& intent)
 {
-    if (intent.debugMerchantPreviewPressed)
+    if (intent.debugSpellAcquisitionPreviewPressed)
+    {
+        startSpellAcquisitionPreview();
+        screen_ = ApplicationScreen::Playing;
+    }
+    else if (intent.debugMerchantPreviewPressed)
     {
         startMerchantPreview();
         screen_ = ApplicationScreen::Playing;
@@ -190,5 +195,11 @@ void ApplicationViewModel::startMerchantPreview()
     loadout_.reset();
     spellAcquisition_.reset();
     victory_ = false;
+}
+
+void ApplicationViewModel::startSpellAcquisitionPreview()
+{
+    startNewRun();
+    spellAcquisition_.start(1001U);
 }
 }

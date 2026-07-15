@@ -1,6 +1,7 @@
 #include "presentation/SfmlApplication.hpp"
 
 #include "platform/SfmlInputMapper.hpp"
+#include "game/player/PlayerController.hpp"
 #include "presentation/PlayerAnimator.hpp"
 #include "presentation/SpellCardArt.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
@@ -54,7 +55,8 @@ std::string makeWindowTitle(const ui::ApplicationViewModel& app)
     if (const auto acquisition = app.spellAcquisition().snapshot())
         return title + std::string {acquisition->bossSpell ? "ULTIMATE SPELL ACQUIRED - "
             : "SPELL ACQUIRED - "} + std::string {acquisition->content.summary.name}
-            + (acquisition->canDismiss ? " | Enter Continue" : " | Unlocking...");
+            + (acquisition->canDismiss ? " | Enter Continue"
+                : acquisition->canSkip ? " | Space Skip" : " | Unlocking...");
 
     const auto& loadout = app.loadout();
     if (loadout.open())
@@ -134,7 +136,14 @@ std::optional<arcane::presentation::PlayerVisualState> updatePresentationState(
     }
     const auto application = app.snapshot();
     if (state && (application.screen == ui::ApplicationScreen::Playing
-        || application.screen == ui::ApplicationScreen::Result)) animator.update(*state, deltaSeconds);
+        || application.screen == ui::ApplicationScreen::Result))
+    {
+        const std::optional<arcane::presentation::PlayerAnimation> presentationOverride =
+            app.spellAcquisition().active()
+            ? std::optional {arcane::presentation::PlayerAnimation::Pickup}
+            : std::nullopt;
+        animator.update(*state, deltaSeconds, presentationOverride);
+    }
     return state;
 }
 
@@ -142,8 +151,9 @@ void updateWindowTitle(sf::RenderWindow& window, const ui::ApplicationViewModel&
 {
     const auto model = app.snapshot();
     if (model.screen == ui::ApplicationScreen::Start)
-        window.setTitle(model.canContinue ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop"
-            : "Arcane Spire | START - Enter | F2 Event | F3 Shop");
+        window.setTitle(model.canContinue
+            ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop | F4 Spell"
+            : "Arcane Spire | START - Enter | F2 Event | F3 Shop | F4 Spell");
     else if (model.screen == ui::ApplicationScreen::Pause)
         window.setTitle("Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume");
     else if (model.screen == ui::ApplicationScreen::Result)
@@ -255,7 +265,19 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
         }
         if (tower->combat()) drawCombatOverlay(window, *tower->combat(), resources.portraits);
         if (const auto acquisition = app.spellAcquisition().snapshot())
-            drawSpellAcquisition(window, *acquisition, resources.spellCards);
+        {
+            sf::Vector2f focusPosition {
+                static_cast<float>(WindowWidth) * 0.5F, GroundTop - 145.0F};
+            if (playerVisualState)
+            {
+                focusPosition = {
+                    playerVisualState->position.x
+                        + arcane::game::PlayerController::Width * 0.5F,
+                    playerVisualState->position.y - 60.0F};
+            }
+            drawSpellAcquisition(window, *acquisition, resources.spellCards,
+                focusPosition);
+        }
     }
     window.display();
 }

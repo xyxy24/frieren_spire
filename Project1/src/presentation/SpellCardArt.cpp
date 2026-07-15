@@ -47,7 +47,7 @@ bool SpellCardArt::loadFromDirectory(const std::filesystem::path& directory)
 }
 
 bool SpellCardArt::draw(sf::RenderTarget& target, const std::uint32_t spellId,
-    const sf::Vector2f position, const sf::Vector2f size) const
+    const sf::Vector2f position, const sf::Vector2f size, const sf::Color tint) const
 {
     const auto index = indexFor(spellId);
     if (!index || !textures_[*index] || size.x <= 0.0F || size.y <= 0.0F) return false;
@@ -78,6 +78,7 @@ bool SpellCardArt::draw(sf::RenderTarget& target, const std::uint32_t spellId,
     sprite.setPosition(position);
     sprite.setScale({size.x / static_cast<float>(source.size.x),
         size.y / static_cast<float>(source.size.y)});
+    sprite.setColor(tint);
     target.draw(sprite);
     return true;
 }
