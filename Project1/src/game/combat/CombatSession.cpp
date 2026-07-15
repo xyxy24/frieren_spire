@@ -330,8 +330,11 @@ CombatSession::CombatSession(CombatRequest request)
             const Vec2 position {x, request_.worldBounds.groundTop - config.height};
             enemies_.push_back({archetype, ai::EnemyController(position, config), Health(hp, hp)});
         };
-        spawnCopy(EnemyArchetype::StarkCopy, 720.0F, 300);
-        spawnCopy(EnemyArchetype::FernCopy, 980.0F, 180);
+        const bool preview = waterMirror->health.maximum() != 200;
+        spawnCopy(EnemyArchetype::StarkCopy, 720.0F,
+            preview ? waterMirror->health.maximum() : 300);
+        spawnCopy(EnemyArchetype::FernCopy, 980.0F,
+            preview ? waterMirror->health.maximum() : 180);
         enemies_[enemies_.size() - 2U].revolteCooldowns = {4.0F, 2.0F, 0.0F, 0.0F, 0.0F};
         enemies_.back().specialCooldown = 3.0F;
     }
@@ -728,6 +731,22 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     for (auto& beam : activeEnemyBeams_)
         beam.remaining = std::max(0.0F, beam.remaining - deltaSeconds);
     std::erase_if(activeEnemyBeams_, [](const auto& beam) { return beam.remaining <= 0.0F; });
+    for (auto& storm : activeEnemyLightningStorms_)
+    {
+        storm.nextStrikeRemaining -= deltaSeconds;
+        while (storm.strikesRemaining > 0U && storm.nextStrikeRemaining <= 0.0F)
+        {
+            const auto target = playerBounds();
+            pendingEnemyLightning_.push_back({{target.left + target.width * 0.5F - 42.0F,
+                request_.worldBounds.groundTop - 180.0F, 84.0F, 180.0F},
+                0.4F + deltaSeconds, ++environmentalSequence_});
+            --storm.strikesRemaining;
+            storm.nextStrikeRemaining += 0.8F;
+        }
+    }
+    std::erase_if(activeEnemyLightningStorms_, [](const auto& storm) {
+        return storm.strikesRemaining == 0U;
+    });
     for (auto& lightning : pendingEnemyLightning_)
     {
         lightning.delayRemaining -= deltaSeconds;
@@ -1056,7 +1075,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     {
                         const auto landed = enemy.controller.bounds();
                         const Aabb impact {landed.left + landed.width * 0.5F - 144.0F,
-                            request_.worldBounds.groundTop - 96.0F, 288.0F, 96.0F};
+                            request_.worldBounds.groundTop - 144.0F, 288.0F, 144.0F};
                         if (intersects(impact, playerBounds()))
                             static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
                                 ++environmentalSequence_, 20, 1.0F,
@@ -1177,12 +1196,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     const auto target = playerBounds();
                     if (enemy.manualSkill == 0)
                     {
-                        const Aabb strike {target.left + target.width * 0.5F - 42.0F,
-                            request_.worldBounds.groundTop - 180.0F, 84.0F, 180.0F};
-                        for (std::uint32_t index = 0U; index < 5U; ++index)
-                            pendingEnemyLightning_.push_back({strike,
-                                0.4F + 0.8F * static_cast<float>(index),
-                                ++environmentalSequence_});
+                        activeEnemyLightningStorms_.push_back({5U, 0.0F});
                         enemy.revolteCooldowns[0] = 8.0F;
                     }
                     else if (enemy.manualSkill == 1)
@@ -1210,7 +1224,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                                 sequence, 15, 1.0F, relics_.incomingDamageMultiplier()}));
                         enemy.revolteCooldowns[2] = 3.0F;
                     }
-                    enemy.specialActive = 0.6F;
+                    enemy.specialActive = enemy.manualSkill == 0 ? 0.0F : 0.6F;
+                    if (enemy.manualSkill == 0) enemy.manualSkill = -1;
                 }
                 continue;
             }
@@ -2374,8 +2389,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const auto config = enemyConfigFor(EnemyArchetype::FrierenCopy);
             Vec2 position {820.0F,
                 request_.worldBounds.groundTop - 48.0F - config.height};
+            const int copyHealth = waterMirror->health.maximum() == 200
+                ? 350 : waterMirror->health.maximum();
             enemies_.push_back({EnemyArchetype::FrierenCopy,
-                ai::EnemyController(position, config), Health(350, 350)});
+                ai::EnemyController(position, config), Health(copyHealth, copyHealth)});
             enemies_.back().revolteCooldowns = {4.0F, 4.0F, 1.5F, 0.0F, 0.0F};
             beginDialogue(DialogueScript::WaterMirrorSecondPhase);
             return;
@@ -2595,6 +2612,11 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
                     : bounds.left - range,
                 bounds.top, range, bounds.height};
         }
+        if (enemy.archetype == EnemyArchetype::StarkCopy && enemy.manualSkill == 1
+            && (enemy.specialWindup > 0.0F || enemy.specialActive > 0.0F))
+            skillBounds = Aabb {enemy.specialDirection > 0.0F
+                    ? bounds.left + bounds.width : bounds.left - 54.0F,
+                bounds.top, 54.0F, bounds.height};
         if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
             && skill != ai::EnemySkill::WolfClaw && skill != ai::EnemySkill::LeafBlade)
         {
@@ -2795,7 +2817,8 @@ Aabb CombatSession::playerBounds() const noexcept
 Aabb CombatSession::firstLivingEnemyBounds() const noexcept
 {
     const auto found = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
-        return enemy.health.isAlive();
+        return enemy.health.isAlive()
+            && enemy.archetype != EnemyArchetype::WaterMirrorDemon;
     });
     return found == enemies_.end() ? Aabb {} : found->controller.bounds();
 }

@@ -162,6 +162,11 @@ private:
         float delayRemaining {0.4F};
         std::uint64_t sequence {};
     };
+    struct ActiveEnemyLightningStorm
+    {
+        std::uint32_t strikesRemaining {5U};
+        float nextStrikeRemaining {};
+    };
     struct ActiveEnemyGroundFire
     {
         Aabb bounds;
@@ -260,6 +265,7 @@ private:
     std::vector<ActiveEnemyProjectile> activeEnemyProjectiles_;
     std::vector<ActiveEnemyBeam> activeEnemyBeams_;
     std::vector<PendingEnemyLightning> pendingEnemyLightning_;
+    std::vector<ActiveEnemyLightningStorm> activeEnemyLightningStorms_;
     std::vector<ActiveEnemyGroundFire> activeEnemyGroundFire_;
     std::uint64_t environmentalSequence_ {};
     std::optional<CombatResult> result_;

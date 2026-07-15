@@ -1754,6 +1754,95 @@ bool swordDemonSlashUsesOneInstantDamageWindow()
     return expect(combat.playerState().currentHealth == 80,
         "Sword Demon slash attack pose must not repeat its instant damage check");
 }
+
+bool waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {740.0F, 576.0F};
+    request.enemySpawn = {800.0F, 568.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::WaterMirrorDemon;
+    request.enemyMaximumHealth = 200;
+    arcane::game::CombatSession combat(request);
+    const auto enemies = combat.enemyStates();
+    if (!expect(enemies.size() == 3U,
+            "Water Mirror Demon must open with the Stark and Fern copies")
+        || !expect(enemies[0].archetype == arcane::game::EnemyArchetype::WaterMirrorDemon
+                && enemies[0].currentHealth == 200,
+            "the final boss must expose its authoritative two hundred HP")
+        || !expect(enemies[1].archetype == arcane::game::EnemyArchetype::StarkCopy
+                && enemies[1].currentHealth == 300,
+            "the Stark copy must open with three hundred HP")
+        || !expect(enemies[2].archetype == arcane::game::EnemyArchetype::FernCopy
+                && enemies[2].currentHealth == 180,
+            "the Fern copy must open with one hundred eighty HP")
+        || !expect(combat.bossIntro() && combat.bossIntro()->name == "WATER MIRROR DEMON",
+            "the final boss must expose its name introduction")) return false;
+    combat.update({}, 2.4F);
+    advanceDialogue(combat);
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    combat.update(attack, 0.01F);
+    return expect(combat.enemyStates()[0].currentHealth == 200,
+        "the Water Mirror Demon must reject direct player damage");
+}
+
+bool waterMirrorBossAdvancesThroughBothCopyPhases()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {660.0F, 576.0F};
+    request.enemySpawn = {1100.0F, 568.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::WaterMirrorDemon;
+    request.enemyMaximumHealth = 2;
+    request.playerMaximumHealth = 10000;
+    request.playerCurrentHealth = 10000;
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.4F);
+    advanceDialogue(combat);
+
+    const auto defeat = [&](const arcane::game::EnemyArchetype archetype) {
+        for (int step = 0; step < 800; ++step)
+        {
+            const auto enemies = combat.enemyStates();
+            const auto target = std::find_if(enemies.begin(), enemies.end(), [&](const auto& enemy) {
+                return enemy.archetype == archetype && enemy.alive;
+            });
+            if (target == enemies.end()) return true;
+            const auto player = combat.playerState();
+            const float playerCenter = player.position.x + 21.0F;
+            const float targetCenter = target->position.x + target->width * 0.5F;
+            arcane::game::PlayerIntent intent;
+            if (std::abs(targetCenter - playerCenter) > 72.0F)
+                intent.moveAxis = targetCenter > playerCenter ? 1.0F : -1.0F;
+            else
+            {
+                intent.moveAxis = targetCenter > playerCenter ? 1.0F : -1.0F;
+                intent.attackPressed = true;
+            }
+            combat.update(intent, 0.05F);
+        }
+        return false;
+    };
+
+    if (!expect(defeat(arcane::game::EnemyArchetype::StarkCopy)
+            && defeat(arcane::game::EnemyArchetype::FernCopy),
+        "defeating both opening copies must be possible in the deterministic preview")) return false;
+    if (!expect(combat.dialogueLine().has_value(),
+            "defeating both opening copies must enter the second-phase dialogue")) return false;
+    const auto secondPhase = combat.enemyStates();
+    const auto mirror = std::find_if(secondPhase.begin(), secondPhase.end(), [](const auto& enemy) {
+        return enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon;
+    });
+    if (!expect(mirror != secondPhase.end() && mirror->currentHealth == 1,
+            "the phase transition must halve the Water Mirror Demon's health")) return false;
+    advanceDialogue(combat);
+    if (!expect(defeat(arcane::game::EnemyArchetype::FrierenCopy),
+            "the Frieren copy must be the second-phase target")) return false;
+    if (!expect(combat.dialogueLine().has_value(),
+            "defeating the Frieren copy must enter the final dialogue")) return false;
+    advanceDialogue(combat);
+    return expect(combat.result() && combat.result()->outcome == arcane::game::CombatOutcome::Victory,
+        "the final dialogue must resolve the Water Mirror Demon victory");
+}
 }
 
 int main()
@@ -1821,6 +1910,8 @@ int main()
         && threeHeadedDemonHealsToThePreviousStateThreshold()
         && swordDemonMagicHitImmediatelyTriggersFlashStep()
         && swordDemonSlashUsesOneInstantDamageWindow()
+        && waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
+        && waterMirrorBossAdvancesThroughBothCopyPhases()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()
