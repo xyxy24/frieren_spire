@@ -95,6 +95,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const std::optional<sf::Texture>& heimonFogTexture,
     const EnemyStateTextures& demonWarriorTextures,
     const EnemyStateTextures& largeBirdDemonTextures,
+    const EnemyStateTextures& gargoyleTextures,
+    const std::array<std::optional<sf::Texture>, 2>& gargoyleSkillTextures,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -163,6 +165,20 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         }
         if (effect.spellId == 9200U)
         {
+            const std::size_t frame = effect.remaining > effect.duration * 0.5F ? 0U : 1U;
+            if (gargoyleSkillTextures[frame])
+            {
+                const sf::Texture& texture = *gargoyleSkillTextures[frame];
+                sf::Sprite laser(texture);
+                const auto size = texture.getSize();
+                laser.setOrigin({0.0F, static_cast<float>(size.y) * 0.5F});
+                laser.setPosition({effect.bounds.left,
+                    effect.bounds.top + effect.bounds.height * 0.5F});
+                laser.setRotation(sf::degrees(effect.rotationDegrees));
+                laser.setScale({effect.bounds.width / static_cast<float>(size.x), 1.0F});
+                target.draw(laser);
+                continue;
+            }
             sf::RectangleShape laser({effect.bounds.width, effect.bounds.height});
             laser.setOrigin({0.0F, effect.bounds.height * 0.5F});
             laser.setPosition({effect.bounds.left, effect.bounds.top + effect.bounds.height * 0.5F});
@@ -280,6 +296,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &demonWarriorTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::LargeBirdDemon)
             stateTextures = &largeBirdDemonTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Gargoyle)
+            stateTextures = &gargoyleTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -318,6 +336,9 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 && stateTextures->jump) texture = &*stateTextures->jump;
             else if (enemy.archetype == arcane::game::EnemyArchetype::LargeBirdDemon
                 && enemy.returningToAir && stateTextures->idle) texture = &*stateTextures->idle;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Gargoyle
+                && enemy.activated && !enemy.windingUp && !enemy.attackActive
+                && stateTextures->jump) texture = &*stateTextures->jump;
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;

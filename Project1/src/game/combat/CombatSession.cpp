@@ -811,7 +811,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     const float dy = enemy.specialTarget.y - start.y;
                     const float distance = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
                     const Vec2 end {start.x + dx / distance * 240.0F,
-                        std::min(request_.worldBounds.groundTop - 9.0F,
+                        std::min(request_.worldBounds.groundTop - 29.0F,
                             start.y + dy / distance * 240.0F)};
                     const std::uint64_t sequence = ++environmentalSequence_;
                     activeEnemyBeams_.push_back({start, end, 0.6F, sequence});
@@ -2270,7 +2270,7 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
             enemy.concealmentProgress, enemy.specialWindup > 0.0F,
             enemy.specialActive > 0.0F, enemy.revolteSkill,
-            enemy.controller.isSwoopAscending()});
+            enemy.controller.isSwoopAscending(), enemy.activated});
     }
     return views;
 }
@@ -2349,7 +2349,7 @@ EnemyStateView CombatSession::enemyState() const noexcept
         enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
         enemy.concealmentProgress, enemy.specialWindup > 0.0F,
         enemy.specialActive > 0.0F, enemy.revolteSkill,
-        enemy.controller.isSwoopAscending()};
+        enemy.controller.isSwoopAscending(), enemy.activated};
 }
 
 Aabb CombatSession::attackBounds() const noexcept

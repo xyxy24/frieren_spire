@@ -114,6 +114,7 @@ struct EnemyStateView
     bool specialAttackActive {false};
     int skillVariant {-1};
     bool returningToAir {false};
+    bool activated {false};
 };
 
 struct SpellEffectView

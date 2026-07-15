@@ -1625,7 +1625,7 @@ bool gargoyleActivatesBeforeFiringAnAngledLaser()
             "Gargoyle laser must deal twenty damage along its locked diagonal")
         && expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
                 return effect.spellId == 9200U && effect.bounds.width <= 240.01F
-                    && effect.bounds.width > 160.0F
+                    && effect.bounds.width > 100.0F
                     && effect.bounds.height == 18.0F
                     && std::abs(effect.rotationDegrees) > 1.0F;
             }), "Gargoyle must expose a ground-clipped 240-pixel laser visual");

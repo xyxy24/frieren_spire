@@ -135,6 +135,14 @@
 - Purpose: Denken's idle, tornado summon and cremation-magic poses, plus the normal and evolved
   tornado effects.
 
+## Gargoyle character and laser effect
+
+- Files: `enemies/gargoyle/*.png`.
+- Added by: project team, 2026-07-15.
+- Source: team-provided classroom prototype artwork.
+- Purpose: Gargoyle dormant, flying, windup and attack poses, plus its two-frame angled laser
+  effect.
+
 ## Three-act environment backgrounds and battle platforms
 
 - Files: runtime textures under `environments/processed/`; generation sources, chroma-key
