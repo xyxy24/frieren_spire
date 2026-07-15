@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 
@@ -26,7 +27,11 @@ EnemyStateTextures loadEnemyStateTextures(const std::string_view base, const boo
     const bool loadWalk)
 {
     EnemyStateTextures textures;
-    textures.animation = loadTexture(std::string {base} + "animation.png");
+    const std::string animationPath = std::string {base} + "animation.png";
+    // A combined animation atlas is optional: enemies with individual state images
+    // deliberately omit it, so avoid asking SFML to load a file that need not exist.
+    if (std::filesystem::exists(animationPath))
+        textures.animation = loadTexture(animationPath);
     if (loadWalk) textures.walk = loadTexture(std::string {base} + "walk.png");
     if (loadIntroAndDeath) textures.initial = loadTexture(std::string {base} + "initial.png");
     textures.idle = loadTexture(std::string {base} + "idle.png");
