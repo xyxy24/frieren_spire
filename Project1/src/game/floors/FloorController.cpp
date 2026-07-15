@@ -1,5 +1,6 @@
 #include "game/floors/FloorController.hpp"
 
+#include "game/floors/ArenaLayout.hpp"
 #include "game/run/DeterministicRng.hpp"
 
 #include <stdexcept>
@@ -20,9 +21,9 @@ const run::FloorDescriptor& FloorController::load(const run::RunContext& context
         throw std::invalid_argument("combat floors require an encounter pool");
     }
 
-    run::DeterministicRng layout(run::deriveStreamSeed(context.floorSeed, run::RandomStream::Layout));
     run::DeterministicRng encounters(run::deriveStreamSeed(context.floorSeed, run::RandomStream::Encounter));
-    run::FloorDescriptor descriptor {type, context.floorSeed, 100U + layout.index(4U), {}};
+    run::FloorDescriptor descriptor {
+        type, context.floorSeed, selectArenaId(context, type), {}};
     if (requiresEncounter)
     {
         descriptor.encounterIds.push_back(encounterPool[encounters.index(

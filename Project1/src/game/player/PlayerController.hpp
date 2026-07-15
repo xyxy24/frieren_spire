@@ -1,7 +1,10 @@
 #pragma once
 
+#include "game/combat/Aabb.hpp"
 #include "game/contracts/PlayerIntent.hpp"
 #include "game/math/Vec2.hpp"
+
+#include <span>
 
 namespace arcane::game
 {
@@ -24,7 +27,8 @@ public:
 
     explicit PlayerController(Vec2 spawnPosition = {160.0F, 576.0F});
 
-    void update(const PlayerIntent& intent, float deltaSeconds, const WorldBounds& bounds);
+    void update(const PlayerIntent& intent, float deltaSeconds, const WorldBounds& bounds,
+        std::span<const Aabb> oneWayPlatforms = {});
 
     [[nodiscard]] Vec2 position() const noexcept;
     [[nodiscard]] Vec2 velocity() const noexcept;
@@ -50,6 +54,7 @@ public:
 private:
     static constexpr float MoveSpeed = 260.0F;
     static constexpr float JumpSpeed = 650.0F;
+    static constexpr float DropThroughSpeed = 80.0F;
     static constexpr float Gravity = 1600.0F;
     static constexpr float GroundTolerance = 0.01F;
 

@@ -5,6 +5,7 @@
 #include "presentation/ShadeChargeAnimator.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
 #include "presentation/viewmodel/CombatFeedbackViewModel.hpp"
+#include "presentation/views/ArenaView.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -61,6 +62,7 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& linieTextures,
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
     const EnemyStateTextures& drahtTextures, const EnemyStateTextures& auraTextures,
+    const ArenaTextures& arenaTextures,
     const PlayerAnimator& playerAnimator, const ShadeChargeAnimator& shadeChargeAnimator,
     const SpellEffectAnimator& spellEffectAnimator,
     const viewmodel::CombatFeedbackSnapshot& feedback);

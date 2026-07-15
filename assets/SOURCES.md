@@ -76,6 +76,23 @@
   ground-impact, decoy, golem, mirror-summon, field-conversion, blood, spatial-slash, firestorm,
   and mimic VFX for the course build.
 
+## Restrained pixel spell cards
+
+- Files: all runtime cards under `../Project1/assets/spell_cards/v2/`; generation sources under
+  `../Project1/assets/spell_cards/generated-v2/`.
+- Added by: project team with OpenAI built-in image generation and deterministic local cleanup,
+  2026-07-15.
+- Original source/license: AI-generated classroom prototype material; no external card artwork.
+- Style reference: the project-owned player pixel-style reference was supplied only to match
+  pixel density, hard-edge clusters, outline discipline, and the restrained in-game palette.
+- Prompt record: `../docs/SPELL_CARD_ART_DIRECTION.md` stores the shared visual constraints and
+  every spell's dominant composition so the set can be regenerated consistently.
+- Processing: `scripts/PrepareSpellCardSamples.py` center-crops each source, downsizes it to a
+  native `128x128` image with nearest-neighbor sampling, and limits it to a fixed 24-color palette.
+- Purpose: a complete, restrained pixel-card identity for every active regular and Boss spell.
+  `SpellCardArt` prefers these native pixel cards and retains the legacy folder only as a defensive
+  fallback for missing assets.
+
 ## Spell registration presentation reference
 
 - Files: no external binary asset is copied; the reference is reimplemented procedurally in
@@ -101,3 +118,21 @@
   every frame received one shared nearest-neighbor scale, and the eight `128×96` frames were
   combined into the transparent runtime atlas `loot/magic-book.png`.
 - Purpose: looping airborne spellbook reward with distinct hover, page-turn, rune, and glow frames.
+
+## Three-act environment backgrounds and battle platforms
+
+- Files: runtime textures under `environments/processed/`; generation sources, chroma-key
+  inputs, and transparent intermediates under `environments/generated/`.
+- Added by: project team with OpenAI built-in image generation and deterministic local cleanup,
+  2026-07-15.
+- Original source/license: AI-generated classroom prototype material; no external environment
+  asset pack or game texture was copied.
+- Art direction: Act 1 depicts Aura's occupied twilight city with red banners and purple thread
+  magic; Act 2 depicts a snowy northern fortress and mountain pass; Act 3 depicts the First-Class
+  Mage Exam hall with teal runes, pale stone, and restrained gold trim.
+- Processing: `scripts/PrepareEnvironmentAssets.py` crops and normalizes the generated images with
+  nearest-neighbor scaling. Platform chroma keys were removed with the image-generation skill's
+  `remove_chroma_key.py` helper before normalization.
+- Purpose: full-screen scene backgrounds and transparent walkable platform artwork. Runtime
+  artwork is presentation-only; collision continues to come from deterministic `ArenaLayout`
+  rectangles.

@@ -1,5 +1,6 @@
 #include "presentation/views/CombatView.hpp"
 
+#include "presentation/views/ArenaView.hpp"
 #include "presentation/views/ScreenViews.hpp"
 #include "presentation/views/UiPrimitives.hpp"
 
@@ -102,6 +103,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
     const EnemyStateTextures& drahtTextures,
     const EnemyStateTextures& auraTextures,
+    const ArenaTextures& arenaTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator,
@@ -110,10 +112,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const arcane::game::CombatSession* combat = tower.combat();
     if (!combat) return;
 
-    sf::RectangleShape ground({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight) - GroundTop});
-    ground.setPosition({0.0F, GroundTop});
-    ground.setFillColor(sf::Color {64, 72, 88});
-    target.draw(ground);
+    drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
 
     const arcane::game::PlayerStateView player = combat->playerState();
     const sf::Color playerFallback = player.shadowDashing ? sf::Color {28, 22, 42}

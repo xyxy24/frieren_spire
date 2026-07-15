@@ -232,6 +232,12 @@ game::run::FloorType TowerSession::currentFloorType() const noexcept
     return currentFloorType_;
 }
 
+const game::floors::ArenaLayout& TowerSession::arenaLayout() const
+{
+    if (!arenaLayout_) throw std::logic_error("tower session has no active arena layout");
+    return *arenaLayout_;
+}
+
 std::optional<std::array<game::run::ContentId, 3>> TowerSession::rewardCandidates() const
 {
     if (run_.phase() != game::run::RunPhase::Reward) return std::nullopt;
@@ -342,7 +348,8 @@ void TowerSession::startNextFloor()
     eventResultChoice_.reset();
     if (currentFloorType_ == game::run::FloorType::Merchant)
     {
-        static_cast<void>(run_.loadFloor(currentFloorType_, {}));
+        const auto& floor = run_.loadFloor(currentFloorType_, {});
+        arenaLayout_ = &game::floors::arenaLayout(floor.arenaId);
         const auto merchantSeed = game::run::deriveStreamSeed(
             run_.context().floorSeed, game::run::RandomStream::Merchant);
         const auto spellCount = std::min<std::size_t>(3U, eligibleCount(SpellMerchantCatalog, run_.player()));
@@ -373,7 +380,8 @@ void TowerSession::startNextFloor()
     }
     if (currentFloorType_ == game::run::FloorType::Event)
     {
-        static_cast<void>(run_.loadFloor(currentFloorType_, {}));
+        const auto& floor = run_.loadFloor(currentFloorType_, {});
+        arenaLayout_ = &game::floors::arenaLayout(floor.arenaId);
         eventTransaction_.emplace();
         const auto spellOffer = game::rewards::generateOffer(NormalRewardPool,
             run_.player().learnedSpells,
@@ -419,6 +427,7 @@ void TowerSession::startNextFloor()
         : 1000U + run_.context().floorIndex;
     const std::array encounterPool {encounterId};
     const game::run::FloorDescriptor& floor = run_.loadFloor(currentFloorType_, encounterPool);
+    arenaLayout_ = &game::floors::arenaLayout(floor.arenaId);
 
     game::CombatRequest request;
     request.encounterId = floor.encounterIds.front();
@@ -426,6 +435,7 @@ void TowerSession::startNextFloor()
     request.playerSpawn = config_.playerSpawn;
     request.enemySpawn = config_.enemySpawn;
     request.worldBounds = config_.worldBounds;
+    request.oneWayPlatforms = arenaLayout_->oneWayPlatforms;
     request.playerMaximumHealth = run_.player().maxHp;
     request.playerCurrentHealth = run_.player().currentHp;
     request.enemyMaximumHealth = currentFloorType_ == game::run::FloorType::Boss
@@ -572,7 +582,8 @@ void TowerSession::updateSpecialFloor(const game::PlayerIntent& intent, const fl
         return;
     }
 
-    explorationPlayer_->update(intent, deltaSeconds, config_.worldBounds);
+    explorationPlayer_->update(intent, deltaSeconds, config_.worldBounds,
+        arenaLayout().oneWayPlatforms);
     if (!intent.interactPressed) return;
     const auto position = explorationPlayer_->position();
     const game::Aabb playerBounds {position.x, position.y,

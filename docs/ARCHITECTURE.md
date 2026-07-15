@@ -62,7 +62,7 @@ flowchart TB
 | `RelicSystem` | 注册修正与触发器，处理叠加和防重入 | 直接修改表现动画 |
 | `RewardSystem` | 从对应池生成不重复候选并应用选择 | 商店交易 |
 | `MerchantSystem` | 商品生成、价格校验、购买事务 | 普通战奖励 |
-| `FloorGenerator` | 从种子和楼层上下文生成可验证楼层描述 | 直接创建引擎节点 |
+| `FloorGenerator` | 从种子和楼层上下文生成可验证楼层描述；平台、出生标记与可达性契约见 `MAP_DESIGN.md` | 直接创建引擎节点 |
 | `ContentRegistry` | 加载和查询内容定义，校验 ID 与引用 | 持有本局进度 |
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
@@ -256,6 +256,8 @@ runSeed
 7. 将纯数据 `FloorDescriptor` 交给引擎适配层实例化。
 
 当前 `FloorScheduler` 的正式默认节奏为每五层一个 Boss，Boss 固定出现在第 5、10、15 层，完整流程共 15 层；Boss 层优先且不消耗普通候选层的保底计数。`floorsPerBoss` 仍可在测试和快速预览配置中显式缩短。其他楼层由 `encounter` 随机流确定，并通过可配置间隔保证商店和事件出现。商店库存使用独立 `merchant` 随机流，新增楼层布局随机数不会改变商品。
+
+`ArenaLayout` 目录现以稳定 ID `110～115`、`210～215`、`310～315` 描述三幕纯平地安全房、普通竞技场与 Boss 房。`FloorController` 只使用 `RandomStream::Layout` 在当前幕普通竞技场池中选择 ID；事件和商店直接选择当幕 `SafeRoom`，Boss 直接选择专用房。`TowerSession` 将当前布局的静态单向平台复制进 `CombatRequest`，`PlayerController` 负责从下方穿台、下落落台、离开边缘，以及仅在站立于单向平台时响应“下方向 + 跳跃”的主动穿台；基础地面始终不可穿透。当前地面敌人仍只使用主地面，待 B 的敌人模块消费 lane/出生标记后再允许高台出生。SFML `ArenaTextures` 在应用启动时一次性持有当前课程版本三幕共六张背景/平台纹理，`ArenaView` 只读取布局主题和平台矩形完成缩放绘制，不重新计算碰撞；纹理缺失时使用程序化场景后备。平台图可向碰撞顶面下方延伸，但权威碰撞仍只来自 `ArenaLayout`。
 
 商店/事件层由 `TowerSession` 持有独立的探索玩家和 NPC 交互覆盖层。商店库存按魔法与遗物分行生成，`TowerSession` 保存当前选中商品 ID/索引并消费菜单方向与确认意图；表现层只负责按类别分行、显示价格和选中状态。成功交易后从活动库存移除商品。事件使用 `Untriggered → Choosing → Result` 状态机，`Result` 保存选择 ID 到本层卸载为止，以便重复查看相同效果。覆盖层关闭不完成楼层，只有玩家到达后方楼梯才提交非战斗楼层完成与过层事务。
 

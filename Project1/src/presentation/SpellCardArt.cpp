@@ -32,9 +32,11 @@ bool SpellCardArt::loadFromDirectory(const std::filesystem::path& directory)
     for (std::size_t index = 0U; index < SpellIds.size(); ++index)
     {
         sf::Texture texture;
-        if (texture.loadFromFile(directory / (std::to_string(SpellIds[index]) + ".png")))
+        const std::string fileName = std::to_string(SpellIds[index]) + ".png";
+        const bool loadedPixelCard = texture.loadFromFile(directory / "v2" / fileName);
+        if (loadedPixelCard || texture.loadFromFile(directory / fileName))
         {
-            texture.setSmooth(true);
+            texture.setSmooth(!loadedPixelCard);
             textures_[index] = std::move(texture);
         }
         else
