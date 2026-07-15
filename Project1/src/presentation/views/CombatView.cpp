@@ -97,6 +97,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& largeBirdDemonTextures,
     const EnemyStateTextures& gargoyleTextures,
     const std::array<std::optional<sf::Texture>, 2>& gargoyleSkillTextures,
+    const EnemyStateTextures& swordDemonTextures,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -298,6 +299,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &largeBirdDemonTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Gargoyle)
             stateTextures = &gargoyleTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::SwordDemon)
+            stateTextures = &swordDemonTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -339,6 +342,9 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             else if (enemy.archetype == arcane::game::EnemyArchetype::Gargoyle
                 && enemy.activated && !enemy.windingUp && !enemy.attackActive
                 && stateTextures->jump) texture = &*stateTextures->jump;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::SwordDemon
+                && enemy.skillVariant == 0 && enemy.attackActive && stateTextures->dash)
+                texture = &*stateTextures->dash;
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;

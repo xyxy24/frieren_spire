@@ -2269,7 +2269,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             windingUp, active, enemy.slowed, skillBounds, enemy.controller.facingDirection(),
             enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
             enemy.concealmentProgress, enemy.specialWindup > 0.0F,
-            enemy.specialActive > 0.0F, enemy.revolteSkill,
+            enemy.specialActive > 0.0F,
+            enemy.archetype == EnemyArchetype::Revolte ? enemy.revolteSkill : enemy.manualSkill,
             enemy.controller.isSwoopAscending(), enemy.activated});
     }
     return views;
@@ -2348,7 +2349,8 @@ EnemyStateView CombatSession::enemyState() const noexcept
         enemy.slowed, skillBounds, enemy.controller.facingDirection(),
         enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
         enemy.concealmentProgress, enemy.specialWindup > 0.0F,
-        enemy.specialActive > 0.0F, enemy.revolteSkill,
+        enemy.specialActive > 0.0F,
+        enemy.archetype == EnemyArchetype::Revolte ? enemy.revolteSkill : enemy.manualSkill,
         enemy.controller.isSwoopAscending(), enemy.activated};
 }
 

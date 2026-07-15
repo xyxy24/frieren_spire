@@ -1673,6 +1673,24 @@ bool swordDemonMagicHitImmediatelyTriggersFlashStep()
         && expect(std::abs(afterFlash.position.x - hit.position.x) >= 143.9F,
             "Sword Demon must immediately flash-step 144 pixels after player spell damage");
 }
+
+bool swordDemonSlashUsesOneInstantDamageWindow()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {200.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::SwordDemon, {280.0F, 0.0F}}};
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 1.51F);
+    if (!expect(combat.enemyState().windingUp,
+        "Sword Demon slash must retain its warning windup")) return false;
+    combat.update({}, 0.50F);
+    if (!expect(combat.playerState().currentHealth == 80,
+        "Sword Demon slash must deal twenty damage when its windup ends")) return false;
+    combat.update({}, 0.60F);
+    return expect(combat.playerState().currentHealth == 80,
+        "Sword Demon slash attack pose must not repeat its instant damage check");
+}
 }
 
 int main()
@@ -1738,6 +1756,7 @@ int main()
         && gargoyleActivatesBeforeFiringAnAngledLaser()
         && threeHeadedDemonHealsToThePreviousStateThreshold()
         && swordDemonMagicHitImmediatelyTriggersFlashStep()
+        && swordDemonSlashUsesOneInstantDamageWindow()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()

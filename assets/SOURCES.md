@@ -143,6 +143,13 @@
 - Purpose: Gargoyle dormant, flying, windup and attack poses, plus its two-frame angled laser
   effect.
 
+## Sword Demon character artwork
+
+- Files: `enemies/sword_demon/*.png`.
+- Added by: project team, 2026-07-15.
+- Source: team-provided classroom prototype artwork.
+- Purpose: Sword Demon's idle, slash windup, slash attack and flash-step poses.
+
 ## Three-act environment backgrounds and battle platforms
 
 - Files: runtime textures under `environments/processed/`; generation sources, chroma-key

@@ -180,6 +180,7 @@ struct RenderResources
     const EnemyStateTextures& largeBirdDemon;
     const EnemyStateTextures& gargoyle;
     const std::array<std::optional<sf::Texture>, 2>& gargoyleSkill;
+    const EnemyStateTextures& swordDemon;
     const std::optional<sf::Texture>& slash;
     const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
@@ -235,6 +236,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.heimon, resources.heimonSkill, resources.heimonFog,
                 resources.demonWarrior, resources.largeBirdDemon,
                 resources.gargoyle, resources.gargoyleSkill,
+                resources.swordDemon,
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
@@ -355,6 +357,9 @@ int arcane::presentation::SfmlApplication::run()
         loadTexture("assets/enemies/gargoyle/skill1.png"),
         loadTexture("assets/enemies/gargoyle/skill2.png")
     };
+    EnemyStateTextures swordDemonTextures = loadEnemyStateTextures(
+        "assets/enemies/sword_demon/");
+    swordDemonTextures.dash = loadTexture("assets/enemies/sword_demon/dash.png");
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -420,7 +425,8 @@ int arcane::presentation::SfmlApplication::run()
         birdDemonTextures, frostWolfTextures, chaosFlowerTextures, qualTextures, qualSkillTextures,
         heimonTextures, heimonSkillTextures, heimonFogTexture,
         demonWarriorTextures, largeBirdDemonTextures,
-        gargoyleTextures, gargoyleSkillTextures, slashTexture, largeSlashTexture,
+        gargoyleTextures, gargoyleSkillTextures, swordDemonTextures,
+        slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,
         denkenTextures, tornadoTextures, dialoguePortraits,
