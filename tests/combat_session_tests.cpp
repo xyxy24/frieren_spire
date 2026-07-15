@@ -1612,22 +1612,23 @@ bool gargoyleActivatesBeforeFiringAnAngledLaser()
     const float groundPosition = combat.enemyState().position.y;
     combat.update({}, 0.50F);
     if (!expect(combat.enemyState().position.y < groundPosition
-            && combat.enemyState().position.y > 438.0F,
-        "Gargoyle must rise at 120 pixels per second after the player enters 300 pixels"))
+            && combat.enemyState().position.y > 454.0F,
+        "Gargoyle must rise at 80 pixels per second after the player enters 320 pixels"))
         return false;
-    combat.update({}, 0.84F);
-    if (!expect(std::abs(combat.enemyState().position.y - 438.0F) < 0.01F,
-        "Gargoyle must stop 160 pixels above the ground")) return false;
+    combat.update({}, 1.30F);
+    if (!expect(std::abs(combat.enemyState().position.y - 454.0F) < 0.01F,
+        "Gargoyle must stop 144 pixels above the ground")) return false;
     combat.update({}, 2.01F);
     combat.update({}, 0.50F);
     const auto effects = combat.spellEffects();
     return expect(combat.playerState().currentHealth == 80,
             "Gargoyle laser must deal twenty damage along its locked diagonal")
         && expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
-                return effect.spellId == 9200U && effect.bounds.width <= 160.01F
+                return effect.spellId == 9200U && effect.bounds.width <= 240.01F
+                    && effect.bounds.width > 160.0F
                     && effect.bounds.height == 18.0F
                     && std::abs(effect.rotationDegrees) > 1.0F;
-            }), "Gargoyle must expose a rotated 160-pixel laser visual above the ground");
+            }), "Gargoyle must expose a ground-clipped 240-pixel laser visual");
 }
 
 bool threeHeadedDemonHealsToThePreviousStateThreshold()

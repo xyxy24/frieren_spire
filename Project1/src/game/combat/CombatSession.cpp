@@ -179,7 +179,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {160.0F, 144.0F, 144.0F, 0.5F, 4.0F, 0.0F, 0.0F,
             54.0F, 42.0F, 6.0F, true, true, EnemySkill::Swoop};
     case EnemyArchetype::Gargoyle:
-        return EnemyConfig {100.0F, 160.0F, 160.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+        return EnemyConfig {100.0F, 240.0F, 240.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 42.0F, 4.0F, false, false, EnemySkill::BossAttack};
     case EnemyArchetype::ThreeHeadedDemon:
         return EnemyConfig {120.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
@@ -782,14 +782,14 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             const float casterCenter = caster.left + caster.width * 0.5F;
             if (!enemy.activated)
             {
-                if (std::abs(playerCenter - casterCenter) <= 300.0F) enemy.activated = true;
+                if (std::abs(playerCenter - casterCenter) <= 320.0F) enemy.activated = true;
                 if (!enemy.activated) continue;
             }
-            const float airborneY = request_.worldBounds.groundTop - 160.0F - caster.height;
+            const float airborneY = request_.worldBounds.groundTop - 144.0F - caster.height;
             if (caster.top > airborneY)
             {
                 auto position = enemy.controller.position();
-                position.y = std::max(airborneY, position.y - 120.0F * deltaSeconds);
+                position.y = std::max(airborneY, position.y - 80.0F * deltaSeconds);
                 enemy.controller.setPosition(position, request_.worldBounds);
                 continue;
             }
@@ -810,9 +810,9 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     const float dx = enemy.specialTarget.x - start.x;
                     const float dy = enemy.specialTarget.y - start.y;
                     const float distance = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
-                    const Vec2 end {start.x + dx / distance * 160.0F,
+                    const Vec2 end {start.x + dx / distance * 240.0F,
                         std::min(request_.worldBounds.groundTop - 9.0F,
-                            start.y + dy / distance * 160.0F)};
+                            start.y + dy / distance * 240.0F)};
                     const std::uint64_t sequence = ++environmentalSequence_;
                     activeEnemyBeams_.push_back({start, end, 0.6F, sequence});
                     if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
@@ -828,7 +828,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 playerBounds().top + playerBounds().height * 0.5F};
             const float dx = playerTarget.x - casterCenter;
             const float dy = playerTarget.y - (caster.top + caster.height * 0.5F);
-            if (enemy.specialCooldown <= 0.0F && std::sqrt(dx * dx + dy * dy) <= 181.0F)
+            if (enemy.specialCooldown <= 0.0F && std::sqrt(dx * dx + dy * dy) <= 261.0F)
             {
                 enemy.specialTarget = playerTarget;
                 enemy.specialDirection = dx >= 0.0F ? 1.0F : -1.0F;
