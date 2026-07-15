@@ -191,7 +191,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {160.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             64.0F, 96.0F, 7.0F, true, false, EnemySkill::BossAttack};
     case EnemyArchetype::Aura:
-        return EnemyConfig {120.0F, 100000.0F, 100000.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+        return EnemyConfig {120.0F, 420.0F, 420.0F, 0.8F, 0.2F, 0.0F, 0.0F,
             42.0F, 64.0F, 7.0F, false, false, EnemySkill::Domination};
     case EnemyArchetype::RedMirrorDragon:
         return EnemyConfig {96.0F, 72.0F, 72.0F, 0.5F, 0.6F, 0.0F, 0.0F,
@@ -2090,14 +2090,18 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     direction, 144.0F, 144.0F, sequence, 20});
             }
         }
+        const bool firstDomination = skillJustActivated
+            && config.skill == ai::EnemySkill::Domination
+            && auraFirstDominationAvailable_;
+        if (firstDomination) auraFirstDominationAvailable_ = false;
         if (enemy.controller.action() == ai::EnemyAction::Active
             && config.skill != ai::EnemySkill::Swoop
+            && (config.skill != ai::EnemySkill::Domination || skillJustActivated)
             && ((config.skill != ai::EnemySkill::Slash
                     && config.skill != ai::EnemySkill::WhirlwindSlash
                     && config.skill != ai::EnemySkill::WolfClaw
                     && config.skill != ai::EnemySkill::LeafBlade) || skillJustActivated)
-            && (config.skill == ai::EnemySkill::Domination
-                || intersects(playerBounds(), enemy.controller.attackBounds())))
+            && intersects(playerBounds(), enemy.controller.attackBounds()))
         {
             int damage = 20;
             if (config.skill == ai::EnemySkill::Thread) damage = 10;
@@ -2121,21 +2125,17 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                         || (player_.flightRemaining() > 0.0F
                             && config.skill == ai::EnemySkill::LeapingCleave)});
             if (result.appliedDamage > 0) beamRemaining_ = 0.0F;
-            const bool guaranteedDomination = config.skill == ai::EnemySkill::Domination
-                && auraGuaranteedDominationAvailable_;
             const bool dominationHit = config.skill == ai::EnemySkill::Domination
-                && (guaranteedDomination || (!player_.isShadowDashing()
-                    && spellInvulnerableRemaining_ <= 0.0F));
+                && !player_.isShadowDashing() && spellInvulnerableRemaining_ <= 0.0F;
             if ((result.appliedDamage > 0 || dominationHit)
-                && (blessingRemaining_ <= 0.0F || guaranteedDomination))
+                && (blessingRemaining_ <= 0.0F || firstDomination))
             {
                 if (config.skill == ai::EnemySkill::Thread)
                     player_.applyLaunch(540.0F, playerControlDuration(0.28F));
                 else if (config.skill == ai::EnemySkill::Domination)
                 {
                     player_.applyHitReaction(0.0F,
-                        guaranteedDomination ? 1.0F : playerControlDuration(1.0F));
-                    auraGuaranteedDominationAvailable_ = false;
+                        firstDomination ? 1.0F : playerControlDuration(1.0F));
                 }
                 else if (config.skill == ai::EnemySkill::Thrust)
                     player_.applyHitReaction(0.0F, playerControlDuration(1.0F));
@@ -2230,7 +2230,7 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
                 || enemy.controller.action() == ai::EnemyAction::Active)
             && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
             && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
-            && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw
+            && skill != ai::EnemySkill::WolfClaw
             && skill != ai::EnemySkill::LeafBlade)
         {
             const auto area = enemy.controller.attackBounds();
@@ -2321,7 +2321,7 @@ EnemyStateView CombatSession::enemyState() const noexcept
             || enemy.controller.action() == ai::EnemyAction::Active)
         && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
         && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
-        && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw
+        && skill != ai::EnemySkill::WolfClaw
         && skill != ai::EnemySkill::LeafBlade)
     {
         const auto area = enemy.controller.attackBounds();

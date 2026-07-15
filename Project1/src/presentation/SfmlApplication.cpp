@@ -197,6 +197,7 @@ struct RenderResources
     const std::array<std::optional<sf::Texture>, 2>& tornado;
     const DialoguePortraitTextures& portraits;
     const ArenaTextures& arena;
+    const arcane::presentation::EnemyAnimator& enemyAnimator;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator;
@@ -247,7 +248,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.linie, resources.linieSkill,
                 resources.draht, resources.aura, resources.revolte,
                 resources.denken, resources.tornado, resources.arena,
-                resources.playerAnimator,
+                resources.enemyAnimator, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.spellAnimator, feedback);
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
             if (const auto loot = tower->lootDropBounds())
@@ -326,7 +327,7 @@ int arcane::presentation::SfmlApplication::run()
     config.worldBounds = {0.0F, static_cast<float>(WindowWidth), GroundTop};
     ui::ApplicationViewModel app(makeRuntimeSeed(), config);
     const EnemyStateTextures headlessKnightTextures = loadEnemyStateTextures(
-        "assets/enemies/headless_knight/");
+        "assets/enemies/headless_knight/", false, false, true, false, true);
     const EnemyStateTextures chestMimicTextures = loadEnemyStateTextures(
         "assets/enemies/chest_mimic/");
     const EnemyStateTextures birdDemonTextures = loadEnemyStateTextures(
@@ -402,8 +403,9 @@ int arcane::presentation::SfmlApplication::run()
     };
     const EnemyStateTextures drahtTextures = loadEnemyStateTextures(
         "assets/enemies/draht/");
-    const EnemyStateTextures auraTextures = loadEnemyStateTextures(
+    EnemyStateTextures auraTextures = loadEnemyStateTextures(
         "assets/enemies/aura/", false, true, false);
+    auraTextures.domination = loadTexture("assets/enemies/aura/domination.png");
     EnemyStateTextures revolteTextures;
     revolteTextures.idle = loadTexture("assets/enemies/revolte/idle.png");
     revolteTextures.attack = loadTexture("assets/enemies/revolte/attack.png");
@@ -435,6 +437,7 @@ int arcane::presentation::SfmlApplication::run()
             loadTexture("assets/portraits/revolte/avatar3.png")}
     };
     const ArenaTextures arenaTextures = loadArenaTextures("assets/environments/processed");
+    arcane::presentation::EnemyAnimator enemyAnimator;
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
     arcane::presentation::ShadeChargeAnimator shadeChargeAnimator;
@@ -455,7 +458,8 @@ int arcane::presentation::SfmlApplication::run()
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,
         denkenTextures, tornadoTextures, dialoguePortraits,
-        arenaTextures, lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,
+        arenaTextures, enemyAnimator, lootBookAnimator, playerAnimator,
+        shadeChargeAnimator, spellCards,
         spellEffectAnimator};
     sf::Clock frameClock;
     ui::CombatFeedbackViewModel combatFeedback;
@@ -490,10 +494,17 @@ int arcane::presentation::SfmlApplication::run()
             const auto enemies = tower->combat()->enemyStates();
             const float feedbackDelta = !app.loadout().open() ? deltaSeconds : 0.0F;
             combatFeedback.update(tower->combat()->playerState(), enemies, feedbackDelta);
+            const bool enemyAnimationAdvances = !app.loadout().open()
+                && !app.spellAcquisition().active()
+                && !tower->combat()->dialogueLine().has_value()
+                && !tower->combat()->bossIntro().has_value();
+            enemyAnimator.update(enemies,
+                enemyAnimationAdvances ? simulationDeltaSeconds : 0.0F);
         }
         else
         {
             combatFeedback.reset();
+            enemyAnimator.reset();
             feedbackFloor.reset();
         }
         const auto presentationState = updatePresentationState(

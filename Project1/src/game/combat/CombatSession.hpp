@@ -249,7 +249,7 @@ private:
     DialogueScript dialogueScript_ {DialogueScript::None};
     std::uint8_t dialogueLineIndex_ {};
     bool auraFirstDominationDialogueShown_ {};
-    bool auraGuaranteedDominationAvailable_ {true};
+    bool auraFirstDominationAvailable_ {true};
     bool auraDefeatDialogueShown_ {};
     bool revolteDefeatDialogueShown_ {};
     std::optional<CombatOutcome> outcomeAfterDialogue_;
