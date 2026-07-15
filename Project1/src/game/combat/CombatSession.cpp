@@ -519,6 +519,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     const bool wasDashing = player_.isDashing();
     const Vec2 beforePlayerUpdate = player_.position();
     PlayerIntent playerIntent = intent;
+    if (sleepRemaining_ > 0.0F) playerIntent.moveAxis *= 0.8F;
     if (beamRemaining_ > 0.0F)
     {
         playerIntent.moveAxis *= 0.3F;
@@ -672,6 +673,11 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         const bool flowerSlowed = flowerFieldRemaining_ > 0.0F
             && std::abs(bounds.left + bounds.width * 0.5F - flowerFieldCenterX_) <= 300.0F;
         enemy.slowed = flowerSlowed || enemy.frostSlowRemaining > 0.0F;
+        if (enemy.archetype == EnemyArchetype::Heimon && enemy.specialActive > 0.0F)
+        {
+            enemy.specialActive = std::max(0.0F, enemy.specialActive - deltaSeconds);
+            continue;
+        }
         if (enemy.archetype == EnemyArchetype::Heimon && !enemy.fogCreated)
         {
             enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
@@ -684,6 +690,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     enemy.specialTargetBounds = {caster.left + caster.width * 0.5F - 320.0F,
                         request_.worldBounds.groundTop - 96.0F, 640.0F, 96.0F};
                     enemy.fogCreated = true;
+                    enemy.specialActive = 0.6F;
                 }
                 continue;
             }
@@ -796,8 +803,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 && enemy.controller.action() == ai::EnemyAction::Chase)
             {
                 const auto flower = enemy.controller.bounds();
-                const Aabb curse {flower.left + flower.width * 0.5F - 240.0F,
-                    flower.top + flower.height * 0.5F - 240.0F, 480.0F, 480.0F};
+                const Aabb curse {flower.left + flower.width * 0.5F - 300.0F,
+                    flower.top + flower.height * 0.5F - 300.0F, 600.0F, 600.0F};
                 if (intersects(playerBounds(), curse) && blessingRemaining_ <= 0.0F
                     && !player_.isDashing() && spellInvulnerableRemaining_ <= 0.0F)
                     sleepRemaining_ = 5.0F;
@@ -2034,8 +2041,9 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
         views.push_back({tornado.evolutionRemaining > 0.0F ? 9002U : 9003U,
             tornado.bounds, tornado.remaining, 7.0F});
     for (const auto& projectile : activeEnemyProjectiles_)
-        views.push_back({9101U, projectile.bounds,
-            projectile.remainingDistance / 200.0F, projectile.totalDistance / 200.0F});
+        views.push_back({projectile.bounds.width >= 54.0F ? 9102U : 9101U,
+            projectile.bounds, projectile.remainingDistance / 200.0F,
+            projectile.totalDistance / 200.0F, projectile.direction});
     for (const auto& enemy : enemies_)
         if (enemy.archetype == EnemyArchetype::Heimon && enemy.health.isAlive()
             && enemy.fogCreated)
@@ -2077,11 +2085,14 @@ EnemyStateView CombatSession::enemyState() const noexcept
     }
     return {enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
         enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
-        enemy.controller.action() == ai::EnemyAction::Windup || enemy.breathWindup > 0.0F,
-        enemy.controller.action() == ai::EnemyAction::Active || enemy.breathRemaining > 0.0F,
+        enemy.controller.action() == ai::EnemyAction::Windup || enemy.breathWindup > 0.0F
+            || enemy.specialWindup > 0.0F,
+        enemy.controller.action() == ai::EnemyAction::Active || enemy.breathRemaining > 0.0F
+            || enemy.specialActive > 0.0F,
         enemy.slowed, skillBounds, enemy.controller.facingDirection(),
         enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
-        enemy.concealmentProgress};
+        enemy.concealmentProgress, enemy.specialWindup > 0.0F,
+        enemy.specialActive > 0.0F};
 }
 
 Aabb CombatSession::attackBounds() const noexcept

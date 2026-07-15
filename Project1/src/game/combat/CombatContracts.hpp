@@ -118,6 +118,7 @@ struct SpellEffectView
     Aabb bounds;
     float remaining {};
     float duration {};
+    float facingDirection {1.0F};
 };
 
 struct CombatDialogueLineView

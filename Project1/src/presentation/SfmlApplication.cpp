@@ -173,6 +173,12 @@ struct RenderResources
     const EnemyStateTextures& chaosFlower;
     const EnemyStateTextures& qual;
     const std::array<std::optional<sf::Texture>, 3>& qualSkill;
+    const EnemyStateTextures& heimon;
+    const std::array<std::optional<sf::Texture>, 2>& heimonSkill;
+    const std::optional<sf::Texture>& heimonFog;
+    const EnemyStateTextures& demonWarrior;
+    const std::optional<sf::Texture>& slash;
+    const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkill;
     const EnemyStateTextures& linie;
@@ -219,6 +225,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             window.setView(worldView);
             drawCombat(window, *tower, resources.headless, resources.mimic, resources.bird,
                 resources.frostWolf, resources.chaosFlower, resources.qual, resources.qualSkill,
+                resources.heimon, resources.heimonSkill, resources.heimonFog,
+                resources.demonWarrior, resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
                 resources.draht, resources.aura, resources.playerAnimator,
@@ -316,6 +324,21 @@ int arcane::presentation::SfmlApplication::run()
         loadTexture("assets/enemies/qual/skill2.png"),
         loadTexture("assets/enemies/qual/skill3.png")
     };
+    EnemyStateTextures heimonTextures = loadEnemyStateTextures(
+        "assets/enemies/heimon/");
+    heimonTextures.summon = loadTexture("assets/enemies/heimon/summon.png");
+    const std::array<std::optional<sf::Texture>, 2> heimonSkillTextures {
+        loadTexture("assets/enemies/heimon/skill1.png"),
+        loadTexture("assets/enemies/heimon/skill2.png")
+    };
+    const std::optional<sf::Texture> heimonFogTexture =
+        loadTexture("assets/enemies/heimon/fog.png");
+    const EnemyStateTextures demonWarriorTextures = loadEnemyStateTextures(
+        "assets/enemies/demon_warrior/");
+    const std::optional<sf::Texture> slashTexture =
+        loadTexture("assets/enemies/shared/slash.png");
+    const std::optional<sf::Texture> largeSlashTexture =
+        loadTexture("assets/enemies/shared/large_slash.png");
     const EnemyStateTextures lugnerTextures = loadEnemyStateTextures(
         "assets/enemies/lugner/");
     const std::array<std::optional<sf::Texture>, 3> lugnerSkillTextures {
@@ -351,6 +374,8 @@ int arcane::presentation::SfmlApplication::run()
     static_cast<void>(spellEffectAnimator.loadFromDirectory("assets/spells"));
     const RenderResources renderResources {headlessKnightTextures, chestMimicTextures,
         birdDemonTextures, frostWolfTextures, chaosFlowerTextures, qualTextures, qualSkillTextures,
+        heimonTextures, heimonSkillTextures, heimonFogTexture,
+        demonWarriorTextures, slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
         lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,

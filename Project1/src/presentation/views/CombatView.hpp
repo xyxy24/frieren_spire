@@ -23,6 +23,7 @@ struct EnemyStateTextures
     std::optional<sf::Texture> preJump;
     std::optional<sf::Texture> jump;
     std::optional<sf::Texture> attack;
+    std::optional<sf::Texture> summon;
     std::optional<sf::Texture> die;
 };
 
@@ -48,6 +49,12 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
     const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
     const std::array<std::optional<sf::Texture>, 3>& qualSkillTextures,
+    const EnemyStateTextures& heimonTextures,
+    const std::array<std::optional<sf::Texture>, 2>& heimonSkillTextures,
+    const std::optional<sf::Texture>& heimonFogTexture,
+    const EnemyStateTextures& demonWarriorTextures,
+    const std::optional<sf::Texture>& slashTexture,
+    const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
     const EnemyStateTextures& linieTextures,

@@ -1239,6 +1239,15 @@ bool chaosFlowerSleepReducesOutgoingDamageWithoutWindup()
         || !expect(!combat.enemyState().specialWindingUp,
             "sleep curse must not enter a windup state")) return false;
 
+    arcane::game::PlayerIntent moveLeft;
+    moveLeft.moveAxis = -1.0F;
+    combat.update(moveLeft, 0.10F);
+    if (!expect(std::abs(combat.playerState().position.x - 139.2F) < 0.01F,
+        "sleep must reduce normal horizontal movement speed by twenty percent")) return false;
+    arcane::game::PlayerIntent moveRight;
+    moveRight.moveAxis = 1.0F;
+    combat.update(moveRight, 0.10F);
+
     arcane::game::PlayerIntent attack;
     attack.attackPressed = true;
     combat.update(attack, 0.01F);
@@ -1457,6 +1466,9 @@ bool newLateActEnemiesExposeFogProjectileAndFlightRules()
     const arcane::game::PlayerIntent idle;
     fog.update(idle, 1.5F);
     fog.update(idle, 0.5F);
+    if (!expect(fog.enemyState().specialAttackActive,
+        "Heimon must briefly expose the fog-summoning pose after the shared windup")) return false;
+    fog.update(idle, 0.6F);
     fog.update(idle, 0.81F);
     const auto hidden = fog.enemyState();
     const auto fogEffects = fog.spellEffects();
@@ -1492,7 +1504,8 @@ bool newLateActEnemiesExposeFogProjectileAndFlightRules()
         || !expect(std::any_of(warriorEffects.begin(), warriorEffects.end(),
             [](const auto& effect) { return effect.spellId == 9101U
                 && effect.bounds.width == 32.0F && effect.bounds.height == 42.0F
-                && std::abs(effect.duration - 0.72F) < 0.01F; }),
+                && std::abs(effect.duration - 0.72F) < 0.01F
+                && effect.facingDirection < 0.0F; }),
             "Demon Warrior must emit its moving slash when the melee windup ends")) return false;
 
     arcane::game::CombatRequest birdRequest;

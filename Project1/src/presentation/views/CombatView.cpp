@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -50,11 +51,50 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
         player.shadowDashChargeRemaining(), player.isShadowDashing(), player.isStunned()};
 }
 
+namespace
+{
+void drawSleepParticles(sf::RenderTarget& target, const arcane::game::PlayerStateView& player)
+{
+    if (player.sleepRemaining <= 0.0F) return;
+
+    constexpr std::array<float, 9> PhaseOffsets {
+        0.00F, 0.37F, 0.71F, 0.18F, 0.53F, 0.86F, 0.29F, 0.63F, 0.94F
+    };
+    constexpr std::array<float, 9> HorizontalOffsets {
+        4.0F, 31.0F, 16.0F, 38.0F, 9.0F, 25.0F, 1.0F, 34.0F, 20.0F
+    };
+    const float elapsed = 5.0F - std::min(player.sleepRemaining, 5.0F);
+    for (std::size_t index = 0U; index < PhaseOffsets.size(); ++index)
+    {
+        const float progress = std::fmod(elapsed * 0.85F + PhaseOffsets[index], 1.0F);
+        const float drift = std::sin((progress + PhaseOffsets[index]) * 6.2831853F) * 4.0F;
+        const float size = index % 3U == 0U ? 6.0F : 4.0F;
+        sf::RectangleShape particle({size, size});
+        particle.setPosition({player.position.x + HorizontalOffsets[index] + drift,
+            player.position.y + arcane::game::PlayerController::Height
+                - 8.0F - progress * 78.0F});
+        const float fade = std::sin(progress * 3.1415927F);
+        particle.setFillColor(sf::Color {111, 48, 148,
+            static_cast<std::uint8_t>(80.0F + fade * 150.0F)});
+        particle.setOutlineColor(sf::Color {205, 117, 232,
+            static_cast<std::uint8_t>(60.0F + fade * 130.0F)});
+        particle.setOutlineThickness(1.0F);
+        target.draw(particle);
+    }
+}
+}
+
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
     const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
     const std::array<std::optional<sf::Texture>, 3>& qualSkillTextures,
+    const EnemyStateTextures& heimonTextures,
+    const std::array<std::optional<sf::Texture>, 2>& heimonSkillTextures,
+    const std::optional<sf::Texture>& heimonFogTexture,
+    const EnemyStateTextures& demonWarriorTextures,
+    const std::optional<sf::Texture>& slashTexture,
+    const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
     const EnemyStateTextures& linieTextures,
@@ -91,9 +131,38 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     shadeChargeAnimator.drawBack(target, playerBottomCenter);
     drawPlayer(target, playerAnimator, makePlayerVisualState(player), playerFallback, playerTint);
     shadeChargeAnimator.drawFront(target, playerBottomCenter);
+    drawSleepParticles(target, player);
 
     for (const arcane::game::SpellEffectView effect : combat->spellEffects())
     {
+        if (effect.spellId == 9100U && heimonFogTexture)
+        {
+            sf::Sprite fog(*heimonFogTexture);
+            const auto size = heimonFogTexture->getSize();
+            fog.setPosition({effect.bounds.left, effect.bounds.top});
+            fog.setScale({effect.bounds.width / static_cast<float>(size.x),
+                effect.bounds.height / static_cast<float>(size.y)});
+            fog.setColor(sf::Color {255, 255, 255, 205});
+            target.draw(fog);
+            continue;
+        }
+        const std::optional<sf::Texture>* projectileTexture = nullptr;
+        if (effect.spellId == 9101U) projectileTexture = &slashTexture;
+        else if (effect.spellId == 9102U) projectileTexture = &largeSlashTexture;
+        if (projectileTexture && *projectileTexture)
+        {
+            sf::Sprite slash(**projectileTexture);
+            const auto size = (*projectileTexture)->getSize();
+            slash.setOrigin({static_cast<float>(size.x) * 0.5F,
+                static_cast<float>(size.y) * 0.5F});
+            slash.setPosition({effect.bounds.left + effect.bounds.width * 0.5F,
+                effect.bounds.top + effect.bounds.height * 0.5F});
+            slash.setScale({(effect.facingDirection > 0.0F ? 1.0F : -1.0F)
+                    * effect.bounds.width / static_cast<float>(size.x),
+                effect.bounds.height / static_cast<float>(size.y)});
+            target.draw(slash);
+            continue;
+        }
         const float life = effect.duration > 0.0F
             ? std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F) : 0.0F;
         sf::Color color {146, 196, 255};
@@ -136,6 +205,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         case 2012U: color = sf::Color {179, 224, 255}; break;
         case 9100U: color = sf::Color {116, 132, 142}; break;
         case 9101U: color = sf::Color {222, 236, 255}; break;
+        case 9102U: color = sf::Color {174, 219, 255}; break;
         default: break;
         }
         sf::RectangleShape rangeShape({effect.bounds.width, effect.bounds.height});
@@ -176,6 +246,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &frostWolfTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::ChaosFlower)
             stateTextures = &chaosFlowerTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Heimon)
+            stateTextures = &heimonTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::DemonWarrior)
+            stateTextures = &demonWarriorTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -196,6 +270,9 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                         || dialogue->portrait == "frieren-pre")));
             if (showDefeatedAura && stateTextures->die) texture = &*stateTextures->die;
             else if (auraInitial && stateTextures->initial) texture = &*stateTextures->initial;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Heimon
+                && enemy.specialAttackActive && stateTextures->summon)
+                texture = &*stateTextures->summon;
             else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
                 && enemy.specialAttackActive && stateTextures->jump)
                 texture = &*stateTextures->jump;
@@ -254,6 +331,8 @@ else enemyColor.a = alpha;
                 && enemy.attackActive;
             const bool qualKillingMagic = enemy.archetype == arcane::game::EnemyArchetype::Qual
                 && enemy.attackActive;
+            const bool heimonAttack = enemy.archetype == arcane::game::EnemyArchetype::Heimon
+                && enemy.attackActive && !enemy.specialAttackActive;
             const sf::Texture* bloodTexture = nullptr;
             if (lugnerBlood)
             {
@@ -281,7 +360,28 @@ else enemyColor.a = alpha;
                 if (qualSkillTextures[frame])
                     killingMagicTexture = &*qualSkillTextures[frame];
             }
-            if (killingMagicTexture)
+            const sf::Texture* fogAttackTexture = nullptr;
+            if (heimonAttack)
+            {
+                const std::size_t frame = std::min<std::size_t>(1U,
+                    static_cast<std::size_t>(enemy.skillEffectProgress * 2.0F));
+                if (heimonSkillTextures[frame])
+                    fogAttackTexture = &*heimonSkillTextures[frame];
+            }
+            if (fogAttackTexture)
+            {
+                sf::Sprite effect(*fogAttackTexture);
+                const auto size = fogAttackTexture->getSize();
+                effect.setOrigin({static_cast<float>(size.x) * 0.5F,
+                    static_cast<float>(size.y) * 0.5F});
+                effect.setPosition({area.left + area.width * 0.5F,
+                    area.top + area.height * 0.5F});
+                effect.setScale({(enemy.facingDirection > 0.0F ? 1.0F : -1.0F)
+                        * area.width / static_cast<float>(size.x),
+                    area.height / static_cast<float>(size.y)});
+                target.draw(effect);
+            }
+            else if (killingMagicTexture)
             {
                 sf::Sprite effect(*killingMagicTexture);
                 const auto size = killingMagicTexture->getSize();

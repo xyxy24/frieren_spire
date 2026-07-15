@@ -200,6 +200,14 @@ Aabb EnemyController::attackBounds() const noexcept
                 + EffectVerticalOffset,
             config_.attackRange, EffectHeight};
     }
+    if (config_.skill == EnemySkill::FogAttack)
+    {
+        const float left = facingDirection_ > 0.0F
+            ? position_.x + config_.width : position_.x - config_.attackRange;
+        constexpr float EffectHeight = 32.0F;
+        return {left, position_.y + (config_.height - EffectHeight) * 0.5F,
+            config_.attackRange, EffectHeight};
+    }
     const float left = facingDirection_ > 0.0F
         ? position_.x + config_.width : position_.x - config_.attackRange;
     return {left, position_.y, config_.attackRange, config_.height};
