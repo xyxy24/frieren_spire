@@ -22,7 +22,8 @@ enum class CombatOutcome
 enum class EnemyArchetype : std::uint8_t {
     ChestMimic, HeadlessKnight, BirdDemon, Lugner, Linie, Draht,
     ChaosFlower, FrostWolf, Qual, Laufen, Richter, Denken,
-    Heimon, DemonWarrior, LargeBirdDemon, Aura, Revolte, RedMirrorDragon, Boss
+    Heimon, DemonWarrior, LargeBirdDemon, Gargoyle, ThreeHeadedDemon, SwordDemon,
+    Aura, Revolte, RedMirrorDragon, Boss
 };
 
 struct EnemySpawn
@@ -122,6 +123,7 @@ struct SpellEffectView
     float remaining {};
     float duration {};
     float facingDirection {1.0F};
+    float rotationDegrees {0.0F};
 };
 
 struct CombatDialogueLineView

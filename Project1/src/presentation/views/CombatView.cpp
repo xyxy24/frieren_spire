@@ -161,6 +161,18 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             target.draw(tornado);
             continue;
         }
+        if (effect.spellId == 9200U)
+        {
+            sf::RectangleShape laser({effect.bounds.width, effect.bounds.height});
+            laser.setOrigin({0.0F, effect.bounds.height * 0.5F});
+            laser.setPosition({effect.bounds.left, effect.bounds.top + effect.bounds.height * 0.5F});
+            laser.setRotation(sf::degrees(effect.rotationDegrees));
+            laser.setFillColor(sf::Color {224, 80, 255, 205});
+            laser.setOutlineColor(sf::Color {255, 213, 255, 245});
+            laser.setOutlineThickness(2.0F);
+            target.draw(laser);
+            continue;
+        }
         const std::optional<sf::Texture>* projectileTexture = nullptr;
         if (effect.spellId == 9101U) projectileTexture = &slashTexture;
         else if (effect.spellId == 9102U) projectileTexture = &largeSlashTexture;

@@ -107,6 +107,10 @@ private:
         bool revolteSecondPhase {};
         bool revolteTransitionPending {};
         bool revolteCounterDashPending {};
+        float secondaryCooldown {};
+        int manualSkill {-1};
+        bool activated {};
+        Vec2 specialTarget;
     };
     struct ActiveSpellEffect
     {
@@ -143,6 +147,13 @@ private:
         float totalDistance {};
         std::uint64_t sequence {};
         int damage {20};
+    };
+    struct ActiveEnemyBeam
+    {
+        Vec2 start;
+        Vec2 end;
+        float remaining {0.6F};
+        std::uint64_t sequence {};
     };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
@@ -232,6 +243,7 @@ private:
     std::vector<ActivePillar> activePillars_;
     std::vector<ActiveTornado> activeTornadoes_;
     std::vector<ActiveEnemyProjectile> activeEnemyProjectiles_;
+    std::vector<ActiveEnemyBeam> activeEnemyBeams_;
     std::uint64_t environmentalSequence_ {};
     std::optional<CombatResult> result_;
     DialogueScript dialogueScript_ {DialogueScript::None};

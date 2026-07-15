@@ -27,6 +27,29 @@ constexpr bool isPlayerDamage(const DamageSource source) noexcept
     return source == DamageSource::PlayerBasicAttack || isPlayerMagic(source);
 }
 
+bool segmentIntersectsAabb(const Vec2 start, const Vec2 end, const Aabb& bounds,
+    const float halfThickness) noexcept
+{
+    const float left = bounds.left - halfThickness;
+    const float right = bounds.left + bounds.width + halfThickness;
+    const float top = bounds.top - halfThickness;
+    const float bottom = bounds.top + bounds.height + halfThickness;
+    const float dx = end.x - start.x;
+    const float dy = end.y - start.y;
+    float minimum = 0.0F;
+    float maximum = 1.0F;
+    const auto clip = [&](const float origin, const float delta,
+                          const float low, const float high) {
+        if (std::abs(delta) < 0.0001F) return origin >= low && origin <= high;
+        const float first = (low - origin) / delta;
+        const float second = (high - origin) / delta;
+        minimum = std::max(minimum, std::min(first, second));
+        maximum = std::min(maximum, std::max(first, second));
+        return minimum <= maximum;
+    };
+    return clip(start.x, dx, left, right) && clip(start.y, dy, top, bottom);
+}
+
 constexpr float fullClipDuration(const std::uint32_t frameCount, const float framesPerSecond) noexcept
 {
     return static_cast<float>(frameCount) / framesPerSecond;
@@ -155,6 +178,15 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
     case EnemyArchetype::LargeBirdDemon:
         return EnemyConfig {160.0F, 144.0F, 144.0F, 0.5F, 4.0F, 0.0F, 0.0F,
             54.0F, 42.0F, 6.0F, true, true, EnemySkill::Swoop};
+    case EnemyArchetype::Gargoyle:
+        return EnemyConfig {100.0F, 160.0F, 160.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+            42.0F, 42.0F, 4.0F, false, false, EnemySkill::BossAttack};
+    case EnemyArchetype::ThreeHeadedDemon:
+        return EnemyConfig {120.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+            64.0F, 84.0F, 4.0F, true, false, EnemySkill::BossAttack};
+    case EnemyArchetype::SwordDemon:
+        return EnemyConfig {160.0F, 180.0F, 54.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+            42.0F, 72.0F, 3.0F, false, false, EnemySkill::BossAttack};
     case EnemyArchetype::Revolte:
         return EnemyConfig {160.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             64.0F, 96.0F, 7.0F, true, false, EnemySkill::BossAttack};
@@ -209,6 +241,9 @@ CombatSession::CombatSession(CombatRequest request)
             case EnemyArchetype::Heimon: return 125;
             case EnemyArchetype::DemonWarrior: return 150;
             case EnemyArchetype::LargeBirdDemon: return 100;
+            case EnemyArchetype::Gargoyle: return 125;
+            case EnemyArchetype::ThreeHeadedDemon: return 180;
+            case EnemyArchetype::SwordDemon: return 100;
             case EnemyArchetype::Aura: return 225;
             case EnemyArchetype::Revolte: return 300;
             case EnemyArchetype::RedMirrorDragon: return 300;
@@ -234,6 +269,18 @@ CombatSession::CombatSession(CombatRequest request)
             enemies_.back().specialCooldown = 1.5F;
         if (spawn.archetype == EnemyArchetype::Revolte)
             enemies_.back().revolteCooldowns = {3.5F, 3.5F, 4.5F, 4.5F, 3.0F};
+        if (spawn.archetype == EnemyArchetype::Gargoyle)
+            enemies_.back().specialCooldown = 2.0F;
+        if (spawn.archetype == EnemyArchetype::ThreeHeadedDemon)
+        {
+            enemies_.back().specialCooldown = 3.5F;
+            enemies_.back().secondaryCooldown = 2.0F;
+        }
+        if (spawn.archetype == EnemyArchetype::SwordDemon)
+        {
+            enemies_.back().specialCooldown = 2.0F;
+            enemies_.back().secondaryCooldown = 1.5F;
+        }
     }
     const auto aura = std::find_if(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
         return enemy.archetype == EnemyArchetype::Aura;
@@ -340,6 +387,15 @@ DamageResult CombatSession::resolveEnemyDamage(EnemyRuntime& enemy,
         enemy.revolteCounterDashPending = true;
         enemy.specialActive = 0.0F;
         enemy.revolteSkill = -1;
+    }
+    if (enemy.archetype == EnemyArchetype::SwordDemon && enemy.health.isAlive()
+        && result.appliedDamage > 0 && isPlayerMagic(request.source))
+    {
+        enemy.manualSkill = 0;
+        enemy.specialWindup = 0.0F;
+        enemy.specialActive = 144.0F / 320.0F;
+        enemy.specialDirection = enemy.controller.facingDirection();
+        enemy.specialCooldown = 4.0F;
     }
     return result;
 }
@@ -604,6 +660,9 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     std::erase_if(activeEnemyProjectiles_, [](const auto& projectile) {
         return projectile.remainingDistance <= 0.0F;
     });
+    for (auto& beam : activeEnemyBeams_)
+        beam.remaining = std::max(0.0F, beam.remaining - deltaSeconds);
+    std::erase_if(activeEnemyBeams_, [](const auto& beam) { return beam.remaining <= 0.0F; });
     if (player_.flightRemaining() <= 0.0F) flightBoostAvailable_ = false;
     if (wasDashing && !player_.isDashing()) postDashComboRemaining_ = 0.4F;
     if (intent.dashPressed && !wasDashing && player_.isDashing())
@@ -713,6 +772,165 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             if (enemy.specialCooldown <= 0.0F
                 && enemy.controller.action() == ai::EnemyAction::Chase)
             {
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::Gargoyle)
+        {
+            const auto caster = enemy.controller.bounds();
+            const float casterCenter = caster.left + caster.width * 0.5F;
+            if (!enemy.activated)
+            {
+                if (std::abs(playerCenter - casterCenter) <= 300.0F) enemy.activated = true;
+                if (!enemy.activated) continue;
+            }
+            const float airborneY = request_.worldBounds.groundTop - 160.0F - caster.height;
+            if (caster.top > airborneY)
+            {
+                auto position = enemy.controller.position();
+                position.y = std::max(airborneY, position.y - 120.0F * deltaSeconds);
+                enemy.controller.setPosition(position, request_.worldBounds);
+                continue;
+            }
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            if (enemy.specialActive > 0.0F)
+            {
+                enemy.specialActive = std::max(0.0F, enemy.specialActive - deltaSeconds);
+                continue;
+            }
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto current = enemy.controller.bounds();
+                    const Vec2 start {current.left + current.width * 0.5F,
+                        current.top + current.height * 0.5F};
+                    const float dx = enemy.specialTarget.x - start.x;
+                    const float dy = enemy.specialTarget.y - start.y;
+                    const float distance = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
+                    const Vec2 end {start.x + dx / distance * 160.0F,
+                        std::min(request_.worldBounds.groundTop - 9.0F,
+                            start.y + dy / distance * 160.0F)};
+                    const std::uint64_t sequence = ++environmentalSequence_;
+                    activeEnemyBeams_.push_back({start, end, 0.6F, sequence});
+                    if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
+                        static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                            sequence, 20, 1.0F, relics_.incomingDamageMultiplier(), 0,
+                            player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F}));
+                    enemy.specialActive = 0.6F;
+                    enemy.specialCooldown = 4.0F;
+                }
+                continue;
+            }
+            const Vec2 playerTarget {playerBounds().left + playerBounds().width * 0.5F,
+                playerBounds().top + playerBounds().height * 0.5F};
+            const float dx = playerTarget.x - casterCenter;
+            const float dy = playerTarget.y - (caster.top + caster.height * 0.5F);
+            if (enemy.specialCooldown <= 0.0F && std::sqrt(dx * dx + dy * dy) <= 181.0F)
+            {
+                enemy.specialTarget = playerTarget;
+                enemy.specialDirection = dx >= 0.0F ? 1.0F : -1.0F;
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::ThreeHeadedDemon)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            enemy.secondaryCooldown = std::max(0.0F, enemy.secondaryCooldown - deltaSeconds);
+            if (enemy.specialActive > 0.0F)
+            {
+                enemy.specialActive = std::max(0.0F, enemy.specialActive - deltaSeconds);
+                if (enemy.specialActive <= 0.0F) enemy.manualSkill = -1;
+                continue;
+            }
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    if (enemy.manualSkill == 0)
+                    {
+                        const int targetHealth = enemy.health.current() < 60 ? 60 : 120;
+                        static_cast<void>(enemy.health.heal(targetHealth - enemy.health.current()));
+                        enemy.specialCooldown = 7.0F;
+                    }
+                    else
+                    {
+                        const auto area = enemy.controller.attackBounds();
+                        if (intersects(playerBounds(), area))
+                            static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                                ++environmentalSequence_, 20, 1.0F,
+                                relics_.incomingDamageMultiplier()}));
+                        enemy.secondaryCooldown = 4.0F;
+                    }
+                    enemy.specialActive = 0.6F;
+                }
+                continue;
+            }
+            if (enemy.specialCooldown <= 0.0F && enemy.health.current() < 120)
+            {
+                enemy.manualSkill = 0;
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+            const float distance = std::abs(playerCenter
+                - (bounds.left + bounds.width * 0.5F));
+            if (enemy.secondaryCooldown <= 0.0F
+                && distance <= bounds.width * 0.5F + 64.0F + PlayerController::Width * 0.5F)
+            {
+                enemy.manualSkill = 1;
+                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialWindup = 0.5F;
+                continue;
+            }
+        }
+        if (enemy.archetype == EnemyArchetype::SwordDemon)
+        {
+            enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
+            enemy.secondaryCooldown = std::max(0.0F, enemy.secondaryCooldown - deltaSeconds);
+            if (enemy.specialActive > 0.0F)
+            {
+                const float activeDelta = std::min(deltaSeconds, enemy.specialActive);
+                if (enemy.manualSkill == 0)
+                    enemy.controller.translateHorizontal(
+                        enemy.specialDirection * 320.0F * activeDelta, request_.worldBounds);
+                enemy.specialActive -= activeDelta;
+                if (enemy.specialActive <= 0.0F) enemy.manualSkill = -1;
+                continue;
+            }
+            if (enemy.specialWindup > 0.0F)
+            {
+                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
+                if (enemy.specialWindup <= 0.0F)
+                {
+                    const auto area = enemy.controller.attackBounds();
+                    if (intersects(playerBounds(), area))
+                        static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
+                            ++environmentalSequence_, 20, 1.0F,
+                            relics_.incomingDamageMultiplier()}));
+                    enemy.specialActive = 0.6F;
+                    enemy.secondaryCooldown = 3.0F;
+                }
+                continue;
+            }
+            const float distance = std::abs(playerCenter
+                - (bounds.left + bounds.width * 0.5F));
+            if (enemy.specialCooldown <= 0.0F && distance <= 180.0F)
+            {
+                enemy.manualSkill = 0;
+                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialActive = 144.0F / 320.0F;
+                enemy.specialCooldown = 4.0F;
+                continue;
+            }
+            if (enemy.secondaryCooldown <= 0.0F
+                && distance <= bounds.width * 0.5F + 54.0F + PlayerController::Width * 0.5F)
+            {
+                enemy.manualSkill = 1;
+                enemy.specialDirection = enemy.controller.facingDirection();
                 enemy.specialWindup = 0.5F;
                 continue;
             }
@@ -1030,7 +1248,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 : (enemy.frostSlowRemaining > 0.0F ? 0.65F : 1.0F);
             const bool manualSkill = enemy.archetype == EnemyArchetype::Richter
                 || enemy.archetype == EnemyArchetype::Denken
-                || enemy.archetype == EnemyArchetype::Revolte;
+                || enemy.archetype == EnemyArchetype::Revolte
+                || enemy.archetype == EnemyArchetype::Gargoyle
+                || enemy.archetype == EnemyArchetype::ThreeHeadedDemon
+                || enemy.archetype == EnemyArchetype::SwordDemon;
             enemy.controller.update(target, deltaSeconds, request_.worldBounds, speedMultiplier,
                 enemy.skillSealRemaining <= 0.0F && !manualSkill);
             if (enemy.archetype == EnemyArchetype::Aura
@@ -2058,7 +2279,7 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
 {
     std::vector<SpellEffectView> views;
     views.reserve(activeSpellEffects_.size() + activePillars_.size() + activeTornadoes_.size()
-        + activeEnemyProjectiles_.size() + enemies_.size());
+        + activeEnemyProjectiles_.size() + activeEnemyBeams_.size() + enemies_.size());
     for (const auto& effect : activeSpellEffects_)
         views.push_back({effect.spellId, effect.bounds, effect.remaining, effect.duration});
     for (const auto& pillar : activePillars_)
@@ -2070,6 +2291,15 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
         views.push_back({projectile.bounds.width >= 54.0F ? 9102U : 9101U,
             projectile.bounds, projectile.remainingDistance / 200.0F,
             projectile.totalDistance / 200.0F, projectile.direction});
+    for (const auto& beam : activeEnemyBeams_)
+    {
+        const float dx = beam.end.x - beam.start.x;
+        const float dy = beam.end.y - beam.start.y;
+        const float length = std::sqrt(dx * dx + dy * dy);
+        const float angle = std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F;
+        views.push_back({9200U, {beam.start.x, beam.start.y - 9.0F, length, 18.0F},
+            beam.remaining, 0.6F, dx >= 0.0F ? 1.0F : -1.0F, angle});
+    }
     for (const auto& enemy : enemies_)
         if (enemy.archetype == EnemyArchetype::Heimon && enemy.health.isAlive()
             && enemy.fogCreated)

@@ -1601,6 +1601,77 @@ bool newLateActEnemiesExposeFogProjectileAndFlightRules()
         && expect(std::abs(birdState.position.y - 454.0F) < 0.01F,
             "Large Bird Demon must start 144 pixels above the ground");
 }
+
+bool gargoyleActivatesBeforeFiringAnAngledLaser()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {350.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::Gargoyle, {400.0F, 0.0F}}};
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    const float groundPosition = combat.enemyState().position.y;
+    combat.update({}, 0.50F);
+    if (!expect(combat.enemyState().position.y < groundPosition
+            && combat.enemyState().position.y > 438.0F,
+        "Gargoyle must rise at 120 pixels per second after the player enters 300 pixels"))
+        return false;
+    combat.update({}, 0.84F);
+    if (!expect(std::abs(combat.enemyState().position.y - 438.0F) < 0.01F,
+        "Gargoyle must stop 160 pixels above the ground")) return false;
+    combat.update({}, 2.01F);
+    combat.update({}, 0.50F);
+    const auto effects = combat.spellEffects();
+    return expect(combat.playerState().currentHealth == 80,
+            "Gargoyle laser must deal twenty damage along its locked diagonal")
+        && expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == 9200U && effect.bounds.width <= 160.01F
+                    && effect.bounds.height == 18.0F
+                    && std::abs(effect.rotationDegrees) > 1.0F;
+            }), "Gargoyle must expose a rotated 160-pixel laser visual above the ground");
+}
+
+bool threeHeadedDemonHealsToThePreviousStateThreshold()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::ThreeHeadedDemon, {205.0F, 0.0F}}};
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    for (int attackIndex = 0; attackIndex < 5; ++attackIndex)
+    {
+        arcane::game::PlayerIntent attack;
+        attack.attackPressed = true;
+        combat.update(attack, 0.01F);
+        combat.update({}, 0.49F);
+    }
+    if (!expect(combat.enemyState().currentHealth == 105,
+        "Three-Headed Demon must enter its two-head state below 120 HP")) return false;
+    combat.update({}, 1.01F);
+    combat.update({}, 0.50F);
+    combat.update({}, 0.50F);
+    return expect(combat.enemyState().currentHealth == 120,
+        "self-heal must restore the previous state's minimum health threshold");
+}
+
+bool swordDemonMagicHitImmediatelyTriggersFlashStep()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::SwordDemon, {300.0F, 0.0F}}};
+    request.enemyContactDamage = 0;
+    request.equippedSpellIds[0] = 1004U;
+    arcane::game::CombatSession combat(request);
+    arcane::game::PlayerIntent cast;
+    cast.spellPressed[0] = true;
+    combat.update(cast, 0.01F);
+    const auto hit = combat.enemyState();
+    combat.update({}, 144.0F / 320.0F);
+    const auto afterFlash = combat.enemyState();
+    return expect(hit.currentHealth == 80,
+            "player spell damage must be applied before Sword Demon retaliates")
+        && expect(std::abs(afterFlash.position.x - hit.position.x) >= 143.9F,
+            "Sword Demon must immediately flash-step 144 pixels after player spell damage");
+}
 }
 
 int main()
@@ -1663,6 +1734,9 @@ int main()
         && newSpellsApplyTargetingShieldWindAndGravity()
         && combatRelicsModifyCooldownBloodUltimateAndGold()
         && newLateActEnemiesExposeFogProjectileAndFlightRules()
+        && gargoyleActivatesBeforeFiringAnAngledLaser()
+        && threeHeadedDemonHealsToThePreviousStateThreshold()
+        && swordDemonMagicHitImmediatelyTriggersFlashStep()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()

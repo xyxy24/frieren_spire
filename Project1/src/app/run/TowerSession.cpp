@@ -475,6 +475,10 @@ void TowerSession::startNextFloor()
             game::EnemyArchetype::Laufen, game::EnemyArchetype::Richter,
             game::EnemyArchetype::Denken
         };
+        constexpr std::array thirdActOpeningGroup {
+            game::EnemyArchetype::Gargoyle, game::EnemyArchetype::ThreeHeadedDemon,
+            game::EnemyArchetype::SwordDemon
+        };
         std::array<game::EnemyArchetype, 3> encounter;
         const std::uint32_t floorInAct = run_.context().floorIndex % config_.floorsPerBoss;
         if (run_.context().bossesDefeated == 1U && floorInAct == 0U)
@@ -483,6 +487,8 @@ void TowerSession::startNextFloor()
             encounter = secondActLateGroup;
         else if (run_.context().bossesDefeated == 2U && floorInAct == 3U)
             encounter = thirdActLateGroup;
+        else if (run_.context().bossesDefeated == 2U && floorInAct == 0U)
+            encounter = thirdActOpeningGroup;
         else if (run_.context().bossesDefeated == 1U
             && (floorInAct == 1U || floorInAct == 2U))
         {
@@ -495,6 +501,19 @@ void TowerSession::startNextFloor()
             encounter = {secondActOpeningGroup[first], secondActOpeningGroup[second],
                 secondActLateGroup[rng.index(
                     static_cast<std::uint32_t>(secondActLateGroup.size()))]};
+        }
+        else if (run_.context().bossesDefeated == 2U
+            && (floorInAct == 1U || floorInAct == 2U))
+        {
+            game::run::DeterministicRng rng(game::run::deriveStreamSeed(
+                floor.seed, game::run::RandomStream::Encounter));
+            const std::size_t first = rng.index(
+                static_cast<std::uint32_t>(thirdActOpeningGroup.size()));
+            const std::size_t second = (first + 1U + rng.index(2U))
+                % thirdActOpeningGroup.size();
+            encounter = {thirdActOpeningGroup[first], thirdActOpeningGroup[second],
+                thirdActLateGroup[rng.index(
+                    static_cast<std::uint32_t>(thirdActLateGroup.size()))]};
         }
         else if (floorInAct == 0U)
             encounter = firstGroup;
