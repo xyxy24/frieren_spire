@@ -40,6 +40,7 @@ struct PlayerVisualState
     std::uint64_t castSequence {};
     std::uint64_t hurtSequence {};
     float dashRemaining {};
+    float shadowDashChargeRemaining {};
     bool shadowDashing {false};
     bool stunned {false};
 };

@@ -118,7 +118,7 @@ stateDiagram-v2
     Result --> MainMenu
 ```
 
-`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。选择奖励会先由 Model 转入 `FloorComplete` 并写入已学列表，再由 `SpellAcquisitionViewModel` 启动不属于 Model 流程状态的获取覆盖层；该层消费全部顶层输入但不回滚已结算奖励。获取演出开始 0.35 秒后，覆盖层将 `Space` 解释为仅完成表现时间轴而不关闭结果页的跳过命令，避免输入穿透和说明丢失。`LoadoutOverlay` 同样不是 Model 的流程状态，而是 `LoadoutViewModel` 可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的覆盖层；打开时由它消费 UI 输入，Model 的玩法时间不推进。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页；装备通过显式 Model 命令提交，遗物页只绑定本局遗物快照。
+`LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。`LootBookAnimator` 加载 `128×96`、8 帧的透明像素图集，以独立表现时钟循环书页、悬浮高度和魔力光晕，不改变权威交互 AABB；成功打开奖励时，`TowerSession` 命令 `CombatSession` 将玩家落到当前 `WorldBounds` 地面并清除残余速度、冲刺、飞行和硬直，避免模态页面冻结空中状态。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。选择奖励会先由 Model 转入 `FloorComplete` 并写入已学列表，再由 `SpellAcquisitionViewModel` 启动不属于 Model 流程状态的获取覆盖层；该层消费全部顶层输入但不回滚已结算奖励。获取演出开始 0.35 秒后，覆盖层将 `Space` 解释为仅完成表现时间轴而不关闭结果页的跳过命令，避免输入穿透和说明丢失。`LoadoutOverlay` 同样不是 Model 的流程状态，而是 `LoadoutViewModel` 可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的覆盖层；打开时由它消费 UI 输入，Model 的玩法时间不推进。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页；装备通过显式 Model 命令提交，遗物页只绑定本局遗物快照。
 
 ## 7. 战斗与时间
 
@@ -185,6 +185,7 @@ stateDiagram-v2
 - `CombatResult` 只报告胜负、原遭遇 ID、击杀数、应发金币和战斗结束后的玩家 HP；它不直接修改 B 拥有的本局资源或楼层进度。
 - `PlayerStateView` 和 `EnemyStateView` 是表现/UI 可读取的快照。`CombatSession::enemyStates()` 返回每个敌人的类型、位置、碰撞尺寸、HP 和技能阶段，UI 据此在普通敌人头顶绘制独立血条；Boss 继续使用右上角血条。
 - `PlayerStateView` 额外公开权威速度、基础攻击序列号、成功施法序列号、受击序列号与受击无敌剩余时间。SFML `PlayerAnimator` 只用这些只读字段选择或触发动画；一次性动画不得反向延长攻击有效帧、施法冷却、冲刺时间、无敌时间或受击控制。玩家精灵统一为 `128×96` 帧并以 `(64, 92)` 脚底锚点对齐 `42×64` 权威碰撞体，向左朝向通过表现层水平镜像实现。
+- `ShadeChargeAnimator` 只读取投影到 `PlayerVisualState` 的 `shadowDashChargeRemaining` 与 `shadowDashing`：以最多 12 个确定性粒子模板绘制向胸口收束的黑紫轨迹，并在就绪时播放一次 0.3 秒暗环后停止绘制。它是黑冲充能进度的唯一画面提示，HUD 不再重复绘制独立充能条；它不拥有或修改 1.5 秒充能、无敌和标记规则，暂停、构筑与魔法获取覆盖层只冻结其表现时钟。
 - `SpellEffectAnimator` 在表现层持有 32 套法术图集纹理和 33 个当前法术 ID 的布局映射。图集帧尺寸、锚点与播放速度来自经审核的 `assets/spells/processed/manifest.json`，运行时代码不读取或修改领域数值；CMake 将标准化图集复制到可执行文件旁的 `assets/spells/`。每个映射显式选择固定中心、施法者脚底、目标地面、前方端点、地面铺设、牵引线、单光束、三重光束、追踪弹组或多火柱布局，并只允许等比缩放图集。瞬发效果的生命周期不得短于 `frameCount / framesPerSecond`，持续效果必须完整播放入场帧、循环中段和退场帧；二次触发的魔像碎裂与镜阵响应也遵守同一规则。当前朝向型法术读取玩家的只读朝向进行水平镜像，正式拆分弹体与命中阶段时再由 `SpellVisualEvent` 携带施法瞬间朝向。
 - `EnemyStateView` 还公开锁定后的朝向。SFML 表现层可按敌人类型和 `windingUp/attackActive` 选择贴图并水平翻转，但贴图尺寸、透明区域和视觉偏移不得反向改变领域碰撞箱。当前无头骑士使用 `64×64`，宝箱怪和鸟形魔物使用 `54×54` 的 idle/windup/attack PNG；三者均以脚底中心对齐权威碰撞箱。资源由 CMake 复制到可执行文件旁的 `assets/`。
 - 每次基础攻击都有递增序列号，命中目标后记录序列号，保证活动帧跨越多个更新时不会重复结算。

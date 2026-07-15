@@ -1959,6 +1959,11 @@ PlayerStateView CombatSession::playerState() const noexcept
         barrierShield_ + persistentShield_, sleepRemaining_};
 }
 
+void CombatSession::settlePlayerForReward() noexcept
+{
+    player_.settleOnGround(request_.worldBounds);
+}
+
 std::vector<EnemyStateView> CombatSession::enemyStates() const
 {
     std::vector<EnemyStateView> views;

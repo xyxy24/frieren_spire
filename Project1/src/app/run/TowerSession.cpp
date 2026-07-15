@@ -161,8 +161,8 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
             const game::PlayerStateView player = combat_->playerState();
             const game::Aabb playerBounds {player.position.x, player.position.y,
                 game::PlayerController::Width, game::PlayerController::Height};
-            if (game::intersects(playerBounds, *lootDropBounds_))
-                static_cast<void>(run_.openReward());
+            if (game::intersects(playerBounds, *lootDropBounds_) && run_.openReward())
+                combat_->settlePlayerForReward();
         }
         break;
 

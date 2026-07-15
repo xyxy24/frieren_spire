@@ -60,11 +60,17 @@ void interact(arcane::app::TowerSession& tower)
     tower.update(intent, 0.01F);
 }
 
-void collectNearbyLoot(arcane::app::TowerSession& tower)
+void collectNearbyLoot(arcane::app::TowerSession& tower, const bool jumpBeforeInteract = false)
 {
     arcane::game::PlayerIntent moveRight;
     moveRight.moveAxis = 1.0F;
     tower.update(moveRight, 0.10F);
+    if (jumpBeforeInteract)
+    {
+        arcane::game::PlayerIntent jump;
+        jump.jumpPressed = true;
+        tower.update(jump, 0.01F);
+    }
     interact(tower);
 }
 
@@ -76,10 +82,15 @@ bool combatRewardLoadoutAndStairsFormOneFlow()
     if (!expect(tower.run().phase() == arcane::game::run::RunPhase::LootPending,
             "enemy defeat must create a loot drop")
         || !expect(tower.lootDropBounds().has_value(), "loot drop must exist at enemy death")) return false;
-    collectNearbyLoot(tower);
+    collectNearbyLoot(tower, true);
     if (!expect(tower.run().phase() == arcane::game::run::RunPhase::Reward,
             "loot interaction must enter the reward phase")
-        || !expect(tower.rewardCandidates().has_value(), "reward phase must expose three candidates")) return false;
+        || !expect(tower.rewardCandidates().has_value(), "reward phase must expose three candidates")
+        || !expect(tower.combat() && tower.combat()->playerState().grounded
+                && std::abs(tower.combat()->playerState().position.y - 576.0F) < 0.01F
+                && tower.combat()->playerState().velocity.x == 0.0F
+                && tower.combat()->playerState().velocity.y == 0.0F,
+            "opening an airborne reward must settle the player on the floor")) return false;
 
     const auto selectedReward = (*tower.rewardCandidates())[0];
     chooseLeftReward(tower);

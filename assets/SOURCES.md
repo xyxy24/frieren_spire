@@ -87,3 +87,17 @@
   `magic_device_opening` / `magic_device_closing` particle definitions.
 - Purpose: classroom-only study reference for the spell reward acquisition presentation; no
   executable code, texture, audio, or packed Unity resource from the reference game is shipped.
+
+## Animated spellbook loot
+
+- Files: `loot/magic-book.png` and generation sources under
+  `../Project1/assets/loot/generated/`.
+- Added by: project team with OpenAI built-in image generation and deterministic local cleanup,
+  2026-07-15.
+- Original source/license: AI-generated classroom prototype material; no external asset pack.
+- Style reference: the project-owned player pixel-style sheet was supplied only to match outline,
+  pixel density, shading, and the established gold/cyan palette.
+- Processing: the flat chroma background was removed locally, the 4-by-2 contact sheet was split,
+  every frame received one shared nearest-neighbor scale, and the eight `128×96` frames were
+  combined into the transparent runtime atlas `loot/magic-book.png`.
+- Purpose: looping airborne spellbook reward with distinct hover, page-turn, rune, and glow frames.

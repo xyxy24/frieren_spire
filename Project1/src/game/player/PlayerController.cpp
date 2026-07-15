@@ -160,6 +160,17 @@ void PlayerController::setHorizontalPosition(const float position, const WorldBo
     position_.x = std::clamp(position, bounds.left, bounds.right - Width);
     velocity_.x = 0.0F;
 }
+void PlayerController::settleOnGround(const WorldBounds& bounds) noexcept
+{
+    position_.y = bounds.groundTop - Height;
+    velocity_ = {};
+    grounded_ = true;
+    stunRemaining_ = 0.0F;
+    dashRemaining_ = 0.0F;
+    shadowDashActive_ = false;
+    preDashVerticalVelocity_ = 0.0F;
+    flightRemaining_ = 0.0F;
+}
 float PlayerController::flightRemaining() const noexcept { return flightRemaining_; }
 void PlayerController::reduceDashCooldown(const float seconds) noexcept
 { dashCooldownRemaining_ = std::max(0.0F, dashCooldownRemaining_ - std::max(0.0F, seconds)); }

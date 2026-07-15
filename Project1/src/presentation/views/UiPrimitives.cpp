@@ -279,35 +279,6 @@ void drawEquippedSlots(sf::RenderTarget& target, const ui::EquippedSlotsViewMode
         {ultimateX + (model.ultimateUnlocked ? 27.0F : 10.0F), 607.0F}, 1.0F,
         model.ultimateUnlocked ? sf::Color {255, 221, 130} : sf::Color {105, 105, 118});
 
-    const auto drawInnateAbility = [&](const float x, const std::string_view label,
-        const float cooldownRemaining, const float cooldownDuration, const bool active,
-        const sf::Color readyColor)
-    {
-        sf::RectangleShape bar({92.0F, 18.0F});
-        bar.setPosition({x, 661.0F});
-        bar.setFillColor(active ? readyColor : sf::Color {42, 45, 56});
-        bar.setOutlineColor(readyColor);
-        bar.setOutlineThickness(2.0F);
-        target.draw(bar);
-        if (cooldownRemaining > 0.0F)
-        {
-            const float ratio = std::clamp(cooldownRemaining / cooldownDuration, 0.0F, 1.0F);
-            sf::RectangleShape cooldown({92.0F * ratio, 18.0F});
-            cooldown.setPosition({x, 661.0F});
-            cooldown.setFillColor(sf::Color {8, 10, 18, 205});
-            target.draw(cooldown);
-        }
-        drawPixelText(target, label, {x + 8.0F, 638.0F}, 1.0F, readyColor);
-    };
-    drawInnateAbility(startX - 218.0F, "SHADE",
-        combatView ? combatView->shadowDashChargeRemaining : 0.0F,
-        arcane::game::PlayerController::ShadowDashChargeSeconds,
-        combatView && (combatView->shadowDashing
-            || combatView->shadowDashChargeRemaining <= 0.0F), sf::Color {174, 118, 235});
-    drawInnateAbility(startX - 110.0F, "K DASH",
-        combatView ? combatView->dashCooldownRemaining : 0.0F,
-        arcane::game::PlayerController::DashCooldownSeconds,
-        combatView && combatView->dashRemaining > 0.0F, sf::Color {100, 220, 245});
 }
 
 void drawMenuPanel(sf::RenderTarget& target, const float y, const sf::Color color,

@@ -53,7 +53,9 @@ add_executable(Project1
     Project1/src/main.cpp
     Project1/src/platform/SfmlInputMapper.cpp
     Project1/src/presentation/SfmlApplication.cpp
+    Project1/src/presentation/LootBookAnimator.cpp
     Project1/src/presentation/PlayerAnimator.cpp
+    Project1/src/presentation/ShadeChargeAnimator.cpp
     Project1/src/presentation/SpellCardArt.cpp
     Project1/src/presentation/SpellEffectAnimator.cpp
     Project1/src/presentation/views/UiPrimitives.cpp

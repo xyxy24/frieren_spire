@@ -2,7 +2,9 @@
 
 #include "platform/SfmlInputMapper.hpp"
 #include "game/player/PlayerController.hpp"
+#include "presentation/LootBookAnimator.hpp"
 #include "presentation/PlayerAnimator.hpp"
+#include "presentation/ShadeChargeAnimator.hpp"
 #include "presentation/SpellCardArt.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
 #include "presentation/viewmodel/ApplicationViewModel.hpp"
@@ -178,7 +180,9 @@ struct RenderResources
     const EnemyStateTextures& draht;
     const EnemyStateTextures& aura;
     const DialoguePortraitTextures& portraits;
+    const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
+    const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator;
     const arcane::presentation::SpellCardArt& spellCards;
     const arcane::presentation::SpellEffectAnimator& spellAnimator;
 };
@@ -217,10 +221,11 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.frostWolf, resources.chaosFlower, resources.qual, resources.qualSkill,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
-                resources.draht, resources.aura, resources.playerAnimator, resources.spellAnimator,
-                feedback);
+                resources.draht, resources.aura, resources.playerAnimator,
+                resources.shadeChargeAnimator, resources.spellAnimator, feedback);
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
-            if (const auto loot = tower->lootDropBounds()) drawLootDrop(window, *loot);
+            if (const auto loot = tower->lootDropBounds())
+                drawLootDrop(window, *loot, resources.lootBookAnimator);
             window.setView(interfaceView);
         }
         if (phase == arcane::game::run::RunPhase::Reward)
@@ -232,7 +237,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             && (tower->currentFloorType() == arcane::game::run::FloorType::Merchant
                 || tower->currentFloorType() == arcane::game::run::FloorType::Event))
         {
-            drawSpecialFloor(window, *tower, resources.playerAnimator);
+            drawSpecialFloor(window, *tower, resources.playerAnimator,
+                resources.shadeChargeAnimator);
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
             {
@@ -336,6 +342,9 @@ int arcane::presentation::SfmlApplication::run()
     };
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
+    arcane::presentation::ShadeChargeAnimator shadeChargeAnimator;
+    arcane::presentation::LootBookAnimator lootBookAnimator;
+    static_cast<void>(lootBookAnimator.load("assets/loot/magic-book.png"));
     arcane::presentation::SpellCardArt spellCards;
     static_cast<void>(spellCards.loadFromDirectory("assets/spell_cards"));
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
@@ -344,7 +353,8 @@ int arcane::presentation::SfmlApplication::run()
         birdDemonTextures, frostWolfTextures, chaosFlowerTextures, qualTextures, qualSkillTextures,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
-        playerAnimator, spellCards, spellEffectAnimator};
+        lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,
+        spellEffectAnimator};
     sf::Clock frameClock;
     ui::CombatFeedbackViewModel combatFeedback;
     std::optional<std::uint32_t> feedbackFloor;
@@ -358,6 +368,7 @@ int arcane::presentation::SfmlApplication::run()
         }
 
         const float deltaSeconds = std::min(frameClock.restart().asSeconds(), MaximumFrameTime);
+        lootBookAnimator.update(deltaSeconds);
         float simulationDeltaSeconds = deltaSeconds;
         if (const auto* tower = app.model(); app.snapshot().screen == ui::ApplicationScreen::Playing
             && tower && tower->combat()
@@ -385,6 +396,15 @@ int arcane::presentation::SfmlApplication::run()
         }
         const auto presentationState = updatePresentationState(
             app, playerAnimator, simulationDeltaSeconds);
+        if (presentationState)
+        {
+            const bool shadeTimeAdvances = application.screen == ui::ApplicationScreen::Playing
+                && !app.loadout().open() && !app.spellAcquisition().active();
+            shadeChargeAnimator.update(*presentationState,
+                shadeTimeAdvances ? deltaSeconds : 0.0F);
+        }
+        else
+            shadeChargeAnimator.reset();
         updateWindowTitle(window, app);
         renderApplicationFrame(window, app, presentationState, renderResources,
             combatFeedback.snapshot());

@@ -205,7 +205,8 @@ void drawPlayer(sf::RenderTarget& target, const arcane::presentation::PlayerAnim
 }
 
 void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
-    const arcane::presentation::PlayerAnimator& playerAnimator)
+    const arcane::presentation::PlayerAnimator& playerAnimator,
+    const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator)
 {
     sf::RectangleShape ground({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight) - GroundTop});
     ground.setPosition({0.0F, GroundTop});
@@ -213,9 +214,15 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     target.draw(ground);
     if (const auto* player = tower.explorationPlayer())
     {
-        drawPlayer(target, playerAnimator,
-            makePlayerVisualState(*player, tower.run().player().currentHp),
+        const auto visual = makePlayerVisualState(*player, tower.run().player().currentHp);
+        const sf::Vector2f bottomCenter {
+            visual.position.x + arcane::game::PlayerController::Width * 0.5F,
+            visual.position.y + arcane::game::PlayerController::Height
+        };
+        shadeChargeAnimator.drawBack(target, bottomCenter);
+        drawPlayer(target, playerAnimator, visual,
             sf::Color {232, 232, 242});
+        shadeChargeAnimator.drawFront(target, bottomCenter);
     }
     const auto npc = tower.npcBounds();
     sf::RectangleShape npcShape({npc.width, npc.height});
@@ -387,19 +394,15 @@ void drawStaircase(
     }
 }
 
-void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds)
+void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds,
+    const arcane::presentation::LootBookAnimator& animator)
 {
-    sf::CircleShape glow(bounds.width * 0.65F, 32U);
-    glow.setOrigin({glow.getRadius(), glow.getRadius()});
-    glow.setPosition({bounds.left + bounds.width * 0.5F, bounds.top + bounds.height * 0.5F});
-    glow.setFillColor(sf::Color {116, 188, 255, 70});
-    target.draw(glow);
-
-    sf::CircleShape drop(bounds.width * 0.5F, 4U);
-    drop.setPosition({bounds.left, bounds.top});
-    drop.setFillColor(sf::Color {116, 188, 255});
-    drop.setOutlineColor(sf::Color {232, 246, 255});
-    drop.setOutlineThickness(3.0F);
-    target.draw(drop);
+    const sf::Vector2f center {
+        bounds.left + bounds.width * 0.5F,
+        bounds.top - 38.0F
+    };
+    static_cast<void>(animator.draw(target, center));
+    drawPixelText(target, "E  INSPECT", {center.x - 43.0F, bounds.top + bounds.height + 8.0F},
+        0.72F, sf::Color {190, 224, 255, 220});
 }
 }

@@ -38,7 +38,8 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
 {
     return {player.position, player.velocity, player.currentHealth, player.grounded,
         player.facingDirection, player.attackSequence, player.castSequence, player.hurtSequence,
-        player.dashRemaining, player.shadowDashing, player.stunned};
+        player.dashRemaining, player.shadowDashChargeRemaining,
+        player.shadowDashing, player.stunned};
 }
 
 arcane::presentation::PlayerVisualState makePlayerVisualState(
@@ -46,7 +47,7 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
 {
     return {player.position(), player.velocity(), currentHealth, player.isGrounded(),
         player.facingDirection(), 0U, 0U, 0U, player.dashRemaining(),
-        player.isShadowDashing(), player.isStunned()};
+        player.shadowDashChargeRemaining(), player.isShadowDashing(), player.isStunned()};
 }
 
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
@@ -61,6 +62,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& drahtTextures,
     const EnemyStateTextures& auraTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
+    const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator,
     const arcane::presentation::viewmodel::CombatFeedbackSnapshot& feedback)
 {
@@ -82,7 +84,13 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     if (feedback.playerFlashRatio <= 0.0F && player.hitInvulnerabilityRemaining > 0.0F
         && static_cast<int>(player.hitInvulnerabilityRemaining * 24.0F) % 2 == 0)
         playerTint.a = 105;
+    const sf::Vector2f playerBottomCenter {
+        player.position.x + arcane::game::PlayerController::Width * 0.5F,
+        player.position.y + arcane::game::PlayerController::Height
+    };
+    shadeChargeAnimator.drawBack(target, playerBottomCenter);
     drawPlayer(target, playerAnimator, makePlayerVisualState(player), playerFallback, playerTint);
+    shadeChargeAnimator.drawFront(target, playerBottomCenter);
 
     for (const arcane::game::SpellEffectView effect : combat->spellEffects())
     {

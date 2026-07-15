@@ -39,6 +39,7 @@ public:
     [[nodiscard]] std::optional<BossIntroView> bossIntro() const noexcept;
     [[nodiscard]] bool equipSpell(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
     [[nodiscard]] bool equipUltimateSpell(std::optional<std::uint32_t> id) noexcept;
+    void settlePlayerForReward() noexcept;
 
 private:
     static constexpr float AttackRange = 58.0F;
