@@ -186,6 +186,7 @@ struct RenderResources
     const std::array<std::optional<sf::Texture>, 2>& linieSkill;
     const EnemyStateTextures& draht;
     const EnemyStateTextures& aura;
+    const EnemyStateTextures& revolte;
     const DialoguePortraitTextures& portraits;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
@@ -231,7 +232,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
-                resources.draht, resources.aura, resources.playerAnimator,
+                resources.draht, resources.aura, resources.revolte, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.spellAnimator, feedback);
             drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
             if (const auto loot = tower->lootDropBounds())
@@ -360,12 +361,27 @@ int arcane::presentation::SfmlApplication::run()
         "assets/enemies/draht/");
     const EnemyStateTextures auraTextures = loadEnemyStateTextures(
         "assets/enemies/aura/", false, true, false);
+    EnemyStateTextures revolteTextures = loadEnemyStateTextures(
+        "assets/enemies/revolte/", false, false, true);
+    revolteTextures.die = loadTexture("assets/enemies/revolte/die.png");
+    revolteTextures.parry = loadTexture("assets/enemies/revolte/parry.png");
+    revolteTextures.dash = loadTexture("assets/enemies/revolte/dash.png");
+    for (std::size_t index = 0U; index < revolteTextures.skillWindups.size(); ++index)
+        revolteTextures.skillWindups[index] = loadTexture("assets/enemies/revolte/windup"
+            + std::to_string(index + 1U) + ".png");
+    for (std::size_t index = 0U; index < revolteTextures.skillAttacks.size(); ++index)
+        revolteTextures.skillAttacks[index] = loadTexture(index == 0U
+            ? "assets/enemies/revolte/attack.png"
+            : "assets/enemies/revolte/attack" + std::to_string(index + 1U) + ".png");
     const DialoguePortraitTextures dialoguePortraits {
         loadTexture("assets/portraits/frieren/idle.png"),
         loadTexture("assets/portraits/aura/initial.png"),
         loadTexture("assets/portraits/aura/idle.png"),
         loadTexture("assets/portraits/aura/windup.png"),
-        loadTexture("assets/portraits/aura/die.png")
+        loadTexture("assets/portraits/aura/die.png"),
+        {loadTexture("assets/portraits/revolte/avatar1.png"),
+            loadTexture("assets/portraits/revolte/avatar2.png"),
+            loadTexture("assets/portraits/revolte/avatar3.png")}
     };
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
@@ -381,7 +397,7 @@ int arcane::presentation::SfmlApplication::run()
         heimonTextures, heimonSkillTextures, heimonFogTexture,
         demonWarriorTextures, largeBirdDemonTextures, slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
-        linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
+        linieSkillTextures, drahtTextures, auraTextures, revolteTextures, dialoguePortraits,
         lootBookAnimator, playerAnimator, shadeChargeAnimator, spellCards,
         spellEffectAnimator};
     sf::Clock frameClock;

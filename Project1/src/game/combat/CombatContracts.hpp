@@ -110,6 +110,8 @@ struct EnemyStateView
     float concealmentProgress {};
     bool specialWindingUp {false};
     bool specialAttackActive {false};
+    int skillVariant {-1};
+    bool returningToAir {false};
 };
 
 struct SpellEffectView

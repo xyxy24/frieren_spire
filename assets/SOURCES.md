@@ -101,3 +101,11 @@
   every frame received one shared nearest-neighbor scale, and the eight `128×96` frames were
   combined into the transparent runtime atlas `loot/magic-book.png`.
 - Purpose: looping airborne spellbook reward with distinct hover, page-turn, rune, and glow frames.
+
+## Revolte character and dialogue portraits
+
+- Files: `enemies/revolte/*.png` and `portraits/revolte/*.png`.
+- Added by: project team, 2026-07-15.
+- Source: team-provided classroom prototype artwork.
+- Purpose: Revolte's idle, upper/lower slash, heavy strike, parry, dash and defeat poses, plus
+  the three dialogue-stage portraits used before battle, at phase two and after defeat.

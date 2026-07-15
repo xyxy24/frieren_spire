@@ -25,6 +25,10 @@ struct EnemyStateTextures
     std::optional<sf::Texture> attack;
     std::optional<sf::Texture> summon;
     std::optional<sf::Texture> die;
+    std::array<std::optional<sf::Texture>, 4> skillWindups;
+    std::array<std::optional<sf::Texture>, 3> skillAttacks;
+    std::optional<sf::Texture> parry;
+    std::optional<sf::Texture> dash;
 };
 
 struct DialoguePortraitTextures
@@ -34,6 +38,7 @@ struct DialoguePortraitTextures
     std::optional<sf::Texture> auraIdle;
     std::optional<sf::Texture> auraWindup;
     std::optional<sf::Texture> auraDie;
+    std::array<std::optional<sf::Texture>, 3> revolte;
 };
 
 [[nodiscard]] std::optional<sf::Texture> loadTexture(const std::string& path);
@@ -61,6 +66,7 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& linieTextures,
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
     const EnemyStateTextures& drahtTextures, const EnemyStateTextures& auraTextures,
+    const EnemyStateTextures& revolteTextures,
     const PlayerAnimator& playerAnimator, const ShadeChargeAnimator& shadeChargeAnimator,
     const SpellEffectAnimator& spellEffectAnimator,
     const viewmodel::CombatFeedbackSnapshot& feedback);

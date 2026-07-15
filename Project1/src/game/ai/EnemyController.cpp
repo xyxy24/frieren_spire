@@ -112,6 +112,8 @@ void EnemyController::update(const Aabb& playerBounds, const float deltaSeconds,
             else
             {
                 const float playerDelta = playerCenter - (position_.x + config_.width * 0.5F);
+                if (playerDelta != 0.0F)
+                    facingDirection_ = playerDelta > 0.0F ? 1.0F : -1.0F;
                 position_.x += std::clamp(playerDelta, -config_.moveSpeed * deltaSeconds,
                     config_.moveSpeed * deltaSeconds);
                 position_.y = std::max(airY, position_.y - 100.0F * deltaSeconds);
@@ -172,6 +174,11 @@ float EnemyController::activeProgress() const noexcept
 {
     return config_.activeSeconds > 0.0F
         ? std::clamp(activeElapsed_ / config_.activeSeconds, 0.0F, 1.0F) : 0.0F;
+}
+bool EnemyController::isSwoopAscending() const noexcept
+{
+    return config_.skill == EnemySkill::Swoop && action_ == EnemyAction::Active
+        && swoopAscending_;
 }
 
 Aabb EnemyController::attackBounds() const noexcept

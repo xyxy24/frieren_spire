@@ -102,6 +102,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const std::array<std::optional<sf::Texture>, 2>& linieSkillTextures,
     const EnemyStateTextures& drahtTextures,
     const EnemyStateTextures& auraTextures,
+    const EnemyStateTextures& revolteTextures,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator,
@@ -228,10 +229,11 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             && feedback.enemyFlashRatios[enemyIndex] > 0.0F;
         const float impactOffset = enemyIndex < feedback.enemyImpactOffsets.size()
             ? feedback.enemyImpactOffsets[enemyIndex] : 0.0F;
-        const bool showDefeatedAura = !enemy.alive
-            && enemy.archetype == arcane::game::EnemyArchetype::Aura
+        const bool showDefeatedBoss = !enemy.alive
+            && (enemy.archetype == arcane::game::EnemyArchetype::Aura
+                || enemy.archetype == arcane::game::EnemyArchetype::Revolte)
             && combat->dialogueLine().has_value();
-        if (!enemy.alive && !showDefeatedAura) continue;
+        if (!enemy.alive && !showDefeatedBoss) continue;
         const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
             || enemy.archetype == arcane::game::EnemyArchetype::Revolte
             || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
@@ -263,6 +265,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &drahtTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Aura)
             stateTextures = &auraTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte)
+            stateTextures = &revolteTextures;
         const sf::Texture* texture = nullptr;
         if (stateTextures)
         {
@@ -271,7 +275,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 && (combat->bossIntro().has_value()
                     || (dialogue && (dialogue->portrait == "aura-initial"
                         || dialogue->portrait == "frieren-pre")));
-            if (showDefeatedAura && stateTextures->die) texture = &*stateTextures->die;
+            if (showDefeatedBoss && stateTextures->die) texture = &*stateTextures->die;
             else if (auraInitial && stateTextures->initial) texture = &*stateTextures->initial;
             else if (enemy.archetype == arcane::game::EnemyArchetype::Heimon
                 && enemy.specialAttackActive && stateTextures->summon)
@@ -285,6 +289,22 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             else if (enemy.archetype == arcane::game::EnemyArchetype::Linie
                 && enemy.attackActive && !enemy.skillEffectBounds
                 && stateTextures->jump) texture = &*stateTextures->jump;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::LargeBirdDemon
+                && enemy.returningToAir && stateTextures->idle) texture = &*stateTextures->idle;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+                && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
+                texture = &*stateTextures->parry;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+                && enemy.skillVariant == 4 && enemy.attackActive && stateTextures->dash)
+                texture = &*stateTextures->dash;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+                && enemy.windingUp && enemy.skillVariant >= 0 && enemy.skillVariant <= 3
+                && stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)])
+                texture = &*stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)];
+            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+                && enemy.attackActive && enemy.skillVariant >= 0 && enemy.skillVariant <= 2
+                && stateTextures->skillAttacks[static_cast<std::size_t>(enemy.skillVariant)])
+                texture = &*stateTextures->skillAttacks[static_cast<std::size_t>(enemy.skillVariant)];
             else if (enemy.attackActive && stateTextures->attack) texture = &*stateTextures->attack;
             else if (enemy.windingUp && stateTextures->windup) texture = &*stateTextures->windup;
             else if (stateTextures->idle) texture = &*stateTextures->idle;
@@ -297,6 +317,9 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 static_cast<float>(textureSize.y)});
             sprite.setPosition({enemy.position.x + enemy.width * 0.5F + impactOffset,
                 enemy.position.y + enemy.height});
+            if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+                && enemy.skillVariant == 4 && (enemy.windingUp || enemy.attackActive))
+                sprite.move({0.0F, 10.0F});
             float horizontalScale = enemy.facingDirection > 0.0F ? -1.0F : 1.0F;
             if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf)
                 horizontalScale = -horizontalScale;
@@ -608,6 +631,12 @@ void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSessi
         portrait = &*portraits.auraWindup;
     else if (dialogue->portrait == "aura-die" && portraits.auraDie)
         portrait = &*portraits.auraDie;
+    else if (dialogue->portrait.starts_with("revolte-"))
+    {
+        const std::size_t index = static_cast<std::size_t>(dialogue->portrait.back() - '1');
+        if (index < portraits.revolte.size() && portraits.revolte[index])
+            portrait = &*portraits.revolte[index];
+    }
     if (portrait)
     {
         sf::Sprite sprite(*portrait);

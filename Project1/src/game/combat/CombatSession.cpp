@@ -87,17 +87,17 @@ constexpr std::array AuraDefeatDialogue {
     CombatDialogueLineView {"AURA", "IMPOSSIBLE... HOW COULD I...", "aura-die"}
 };
 constexpr std::array RevoltePreBattleDialogue {
-    CombatDialogueLineView {"REVOLTE", "AN ELF MAGE. WHO ARE YOU?", "revolte"},
+    CombatDialogueLineView {"REVOLTE", "AN ELF MAGE. WHO ARE YOU?", "revolte-1"},
     CombatDialogueLineView {"FRIEREN", "FOUR BLADES... EVEN DEFENSIVE MAGIC COULD HARDLY TAKE THEM HEAD-ON.", "frieren"},
-    CombatDialogueLineView {"REVOLTE", "I ASKED WHO YOU ARE.", "revolte"},
+    CombatDialogueLineView {"REVOLTE", "I ASKED WHO YOU ARE.", "revolte-1"},
     CombatDialogueLineView {"FRIEREN", "DO YOU GIVE YOUR NAME EVERY TIME YOU EXTERMINATE VERMIN?", "frieren"}
 };
 constexpr std::array RevolteSecondPhaseDialogue {
-    CombatDialogueLineView {"REVOLTE", "INTERESTING. IT SEEMS I MUST FIGHT YOU SERIOUSLY.", "revolte"},
+    CombatDialogueLineView {"REVOLTE", "INTERESTING. IT SEEMS I MUST FIGHT YOU SERIOUSLY.", "revolte-2"},
     CombatDialogueLineView {"FRIEREN", "...", "frieren"}
 };
 constexpr std::array RevolteDefeatDialogue {
-    CombatDialogueLineView {"REVOLTE", "YOU WIN, ELF.", "revolte"}
+    CombatDialogueLineView {"REVOLTE", "YOU WIN, ELF.", "revolte-3"}
 };
 }
 
@@ -789,7 +789,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (skill == 2 && distance > bounds.width * 0.5F + 464.0F / 3.0F) continue;
                 enemy.revolteSkill = skill;
                 enemy.specialDirection = enemy.controller.facingDirection();
-                enemy.specialWindup = skill < 2 ? 0.3F : 0.5F;
+                if (skill == 3) enemy.specialActive = 1.2F;
+                else enemy.specialWindup = skill < 2 ? 0.3F : 0.5F;
                 enemy.revolteCooldowns[static_cast<std::size_t>(skill)] =
                     skill < 2 ? 7.0F : (skill == 4 ? 6.0F : 9.0F);
                 break;
@@ -2023,7 +2024,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
             windingUp, active, enemy.slowed, skillBounds, enemy.controller.facingDirection(),
             enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
             enemy.concealmentProgress, enemy.specialWindup > 0.0F,
-            enemy.specialActive > 0.0F});
+            enemy.specialActive > 0.0F, enemy.revolteSkill,
+            enemy.controller.isSwoopAscending()});
     }
     return views;
 }
@@ -2092,7 +2094,8 @@ EnemyStateView CombatSession::enemyState() const noexcept
         enemy.slowed, skillBounds, enemy.controller.facingDirection(),
         enemy.markedRemaining > 0.0F, enemy.controller.activeProgress(),
         enemy.concealmentProgress, enemy.specialWindup > 0.0F,
-        enemy.specialActive > 0.0F};
+        enemy.specialActive > 0.0F, enemy.revolteSkill,
+        enemy.controller.isSwoopAscending()};
 }
 
 Aabb CombatSession::attackBounds() const noexcept

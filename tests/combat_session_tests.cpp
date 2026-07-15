@@ -1457,6 +1457,22 @@ bool revolteLocksAtFiveAndHealsForSecondPhase()
         "second-phase dash must travel 144 pixels as soon as its cooldown is ready");
 }
 
+bool revolteParryActivatesWithoutWindup()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {20.0F, 576.0F};
+    request.enemySpawn = {1000.0F, 544.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::Revolte;
+    request.enemyContactDamage = 0;
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.4F);
+    advanceDialogue(combat);
+    combat.update({}, 4.51F);
+    const auto state = combat.enemyState();
+    return expect(state.skillVariant == 3 && state.attackActive && !state.windingUp,
+        "Revolte parry must become active immediately without a windup state");
+}
+
 bool newLateActEnemiesExposeFogProjectileAndFlightRules()
 {
     arcane::game::CombatRequest fogRequest;
@@ -1564,6 +1580,7 @@ int main()
         && auraDominationUsesUpdatedCooldownAndStun()
         && defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
         && revolteLocksAtFiveAndHealsForSecondPhase()
+        && revolteParryActivatesWithoutWindup()
         && redMirrorDragonBreathRespectsPostHitInvulnerability()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
