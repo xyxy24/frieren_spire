@@ -177,7 +177,7 @@ private:
     Aabb phantomBounds_;
     float postDashComboRemaining_ {};
     float spellInvulnerableRemaining_ {};
-    std::uint32_t sleepStacks_ {};
+    float sleepRemaining_ {};
     bool flightBoostAvailable_ {};
     float lightningStaffRemaining_ {};
     std::uint32_t lightningStaffCharges_ {};

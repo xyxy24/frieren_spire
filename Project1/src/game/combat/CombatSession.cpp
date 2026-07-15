@@ -19,6 +19,11 @@ constexpr bool isPlayerMagic(const DamageSource source) noexcept
         || source == DamageSource::PlayerSpell2 || source == DamageSource::PlayerUltimateSpell;
 }
 
+constexpr bool isPlayerDamage(const DamageSource source) noexcept
+{
+    return source == DamageSource::PlayerBasicAttack || isPlayerMagic(source);
+}
+
 constexpr float fullClipDuration(const std::uint32_t frameCount, const float framesPerSecond) noexcept
 {
     return static_cast<float>(frameCount) / framesPerSecond;
@@ -293,6 +298,8 @@ DamageResult CombatSession::resolvePlayerDamage(DamageRequest request) noexcept
 DamageResult CombatSession::resolveEnemyDamage(EnemyRuntime& enemy,
     DamageRequest request) noexcept
 {
+    if (sleepRemaining_ > 0.0F && isPlayerDamage(request.source))
+        request.sourceMultiplier *= 0.7F;
     if (enemy.concealmentProgress >= 1.0F) request.blocked = true;
     if (enemy.archetype == EnemyArchetype::Revolte && enemy.revolteTransitionPending)
         request.blocked = true;
@@ -451,6 +458,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     phantomRemaining_ = std::max(0.0F, phantomRemaining_ - deltaSeconds);
     postDashComboRemaining_ = std::max(0.0F, postDashComboRemaining_ - deltaSeconds);
     spellInvulnerableRemaining_ = std::max(0.0F, spellInvulnerableRemaining_ - deltaSeconds);
+    sleepRemaining_ = std::max(0.0F, sleepRemaining_ - deltaSeconds);
     lightningStaffRemaining_ = std::max(0.0F, lightningStaffRemaining_ - deltaSeconds);
     if (lightningStaffRemaining_ <= 0.0F) lightningStaffCharges_ = 0U;
     barrierRemaining_ = std::max(0.0F, barrierRemaining_ - deltaSeconds);
@@ -784,33 +792,18 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (enemy.archetype == EnemyArchetype::ChaosFlower)
         {
             enemy.specialCooldown = std::max(0.0F, enemy.specialCooldown - deltaSeconds);
-            if (enemy.specialWindup > 0.0F)
-            {
-                enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
-                if (enemy.specialWindup <= 0.0F)
-                {
-                    const auto flower = enemy.controller.bounds();
-                    const Aabb curse {flower.left + flower.width * 0.5F - 160.0F,
-                        flower.top + flower.height * 0.5F - 160.0F, 320.0F, 320.0F};
-                    if (intersects(playerBounds(), curse) && blessingRemaining_ <= 0.0F
-                        && !player_.isDashing()
-                        && spellInvulnerableRemaining_ <= 0.0F)
-                    {
-                        sleepStacks_ = std::min<std::uint32_t>(5U, sleepStacks_ + 1U);
-                        player_.applyHitReaction(0.0F,
-                            playerControlDuration(static_cast<float>(sleepStacks_) * 0.5F));
-                    }
-                    else if (intersects(playerBounds(), curse) && blessingRemaining_ > 0.0F)
-                        onBlessingPreventedControl();
-                    enemy.specialCooldown = 7.0F;
-                }
-                continue;
-            }
             if (enemy.specialCooldown <= 0.0F
                 && enemy.controller.action() == ai::EnemyAction::Chase)
             {
-                enemy.specialWindup = 0.5F;
-                continue;
+                const auto flower = enemy.controller.bounds();
+                const Aabb curse {flower.left + flower.width * 0.5F - 240.0F,
+                    flower.top + flower.height * 0.5F - 240.0F, 480.0F, 480.0F};
+                if (intersects(playerBounds(), curse) && blessingRemaining_ <= 0.0F
+                    && !player_.isDashing() && spellInvulnerableRemaining_ <= 0.0F)
+                    sleepRemaining_ = 5.0F;
+                else if (intersects(playerBounds(), curse) && blessingRemaining_ > 0.0F)
+                    onBlessingPreventedControl();
+                enemy.specialCooldown = 7.0F;
             }
         }
         if (enemy.archetype == EnemyArchetype::FrostWolf)
@@ -1848,7 +1841,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             && config.skill != ai::EnemySkill::Swoop
             && ((config.skill != ai::EnemySkill::Slash
                     && config.skill != ai::EnemySkill::WhirlwindSlash
-                    && config.skill != ai::EnemySkill::WolfClaw) || skillJustActivated)
+                    && config.skill != ai::EnemySkill::WolfClaw
+                    && config.skill != ai::EnemySkill::LeafBlade) || skillJustActivated)
             && (config.skill == ai::EnemySkill::Domination
                 || intersects(playerBounds(), enemy.controller.attackBounds())))
         {
@@ -1962,7 +1956,7 @@ PlayerStateView CombatSession::playerState() const noexcept
         player_.isStunned(), player_.stunRemaining(), playerHitInvulnerabilityRemaining_,
         playerHurtSequence_, blessingRemaining_,
         relics_.vulnerableRemaining(), flowerFieldRemaining_, player_.flightRemaining(),
-        barrierShield_ + persistentShield_};
+        barrierShield_ + persistentShield_, sleepRemaining_};
 }
 
 std::vector<EnemyStateView> CombatSession::enemyStates() const
@@ -1978,7 +1972,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
                 || enemy.controller.action() == ai::EnemyAction::Active)
             && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
             && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
-            && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw)
+            && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw
+            && skill != ai::EnemySkill::LeafBlade)
         {
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -2002,7 +1997,7 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
                 bounds.top, range, bounds.height};
         }
         if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
-            && skill != ai::EnemySkill::WolfClaw)
+            && skill != ai::EnemySkill::WolfClaw && skill != ai::EnemySkill::LeafBlade)
         {
             const auto area = enemy.controller.attackBounds();
             if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -2056,7 +2051,8 @@ EnemyStateView CombatSession::enemyState() const noexcept
             || enemy.controller.action() == ai::EnemyAction::Active)
         && skill != ai::EnemySkill::Thrust && skill != ai::EnemySkill::Dive
         && skill != ai::EnemySkill::Slash && skill != ai::EnemySkill::Thread
-        && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw)
+        && skill != ai::EnemySkill::Domination && skill != ai::EnemySkill::WolfClaw
+        && skill != ai::EnemySkill::LeafBlade)
     {
         const auto area = enemy.controller.attackBounds();
         if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;
@@ -2069,7 +2065,7 @@ EnemyStateView CombatSession::enemyState() const noexcept
         skillBounds = Aabb {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
     }
     if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
-        && skill != ai::EnemySkill::WolfClaw)
+        && skill != ai::EnemySkill::WolfClaw && skill != ai::EnemySkill::LeafBlade)
     {
         const auto area = enemy.controller.attackBounds();
         if (area.width > 0.0F && area.height > 0.0F) skillBounds = area;

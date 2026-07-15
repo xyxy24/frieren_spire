@@ -328,6 +328,10 @@ void TowerSession::startNextFloor()
             ? scheduler_.next(run_.context())
             : ((run_.context().floorIndex + 1U) % config_.floorsPerBoss == 0U
                 ? game::run::FloorType::Boss : game::run::FloorType::Combat);
+    if (currentFloorType_ == game::run::FloorType::Event
+        && std::all_of(run_.context().triggeredEvents.begin(),
+            run_.context().triggeredEvents.end(), [](const bool triggered) { return triggered; }))
+        currentFloorType_ = game::run::FloorType::Combat;
     merchantStock_.clear();
     eventTransaction_.reset();
     combat_.reset();
@@ -378,7 +382,15 @@ void TowerSession::startNextFloor()
             ? spellOffer.candidates[0] : 0U;
         game::run::DeterministicRng eventRng(game::run::deriveStreamSeed(
             run_.context().floorSeed, game::run::RandomStream::Event));
-        const auto eventIndex = eventRng.index(3U);
+        std::array<std::size_t, 3> availableEvents {};
+        std::size_t availableCount = 0U;
+        for (std::size_t index = 0U; index < availableEvents.size(); ++index)
+            if (!run_.eventTriggered(index)) availableEvents[availableCount++] = index;
+        if (availableCount == 0U)
+            throw std::logic_error("event floor has no untriggered event");
+        const auto eventIndex = availableEvents[eventRng.index(
+            static_cast<std::uint32_t>(availableCount))];
+        run_.markEventTriggered(eventIndex);
         eventKind_ = eventIndex == 0U ? EventKind::AldenBall
             : (eventIndex == 1U ? EventKind::HalfCenturyMeteorShower : EventKind::SwordVillage);
         if (eventKind_ == EventKind::AldenBall)

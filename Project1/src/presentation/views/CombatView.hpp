@@ -45,7 +45,7 @@ struct DialoguePortraitTextures
 void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
-    const EnemyStateTextures& qualTextures,
+    const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
     const std::array<std::optional<sf::Texture>, 3>& qualSkillTextures,
     const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,

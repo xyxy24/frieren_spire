@@ -40,6 +40,8 @@ public:
     [[nodiscard]] bool equipUltimate(game::run::ContentId spell);
     [[nodiscard]] bool useStairs();
     [[nodiscard]] game::run::FloorResult floorResult() const noexcept;
+    [[nodiscard]] bool eventTriggered(std::size_t eventIndex) const noexcept;
+    void markEventTriggered(std::size_t eventIndex);
 
 private:
     static int recoverHalfMissingHp(int currentHp, int maxHp) noexcept;

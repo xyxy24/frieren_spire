@@ -52,7 +52,7 @@ arcane::presentation::PlayerVisualState makePlayerVisualState(
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
-    const EnemyStateTextures& qualTextures,
+    const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
     const std::array<std::optional<sf::Texture>, 3>& qualSkillTextures,
     const EnemyStateTextures& lugnerTextures,
     const std::array<std::optional<sf::Texture>, 3>& lugnerSkillTextures,
@@ -166,6 +166,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &birdTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf)
             stateTextures = &frostWolfTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::ChaosFlower)
+            stateTextures = &chaosFlowerTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)

@@ -88,6 +88,7 @@ struct PlayerStateView
     float flowerFieldRemaining {0.0F};
     float flightRemaining {0.0F};
     int shield {0};
+    float sleepRemaining {0.0F};
 };
 
 struct EnemyStateView

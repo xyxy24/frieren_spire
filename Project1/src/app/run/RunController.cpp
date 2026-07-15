@@ -220,6 +220,19 @@ int RunController::recoverHalfMissingHp(const int currentHp, const int maxHp) no
     return std::min(maxHp, currentHp + ((missing + 1) / 2));
 }
 
+bool RunController::eventTriggered(const std::size_t eventIndex) const noexcept
+{
+    return eventIndex < context_.triggeredEvents.size()
+        && context_.triggeredEvents[eventIndex];
+}
+
+void RunController::markEventTriggered(const std::size_t eventIndex)
+{
+    if (eventIndex >= context_.triggeredEvents.size())
+        throw std::out_of_range("event index is outside the event catalog");
+    context_.triggeredEvents[eventIndex] = true;
+}
+
 game::run::FloorResult RunController::floorResult() const noexcept
 {
     const bool rewardComplete = phase_ == game::run::RunPhase::FloorComplete

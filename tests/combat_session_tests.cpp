@@ -1226,16 +1226,26 @@ bool lugnerBloodMagicUsesRaisedSpriteHeightArea()
             "blood magic must be raised above Lugner's body origin");
 }
 
-bool chaosFlowerSleepAppliesStackBasedStun()
+bool chaosFlowerSleepReducesOutgoingDamageWithoutWindup()
 {
     arcane::game::CombatRequest request;
     request.playerSpawn = {160.0F, 576.0F};
     request.enemies = {{arcane::game::EnemyArchetype::ChaosFlower, {223.0F, 0.0F}}};
     arcane::game::CombatSession combat(request);
     combat.update({}, 3.51F);
-    combat.update({}, 0.50F);
-    return expect(combat.playerState().stunRemaining > 0.49F,
-        "first sleep stack must stun for half a second");
+    const auto cursed = combat.playerState();
+    if (!expect(cursed.sleepRemaining > 4.99F && !cursed.stunned,
+            "sleep curse must apply immediately for five seconds without stunning")
+        || !expect(!combat.enemyState().specialWindingUp,
+            "sleep curse must not enter a windup state")) return false;
+
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    combat.update(attack, 0.01F);
+    return expect(combat.enemyState().currentHealth == 115,
+            "sleep must reduce the player's fifteen damage attack by thirty percent")
+        && expect(!combat.enemyState().skillEffectBounds.has_value(),
+            "Chaos Flower skills must not expose a visible range rectangle");
 }
 
 bool lateSecondActEnemiesExposeConfiguredContent()
@@ -1546,7 +1556,7 @@ int main()
         && secondActEnemiesExposeConfiguredContent()
         && qualKillingMagicUsesRestrictedEffectHeight()
         && lugnerBloodMagicUsesRaisedSpriteHeightArea()
-        && chaosFlowerSleepAppliesStackBasedStun()
+        && chaosFlowerSleepReducesOutgoingDamageWithoutWindup()
         && lateSecondActEnemiesExposeConfiguredContent()
         && laufenTeleportsBehindAndImmediatelySideKicks()
         && swordRelicsModifyCollisionDamage()

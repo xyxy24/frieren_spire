@@ -50,6 +50,7 @@ struct RunContext
     std::uint32_t floorIndex {};
     std::uint32_t act {1};
     std::uint32_t bossesDefeated {};
+    std::array<bool, 3> triggeredEvents {};
 };
 
 struct FloorDescriptor

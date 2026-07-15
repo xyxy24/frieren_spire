@@ -207,6 +207,19 @@ bool meteorRestChoiceRestoresToMaximum()
             "meteor rest choice must restore current HP to maximum");
 }
 
+bool runTracksTriggeredEventsWithoutDuplicates()
+{
+    arcane::app::RunController run(808U);
+    if (!expect(!run.eventTriggered(1U),
+        "a new run must begin with every event untriggered")) return false;
+    run.markEventTriggered(1U);
+    run.markEventTriggered(1U);
+    return expect(run.eventTriggered(1U),
+            "triggered event state must persist for the run")
+        && expect(!run.eventTriggered(0U) && !run.eventTriggered(2U),
+            "triggering one event must not consume other event definitions");
+}
+
 bool thirdBossVictorySettlesOnce()
 {
     constexpr std::array<arcane::game::run::ContentId, 1> boss {99U};
@@ -448,7 +461,8 @@ int main()
         && healsHalfMissingRoundedUp() && bossRewardUnlocksOnlyTheUltimateCollection()
         && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
         && merchantPurchaseIsAtomic()
-        && eventChoiceIsAtomic() && meteorRestChoiceRestoresToMaximum() && thirdBossVictorySettlesOnce()
+        && eventChoiceIsAtomic() && meteorRestChoiceRestoresToMaximum()
+        && runTracksTriggeredEventsWithoutDuplicates() && thirdBossVictorySettlesOnce()
         && depletedRewardUsesGoldFallback() && merchantStockAndFloorScheduleReproduce()
         && defaultScheduleBuildsThreeFiveFloorActs()
         && towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction();

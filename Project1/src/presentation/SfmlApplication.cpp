@@ -158,6 +158,7 @@ struct RenderResources
     const EnemyStateTextures& mimic;
     const EnemyStateTextures& bird;
     const EnemyStateTextures& frostWolf;
+    const EnemyStateTextures& chaosFlower;
     const EnemyStateTextures& qual;
     const std::array<std::optional<sf::Texture>, 3>& qualSkill;
     const EnemyStateTextures& lugner;
@@ -203,7 +204,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             worldView.move({feedback.cameraOffset.x, feedback.cameraOffset.y});
             window.setView(worldView);
             drawCombat(window, *tower, resources.headless, resources.mimic, resources.bird,
-                resources.frostWolf, resources.qual, resources.qualSkill,
+                resources.frostWolf, resources.chaosFlower, resources.qual, resources.qualSkill,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
                 resources.draht, resources.aura, resources.playerAnimator, resources.spellAnimator,
@@ -278,6 +279,8 @@ int arcane::presentation::SfmlApplication::run()
         "assets/enemies/bird_demon/");
     const EnemyStateTextures frostWolfTextures = loadEnemyStateTextures(
         "assets/enemies/frost_wolf/", true, false, true, true);
+    const EnemyStateTextures chaosFlowerTextures = loadEnemyStateTextures(
+        "assets/enemies/chaos_flower/");
     const EnemyStateTextures qualTextures = loadEnemyStateTextures(
         "assets/enemies/qual/");
     const std::array<std::optional<sf::Texture>, 3> qualSkillTextures {
@@ -316,7 +319,7 @@ int arcane::presentation::SfmlApplication::run()
     arcane::presentation::SpellEffectAnimator spellEffectAnimator;
     static_cast<void>(spellEffectAnimator.loadFromDirectory("assets/spells"));
     const RenderResources renderResources {headlessKnightTextures, chestMimicTextures,
-        birdDemonTextures, frostWolfTextures, qualTextures, qualSkillTextures,
+        birdDemonTextures, frostWolfTextures, chaosFlowerTextures, qualTextures, qualSkillTextures,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, dialoguePortraits,
         playerAnimator, spellCards, spellEffectAnimator};
