@@ -202,7 +202,8 @@ void drawMerchantScreen(sf::RenderTarget& target, const ui::MerchantViewModel& m
     }
 }
 
-void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower)
+void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
+    const std::array<std::optional<sf::Texture>, 3>& meteorCards)
 {
     sf::RectangleShape panel({1120.0F, 650.0F});
     panel.setPosition({80.0F, 45.0F});
@@ -236,9 +237,17 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     {
         if (tower.eventResultChoice())
         {
-            drawCard(target, *tower.eventResultChoice(), {535.0F, 205.0F}, {210.0F, 280.0F}, true);
             const auto base = swordVillage ? 5201U : (meteor ? 5101U : 5001U);
             const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - base);
+            if (meteor && choiceIndex < meteorCards.size() && meteorCards[choiceIndex])
+            {
+                sf::Sprite card(*meteorCards[choiceIndex]);
+                card.setPosition({535.0F, 205.0F});
+                target.draw(card);
+            }
+            else
+                drawCard(target, *tower.eventResultChoice(),
+                    {535.0F, 205.0F}, {210.0F, 280.0F}, true);
             if (choiceIndex < effects.size())
             {
                 std::string resultText {effects[choiceIndex]};
@@ -254,7 +263,17 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
     const auto choices = tower.eventChoices();
     for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
-        drawCard(target, choices[index].id, {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
+    {
+        if (meteor && meteorCards[index])
+        {
+            sf::Sprite card(*meteorCards[index]);
+            card.setPosition({CardX[index], 205.0F});
+            target.draw(card);
+        }
+        else
+            drawCard(target, choices[index].id,
+                {CardX[index], 205.0F}, {210.0F, 280.0F}, false);
+    }
     for (std::size_t index = 0U; index < choices.size() && index < effects.size(); ++index)
         drawPixelText(target, effects[index], {CardX[index], 505.0F}, 1.25F);
 }
@@ -287,7 +306,8 @@ void drawPlayer(sf::RenderTarget& target, const arcane::presentation::PlayerAnim
 void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
-    const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures)
+    const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures,
+    const std::optional<sf::Texture>& meteorNpcTexture)
 {
     drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
     drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
@@ -305,6 +325,17 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
         shadeChargeAnimator.drawFront(target, bottomCenter);
     }
     const auto npc = tower.npcBounds();
+    if (tower.currentFloorType() == arcane::game::run::FloorType::Event
+        && tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower
+        && meteorNpcTexture)
+    {
+        sf::Sprite npcSprite(*meteorNpcTexture);
+        npcSprite.setPosition({npc.left + (npc.width
+                - static_cast<float>(meteorNpcTexture->getSize().x)) * 0.5F,
+            npc.top + npc.height - static_cast<float>(meteorNpcTexture->getSize().y)});
+        target.draw(npcSprite);
+        return;
+    }
     sf::RectangleShape npcShape({npc.width, npc.height});
     npcShape.setPosition({npc.left, npc.top});
     npcShape.setFillColor(tower.currentFloorType() == arcane::game::run::FloorType::Merchant

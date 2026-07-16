@@ -221,6 +221,8 @@ struct RenderResources
     const DialoguePortraitTextures& portraits;
     const ArenaTextures& arena;
     const StaircaseTextures& staircases;
+    const std::array<std::optional<sf::Texture>, 3>& meteorCards;
+    const std::optional<sf::Texture>& meteorNpc;
     const arcane::presentation::EnemyAnimator& enemyAnimator;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
@@ -303,7 +305,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 || tower->currentFloorType() == arcane::game::run::FloorType::Event))
         {
             drawSpecialFloor(window, *tower, resources.playerAnimator,
-                resources.shadeChargeAnimator, resources.arena, resources.staircases);
+                resources.shadeChargeAnimator, resources.arena, resources.staircases,
+                resources.meteorNpc);
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
             {
@@ -312,7 +315,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             }
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Event)
-                drawEventScreen(window, *tower);
+                drawEventScreen(window, *tower, resources.meteorCards);
         }
         int health = tower->run().player().currentHp;
         std::optional<arcane::game::PlayerStateView> combatView;
@@ -530,6 +533,12 @@ int arcane::presentation::SfmlApplication::run()
     };
     const ArenaTextures arenaTextures = loadArenaTextures("assets/environments/processed");
     const StaircaseTextures staircaseTextures = loadStaircaseTextures("assets/props");
+    const std::array<std::optional<sf::Texture>, 3> meteorCardTextures {
+        loadTexture("assets/events/half_century_meteor_shower/5101.png"),
+        loadTexture("assets/events/half_century_meteor_shower/5102.png"),
+        loadTexture("assets/events/half_century_meteor_shower/5103.png")};
+    const std::optional<sf::Texture> meteorNpcTexture =
+        loadTexture("assets/npcs/meteor_observer.png");
     arcane::presentation::EnemyAnimator enemyAnimator;
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
@@ -556,7 +565,8 @@ int arcane::presentation::SfmlApplication::run()
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,
         denkenTextures, tornadoTextures, dialoguePortraits,
-        arenaTextures, staircaseTextures, enemyAnimator, lootBookAnimator, playerAnimator,
+        arenaTextures, staircaseTextures, meteorCardTextures, meteorNpcTexture,
+        enemyAnimator, lootBookAnimator, playerAnimator,
         shadeChargeAnimator, spellCards,
         spellEffectAnimator};
     sf::Clock frameClock;

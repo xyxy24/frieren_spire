@@ -276,3 +276,11 @@
 - Added by: project team, 2026-07-16.
 - Original source/license: team-provided classroom prototype artwork.
 - Purpose: idle/death art and dialogue portraits for the final Boss encounter.
+
+## Half-Century Meteor Shower event
+
+- Files: `events/half_century_meteor_shower/5101.png` through `5103.png` and
+  `npcs/meteor_observer.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: the three event-choice cards and the spatial NPC for the Half-Century Meteor Shower.
