@@ -1736,6 +1736,88 @@ bool revolteParryActivatesWithoutWindup()
         "Revolte parry must become active immediately without a windup state");
 }
 
+bool revolteWavesCrossTheArenaAndSecondPhaseAddsFallingBlades()
+{
+    arcane::game::CombatRequest waveRequest;
+    waveRequest.playerSpawn = {160.0F, 576.0F};
+    waveRequest.enemySpawn = {450.0F, 544.0F};
+    waveRequest.enemyArchetype = arcane::game::EnemyArchetype::Revolte;
+    waveRequest.enemyContactDamage = 0;
+    waveRequest.enemyAttackDamage = 0;
+    arcane::game::CombatSession wave(waveRequest);
+    wave.update({}, 2.4F);
+    advanceDialogue(wave);
+    wave.update({}, 3.51F);
+    wave.update({}, 0.31F);
+    const auto waveEffects = wave.spellEffects();
+    const auto slash = std::find_if(waveEffects.begin(), waveEffects.end(), [](const auto& effect) {
+        return effect.spellId == 9101U;
+    });
+    if (!expect(slash != waveEffects.end() && slash->duration > 1.59F
+            && slash->duration < 1.61F,
+            "Revolte's light sword wave must retain a finite 480-pixel path at 300 px/s"))
+        return false;
+    const float initialWaveTop = slash->bounds.top;
+    arcane::game::PlayerIntent jump;
+    jump.jumpPressed = true;
+    wave.update(jump, 0.20F);
+    const auto trackingEffects = wave.spellEffects();
+    const auto trackingSlash = std::find_if(trackingEffects.begin(), trackingEffects.end(),
+        [](const auto& effect) { return effect.spellId == 9101U; });
+    if (!expect(trackingSlash != trackingEffects.end()
+            && trackingSlash->bounds.top < initialWaveTop - 8.0F
+            && std::abs(trackingSlash->rotationDegrees) > 5.0F
+            && std::abs(trackingSlash->rotationDegrees) <= 19.0F,
+            "Revolte's sword wave must curve toward a jump without turning instantly")) return false;
+
+    arcane::game::CombatRequest phaseRequest;
+    phaseRequest.playerSpawn = {160.0F, 576.0F};
+    phaseRequest.playerMaximumHealth = 500;
+    phaseRequest.playerCurrentHealth = 500;
+    phaseRequest.enemySpawn = {210.0F, 544.0F};
+    phaseRequest.enemyArchetype = arcane::game::EnemyArchetype::Revolte;
+    phaseRequest.enemyMaximumHealth = 30;
+    phaseRequest.enemyContactDamage = 0;
+    phaseRequest.enemyAttackDamage = 0;
+    arcane::game::CombatSession phase(phaseRequest);
+    phase.update({}, 2.4F);
+    advanceDialogue(phase);
+    arcane::game::PlayerIntent attack;
+    attack.attackPressed = true;
+    phase.update(attack, 0.01F);
+    phase.update({}, 0.5F);
+    phase.update(attack, 0.01F);
+    if (!expect(phase.dialogueLine().has_value(),
+            "the falling-blade test must reach Revolte's second phase")) return false;
+    advanceDialogue(phase);
+
+    bool sawLockedWindup = false;
+    bool sawThreeTelegraphs = false;
+    bool sawImpact = false;
+    for (int step = 0; step < 180 && !sawImpact; ++step)
+    {
+        phase.update({}, 0.1F);
+        const auto state = phase.enemyState();
+        if (state.skillVariant == 5 && state.windingUp && state.skillEffectBounds)
+            sawLockedWindup = state.skillEffectBounds->width == 84.0F
+                && state.skillEffectBounds->height == 260.0F;
+        const auto effects = phase.spellEffects();
+        const auto telegraphs = std::count_if(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == 9400U;
+        });
+        sawThreeTelegraphs = sawThreeTelegraphs || telegraphs == 3;
+        sawImpact = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == 9402U;
+        });
+    }
+    return expect(sawLockedWindup,
+            "Four-Blade Descent must lock and expose the player's original position")
+        && expect(sawThreeTelegraphs,
+            "Four-Blade Descent must create three readable sequential danger columns")
+        && expect(sawImpact,
+            "Four-Blade Descent must expose a distinct impact visual after its warning");
+}
+
 bool newLateActEnemiesExposeFogProjectileAndFlightRules()
 {
     arcane::game::CombatRequest fogRequest;
@@ -2144,6 +2226,7 @@ int main()
         && revolteLocksAtFiveAndHealsForSecondPhase()
         && revolteParryActivatesWithoutWindup()
         && revolteRetargetsBetweenConsecutiveReadySkills()
+        && revolteWavesCrossTheArenaAndSecondPhaseAddsFallingBlades()
         && redMirrorDragonBreathRespectsPostHitInvulnerability()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
