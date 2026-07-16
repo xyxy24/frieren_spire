@@ -300,3 +300,12 @@
 - Added by: project team, 2026-07-16.
 - Original source/license: team-provided classroom prototype artwork.
 - Purpose: the three event-choice cards and the spatial NPC for Village of the Sword.
+
+## Hero of the South event
+
+- Files: `events/hero_of_the_south/5301.png` through `5303.png` and
+  `npcs/hero_of_the_south.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: the three event-choice cards and the spatial NPC for Hero of the South. The high
+  resolution card art is scaled to the standard `210x280` event-card area at runtime.

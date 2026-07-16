@@ -205,7 +205,8 @@ void drawMerchantScreen(sf::RenderTarget& target, const ui::MerchantViewModel& m
 void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const std::array<std::optional<sf::Texture>, 3>& meteorCards,
     const std::array<std::optional<sf::Texture>, 3>& ordenCards,
-    const std::array<std::optional<sf::Texture>, 3>& swordVillageCards)
+    const std::array<std::optional<sf::Texture>, 3>& swordVillageCards,
+    const std::array<std::optional<sf::Texture>, 3>& southernHeroCards)
 {
     sf::RectangleShape panel({1120.0F, 650.0F});
     panel.setPosition({80.0F, 45.0F});
@@ -252,12 +253,16 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
             const auto base = southernHero ? 5301U
                 : (swordVillage ? 5201U : (meteor ? 5101U : 5001U));
             const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - base);
-            const auto& eventCards = swordVillage ? swordVillageCards
-                : (meteor ? meteorCards : ordenCards);
-            if (!southernHero && choiceIndex < eventCards.size() && eventCards[choiceIndex])
+            const auto& eventCards = southernHero ? southernHeroCards
+                : (swordVillage ? swordVillageCards : (meteor ? meteorCards : ordenCards));
+            if (choiceIndex < eventCards.size() && eventCards[choiceIndex])
             {
-                sf::Sprite card(*eventCards[choiceIndex]);
+                const sf::Texture& texture = *eventCards[choiceIndex];
+                sf::Sprite card(texture);
                 card.setPosition({535.0F, 205.0F});
+                const auto size = texture.getSize();
+                card.setScale({210.0F / static_cast<float>(size.x),
+                    280.0F / static_cast<float>(size.y)});
                 target.draw(card);
             }
             else
@@ -279,12 +284,16 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     const auto choices = tower.eventChoices();
     for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
     {
-        const auto& eventCards = swordVillage ? swordVillageCards
-            : (meteor ? meteorCards : ordenCards);
-        if (!southernHero && eventCards[index])
+        const auto& eventCards = southernHero ? southernHeroCards
+            : (swordVillage ? swordVillageCards : (meteor ? meteorCards : ordenCards));
+        if (eventCards[index])
         {
-            sf::Sprite card(*eventCards[index]);
+            const sf::Texture& texture = *eventCards[index];
+            sf::Sprite card(texture);
             card.setPosition({CardX[index], 205.0F});
+            const auto size = texture.getSize();
+            card.setScale({210.0F / static_cast<float>(size.x),
+                280.0F / static_cast<float>(size.y)});
             target.draw(card);
         }
         else
@@ -326,7 +335,8 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures,
     const std::optional<sf::Texture>& meteorNpcTexture,
     const std::optional<sf::Texture>& ordenNpcTexture,
-    const std::optional<sf::Texture>& swordVillageNpcTexture)
+    const std::optional<sf::Texture>& swordVillageNpcTexture,
+    const std::optional<sf::Texture>& southernHeroNpcTexture)
 {
     drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
     drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
@@ -351,6 +361,8 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
         eventNpcTexture = &ordenNpcTexture;
     else if (tower.eventKind() == arcane::app::EventKind::SwordVillage)
         eventNpcTexture = &swordVillageNpcTexture;
+    else if (tower.eventKind() == arcane::app::EventKind::SouthernHero)
+        eventNpcTexture = &southernHeroNpcTexture;
     if (tower.currentFloorType() == arcane::game::run::FloorType::Event
         && eventNpcTexture && *eventNpcTexture)
     {
