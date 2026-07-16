@@ -504,6 +504,10 @@ int arcane::presentation::SfmlApplication::run()
     revolteTextures.die = loadTexture("assets/enemies/revolte/die.png");
     revolteTextures.parry = loadTexture("assets/enemies/revolte/parry.png");
     revolteTextures.dash = loadTexture("assets/enemies/revolte/dash.png");
+    revolteTextures.fallingBladeFrame =
+        loadTexture("assets/enemies/revolte/falling-blade-frame.png");
+    revolteTextures.fallingBlades =
+        loadTexture("assets/enemies/revolte/falling-blades.png");
     for (std::size_t index = 0U; index < revolteTextures.skillWindups.size(); ++index)
         revolteTextures.skillWindups[index] = loadTexture("assets/enemies/revolte/windup"
             + std::to_string(index + 1U) + ".png");

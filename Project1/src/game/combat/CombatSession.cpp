@@ -180,7 +180,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
         return EnemyConfig {160.0F, 180.0F, 54.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             42.0F, 72.0F, 3.0F, false, false, EnemySkill::BossAttack};
     case EnemyArchetype::Revolte:
-        return EnemyConfig {160.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
+        return EnemyConfig {180.0F, 64.0F, 64.0F, 0.5F, 0.6F, 0.0F, 0.0F,
             64.0F, 96.0F, 7.0F, true, false, EnemySkill::BossAttack};
     case EnemyArchetype::Aura:
         return EnemyConfig {120.0F, 420.0F, 420.0F, 0.8F, 0.2F, 0.0F, 0.0F,
@@ -295,7 +295,7 @@ CombatSession::CombatSession(CombatRequest request)
         if (spawn.archetype == EnemyArchetype::Heimon)
             enemies_.back().specialCooldown = 1.5F;
         if (spawn.archetype == EnemyArchetype::Revolte)
-            enemies_.back().revolteCooldowns = {3.5F, 3.5F, 4.5F, 4.5F, 3.0F};
+            enemies_.back().revolteCooldowns = {3.0F, 3.0F, 3.75F, 4.0F, 2.5F, 7.0F};
         if (spawn.archetype == EnemyArchetype::Gargoyle)
             enemies_.back().specialCooldown = 2.0F;
         if (spawn.archetype == EnemyArchetype::ThreeHeadedDemon)
@@ -728,8 +728,39 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     std::erase_if(activeTornadoes_, [](const auto& tornado) { return tornado.remaining <= 0.0F; });
     for (auto& projectile : activeEnemyProjectiles_)
     {
+        if (projectile.tracksPlayer)
+        {
+            const auto target = playerBounds();
+            const float targetCenterX = target.left + target.width * 0.5F;
+            const float targetCenterY = target.top + target.height * 0.5F;
+            const float projectileCenterX = projectile.bounds.left
+                + projectile.bounds.width * 0.5F;
+            const float projectileCenterY = projectile.bounds.top
+                + projectile.bounds.height * 0.5F;
+            const float desiredAngle = std::atan2(
+                targetCenterY - projectileCenterY, targetCenterX - projectileCenterX);
+            float currentAngle = std::atan2(projectile.velocity.y, projectile.velocity.x);
+            float angleDifference = desiredAngle - currentAngle;
+            constexpr float Pi = 3.14159265358979323846F;
+            while (angleDifference > Pi) angleDifference -= Pi * 2.0F;
+            while (angleDifference < -Pi) angleDifference += Pi * 2.0F;
+            const float maximumTurn = projectile.homingTurnRateRadians * deltaSeconds;
+            currentAngle += std::clamp(angleDifference, -maximumTurn, maximumTurn);
+            projectile.velocity = {std::cos(currentAngle) * projectile.speed,
+                std::sin(currentAngle) * projectile.speed};
+            if (std::abs(projectile.velocity.x) > 0.01F)
+                projectile.direction = projectile.velocity.x > 0.0F ? 1.0F : -1.0F;
+        }
         const float travel = std::min(projectile.remainingDistance, projectile.speed * deltaSeconds);
-        projectile.bounds.left += projectile.direction * travel;
+        if (projectile.tracksPlayer)
+        {
+            const float ratio = projectile.speed > 0.0F ? travel / projectile.speed : 0.0F;
+            projectile.bounds.left += projectile.velocity.x * ratio;
+            projectile.bounds.top += projectile.velocity.y * ratio;
+            projectile.bounds.top = std::clamp(projectile.bounds.top, 0.0F,
+                request_.worldBounds.groundTop - projectile.bounds.height);
+        }
+        else projectile.bounds.left += projectile.direction * travel;
         projectile.remainingDistance -= travel;
         if (intersects(projectile.bounds, playerBounds()))
         {
@@ -771,10 +802,12 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         if (lightning.delayRemaining <= 0.0F && lightning.delayRemaining + deltaSeconds > 0.0F)
         {
             activeSpellEffects_.push_back(
-                {FrierenCopyLightningVisualId, lightning.bounds, 0.6F, 0.6F});
+                {lightning.impactVisualId, lightning.bounds,
+                    lightning.impactDuration, lightning.impactDuration});
             if (intersects(lightning.bounds, playerBounds()))
                 static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
-                    lightning.sequence, 20, 1.0F, relics_.incomingDamageMultiplier(), 0,
+                    lightning.sequence, lightning.damage, 1.0F,
+                    relics_.incomingDamageMultiplier(), 0,
                     player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F}));
         }
     }
@@ -1983,6 +2016,9 @@ void CombatSession::populateEnemyStates(std::vector<EnemyStateView>& views) cons
                     : bounds.left - range,
                 bounds.top, range, bounds.height};
         }
+        if (enemy.archetype == EnemyArchetype::Revolte
+            && enemy.specialWindup > 0.0F && enemy.revolteSkill == 5)
+            skillBounds = enemy.specialTargetBounds;
         if (enemy.archetype == EnemyArchetype::StarkCopy && enemy.manualSkill == 1
             && (enemy.specialWindup > 0.0F || enemy.specialActive > 0.0F))
             skillBounds = Aabb {bounds.left - 54.0F, bounds.top,
@@ -2037,10 +2073,16 @@ void CombatSession::populateSpellEffects(std::vector<SpellEffectView>& views) co
         views.push_back({tornado.evolutionRemaining > 0.0F ? 9002U : 9003U,
             tornado.bounds, tornado.remaining, 7.0F});
     for (const auto& projectile : activeEnemyProjectiles_)
+    {
+        const float rotation = projectile.tracksPlayer
+            ? std::atan2(projectile.velocity.y, std::abs(projectile.velocity.x))
+                * 180.0F / 3.14159265358979323846F
+            : 0.0F;
         views.push_back({projectile.bounds.height >= 96.0F ? 9302U
-                : (projectile.bounds.width >= 54.0F ? 9102U : 9101U),
+                    : (projectile.bounds.width >= 54.0F ? 9102U : 9101U),
             projectile.bounds, projectile.remainingDistance / projectile.speed,
-            projectile.totalDistance / projectile.speed, projectile.direction});
+            projectile.totalDistance / projectile.speed, projectile.direction, rotation});
+    }
     for (const auto& beam : activeEnemyBeams_)
     {
         const float dx = beam.end.x - beam.start.x;
@@ -2051,8 +2093,8 @@ void CombatSession::populateSpellEffects(std::vector<SpellEffectView>& views) co
             beam.remaining, 0.6F, dx >= 0.0F ? 1.0F : -1.0F, angle});
     }
     for (const auto& lightning : pendingEnemyLightning_)
-        views.push_back({FrierenCopyLightningVisualId, lightning.bounds,
-            lightning.delayRemaining, 0.4F});
+        views.push_back({lightning.telegraphVisualId, lightning.bounds,
+            lightning.delayRemaining, lightning.telegraphDuration});
     for (const auto& fire : activeEnemyGroundFire_)
         views.push_back({FrierenCopyGroundFireVisualId, fire.bounds, fire.remaining, 5.0F});
     for (const auto& enemy : enemies_)
@@ -2094,6 +2136,9 @@ EnemyStateView CombatSession::enemyState() const noexcept
             ? bounds.left + bounds.width : bounds.left - 160.0F;
         skillBounds = Aabb {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
     }
+    if (enemy.archetype == EnemyArchetype::Revolte
+        && enemy.specialWindup > 0.0F && enemy.revolteSkill == 5)
+        skillBounds = enemy.specialTargetBounds;
     if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
         && skill != ai::EnemySkill::WolfClaw && skill != ai::EnemySkill::LeafBlade)
     {
@@ -2198,7 +2243,7 @@ void CombatSession::advanceDialogue() noexcept
                 revolte->health.maximum() / 2 - revolte->health.current()));
             revolte->revolteSecondPhase = true;
             revolte->revolteTransitionPending = false;
-            revolte->revolteCooldowns = {7.0F, 7.0F, 9.0F, 9.0F, 3.0F};
+            revolte->revolteCooldowns = {6.0F, 6.0F, 7.5F, 8.0F, 2.2F, 3.5F};
         }
     }
     if (outcomeAfterDialogue_)

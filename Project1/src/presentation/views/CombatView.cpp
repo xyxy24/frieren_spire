@@ -305,6 +305,88 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 continue;
             }
         }
+        if (effect.spellId == 9400U || effect.spellId == 9402U)
+        {
+            const bool impact = effect.spellId == 9402U;
+            const float progress = effect.duration > 0.0F
+                ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
+                : 1.0F;
+            sf::RectangleShape warning({effect.bounds.width, effect.bounds.height});
+            warning.setPosition({effect.bounds.left, effect.bounds.top});
+            warning.setFillColor(impact ? sf::Color {164, 35, 54, 92}
+                : sf::Color {102, 30, 55,
+                    static_cast<std::uint8_t>(24.0F + progress * 42.0F)});
+            warning.setOutlineColor(revolteTextures.fallingBladeFrame
+                ? sf::Color::Transparent
+                : (impact ? sf::Color {255, 222, 218, 245}
+                          : sf::Color {235, 93, 128, 205}));
+            warning.setOutlineThickness(revolteTextures.fallingBladeFrame
+                ? 0.0F : (impact ? 4.0F : 2.0F));
+            target.draw(warning, impact
+                ? sf::RenderStates {sf::BlendAdd} : sf::RenderStates::Default);
+
+            if (revolteTextures.fallingBladeFrame)
+            {
+                sf::Sprite frame(*revolteTextures.fallingBladeFrame);
+                const auto size = revolteTextures.fallingBladeFrame->getSize();
+                frame.setPosition({effect.bounds.left, effect.bounds.top});
+                frame.setScale({effect.bounds.width / static_cast<float>(size.x),
+                    effect.bounds.height / static_cast<float>(size.y)});
+                frame.setColor(impact ? sf::Color {255, 235, 235, 255}
+                    : sf::Color {255, 255, 255,
+                        static_cast<std::uint8_t>(150.0F + progress * 85.0F)});
+                target.draw(frame, impact
+                    ? sf::RenderStates {sf::BlendAdd} : sf::RenderStates::Default);
+            }
+
+            if (revolteTextures.fallingBlades)
+            {
+                sf::Sprite blades(*revolteTextures.fallingBlades);
+                const auto size = revolteTextures.fallingBlades->getSize();
+                const sf::Vector2f destinationSize {
+                    effect.bounds.width * 0.86F, effect.bounds.height * 0.80F};
+                const float travel = effect.bounds.height - destinationSize.y;
+                blades.setPosition({effect.bounds.left
+                        + (effect.bounds.width - destinationSize.x) * 0.5F,
+                    effect.bounds.top + (impact ? travel : travel * progress)});
+                blades.setScale({destinationSize.x / static_cast<float>(size.x),
+                    destinationSize.y / static_cast<float>(size.y)});
+                blades.setColor(impact ? sf::Color::White
+                    : sf::Color {255, 255, 255,
+                        static_cast<std::uint8_t>(105.0F + progress * 130.0F)});
+                target.draw(blades, sf::RenderStates {sf::BlendAdd});
+            }
+            else
+            {
+                constexpr std::array<float, 4> BladeOffsets {0.18F, 0.39F, 0.61F, 0.82F};
+                for (std::size_t bladeIndex = 0U; bladeIndex < BladeOffsets.size(); ++bladeIndex)
+                {
+                    const float bladeHeight = effect.bounds.height * 0.72F;
+                    sf::RectangleShape blade({impact ? 7.0F : 4.0F, bladeHeight});
+                    blade.setOrigin({blade.getSize().x * 0.5F, bladeHeight});
+                    blade.setPosition({effect.bounds.left
+                            + effect.bounds.width * BladeOffsets[bladeIndex],
+                        effect.bounds.top + (impact ? effect.bounds.height
+                            : effect.bounds.height
+                                * std::clamp(progress * 1.15F, 0.12F, 0.92F))});
+                    blade.setRotation(sf::degrees(
+                        bladeIndex % 2U == 0U ? -7.0F : 7.0F));
+                    blade.setFillColor(impact ? sf::Color {255, 245, 232, 245}
+                        : sf::Color {224, 174, 199, 185});
+                    target.draw(blade, sf::RenderStates {sf::BlendAdd});
+                }
+            }
+            if (!revolteTextures.fallingBladeFrame)
+            {
+                sf::RectangleShape seal({effect.bounds.width, impact ? 8.0F : 4.0F});
+                seal.setPosition({effect.bounds.left,
+                    effect.bounds.top + effect.bounds.height - seal.getSize().y});
+                seal.setFillColor(impact ? sf::Color {255, 92, 106, 235}
+                    : sf::Color {214, 76, 116, 190});
+                target.draw(seal, sf::RenderStates {sf::BlendAdd});
+            }
+            continue;
+        }
         const std::optional<sf::Texture>* projectileTexture = nullptr;
         if (effect.spellId == 9101U) projectileTexture = &slashTexture;
         else if (effect.spellId == 9102U) projectileTexture = &largeSlashTexture;
@@ -320,6 +402,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             slash.setScale({(effect.facingDirection > 0.0F ? -1.0F : 1.0F)
                     * effect.bounds.width / static_cast<float>(size.x),
                 effect.bounds.height / static_cast<float>(size.y)});
+            slash.setRotation(sf::degrees(effect.rotationDegrees));
             target.draw(slash);
             continue;
         }

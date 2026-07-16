@@ -507,8 +507,9 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                         const float top = request_.worldBounds.groundTop
                             - (enemy.revolteSkill == 0 ? 84.0F : 42.0F);
                         activeEnemyProjectiles_.push_back({{left, top, 32.0F, 42.0F},
-                            direction, 144.0F, 144.0F, ++environmentalSequence_, 20});
-                        enemy.specialActive = 0.6F;
+                            direction, 480.0F, 480.0F, ++environmentalSequence_, 20,
+                            300.0F, true, 1.65F, {direction * 300.0F, 0.0F}});
+                        enemy.specialActive = 0.42F;
                     }
                     else if (enemy.revolteSkill == 2)
                     {
@@ -518,12 +519,35 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                             : caster.left - 64.0F - 37.0F;
                         activeEnemyProjectiles_.push_back({{left,
                             request_.worldBounds.groundTop - 72.0F, 54.0F, 72.0F},
-                            direction, 168.0F, 168.0F, ++environmentalSequence_, 25});
-                        enemy.specialActive = 0.6F;
+                            direction, 560.0F, 560.0F, ++environmentalSequence_, 25,
+                            330.0F, true, 1.25F, {direction * 330.0F, 0.0F}});
+                        enemy.specialActive = 0.42F;
                     }
-                    else if (enemy.revolteSkill == 3) enemy.specialActive = 1.2F;
+                    else if (enemy.revolteSkill == 3) enemy.specialActive = 0.9F;
                     else if (enemy.revolteSkill == 4)
-                        enemy.specialActive = 144.0F / 220.0F;
+                        enemy.specialActive = 144.0F / 300.0F;
+                    else if (enemy.revolteSkill == 5)
+                    {
+                        constexpr float BladeWidth = 84.0F;
+                        constexpr float BladeHeight = 260.0F;
+                        constexpr std::array<float, 3> Offsets {0.0F, -120.0F, 120.0F};
+                        constexpr std::array<float, 3> Delays {0.25F, 0.45F, 0.65F};
+                        const float lockedCenter = enemy.specialTargetBounds.left
+                            + enemy.specialTargetBounds.width * 0.5F;
+                        for (std::size_t index = 0U; index < Offsets.size(); ++index)
+                        {
+                            const float left = std::clamp(
+                                lockedCenter + Offsets[index] - BladeWidth * 0.5F,
+                                request_.worldBounds.left,
+                                request_.worldBounds.right - BladeWidth);
+                            pendingEnemyLightning_.push_back({{left,
+                                request_.worldBounds.groundTop - BladeHeight,
+                                BladeWidth, BladeHeight}, Delays[index],
+                                ++environmentalSequence_, Delays[index], 18,
+                                9400U, 9402U, 0.24F});
+                        }
+                        enemy.specialActive = Delays.back();
+                    }
                 }
                 continue;
             }
@@ -532,12 +556,13 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 const float activeDelta = std::min(deltaSeconds, enemy.specialActive);
                 if (enemy.revolteSkill == 4)
                     enemy.controller.translateHorizontal(
-                        enemy.specialDirection * 220.0F * activeDelta, movementBoundsFor(enemy));
+                        enemy.specialDirection * 300.0F * activeDelta, movementBoundsFor(enemy));
                 enemy.specialActive -= activeDelta;
                 if (enemy.specialActive <= 0.0F)
                 {
                     if (enemy.revolteSkill == 4)
-                        enemy.revolteCooldowns = {0.0F, 0.0F, 0.0F, 0.0F, 6.0F};
+                        enemy.revolteCooldowns = {
+                            0.0F, 0.0F, 0.0F, 0.0F, 5.0F, 2.0F};
                     enemy.revolteSkill = -1;
                 }
                 continue;
@@ -547,24 +572,37 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 enemy.revolteCounterDashPending = false;
                 enemy.revolteSkill = 4;
                 enemy.specialDirection = enemy.controller.facingDirection();
-                enemy.specialWindup = 0.5F;
+                enemy.specialWindup = 0.35F;
                 continue;
             }
-            for (int skill = 0; skill < 5; ++skill)
+            constexpr std::array<int, 6> FirstPhasePriority {0, 1, 2, 3, 4, 5};
+            constexpr std::array<int, 6> SecondPhasePriority {5, 0, 1, 2, 3, 4};
+            const auto& priority = enemy.revolteSecondPhase
+                ? SecondPhasePriority : FirstPhasePriority;
+            for (const int skill : priority)
             {
-                if (skill == 4 && !enemy.revolteSecondPhase) continue;
+                if (skill >= 4 && !enemy.revolteSecondPhase) continue;
                 if (enemy.revolteCooldowns[static_cast<std::size_t>(skill)] > 0.0F) continue;
                 const float distance = std::abs(playerCenter
                     - (bounds.left + bounds.width * 0.5F));
-                if (skill < 2 && distance > bounds.width * 0.5F + 124.0F) continue;
-                if (skill == 2 && distance > bounds.width * 0.5F + 464.0F / 3.0F) continue;
+                if (skill < 2 && distance > bounds.width * 0.5F + 348.0F) continue;
+                if (skill == 2 && distance > bounds.width * 0.5F + 416.0F) continue;
                 enemy.revolteSkill = skill;
                 enemy.specialDirection = playerCenter
                         >= bounds.left + bounds.width * 0.5F ? 1.0F : -1.0F;
-                if (skill == 3) enemy.specialActive = 1.2F;
-                else enemy.specialWindup = skill < 2 ? 0.3F : 0.5F;
-                enemy.revolteCooldowns[static_cast<std::size_t>(skill)] =
-                    skill < 2 ? 7.0F : (skill == 4 ? 6.0F : 9.0F);
+                if (skill == 5)
+                {
+                    const auto target = playerBounds();
+                    enemy.specialTargetBounds = {
+                        target.left + target.width * 0.5F - 42.0F,
+                        request_.worldBounds.groundTop - 260.0F, 84.0F, 260.0F};
+                }
+                if (skill == 3) enemy.specialActive = 0.9F;
+                else enemy.specialWindup = skill < 2 ? 0.22F
+                    : (skill == 5 ? 0.50F : 0.36F);
+                enemy.revolteCooldowns[static_cast<std::size_t>(skill)] = skill < 2 ? 6.0F
+                    : (skill == 2 ? 7.5F : (skill == 3 ? 8.0F
+                        : (skill == 4 ? 5.0F : 7.0F)));
                 break;
             }
             if (enemy.revolteSkill >= 0) continue;

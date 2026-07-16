@@ -106,7 +106,7 @@ private:
         Aabb specialTargetBounds;
         float concealmentProgress {};
         bool fogCreated {};
-        std::array<float, 5> revolteCooldowns {};
+        std::array<float, 6> revolteCooldowns {};
         int revolteSkill {-1};
         bool revolteSecondPhase {};
         bool revolteTransitionPending {};
@@ -153,6 +153,9 @@ private:
         std::uint64_t sequence {};
         int damage {20};
         float speed {200.0F};
+        bool tracksPlayer {};
+        float homingTurnRateRadians {};
+        Vec2 velocity;
     };
     struct ActiveEnemyBeam
     {
@@ -167,6 +170,11 @@ private:
         Aabb bounds;
         float delayRemaining {0.4F};
         std::uint64_t sequence {};
+        float telegraphDuration {0.4F};
+        int damage {20};
+        std::uint32_t telegraphVisualId {FrierenCopyLightningVisualId};
+        std::uint32_t impactVisualId {FrierenCopyLightningVisualId};
+        float impactDuration {0.6F};
     };
     struct ActiveEnemyLightningStorm
     {
