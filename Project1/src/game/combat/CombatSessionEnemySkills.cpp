@@ -866,7 +866,14 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
         if (golemRemaining_ > 0.0F && enemy.controller.action() == ai::EnemyAction::Active
             && intersects(golemBounds_, enemy.controller.attackBounds()))
         {
+            if (golemHitsRemaining_ > 1U)
+            {
+                --golemHitsRemaining_;
+                enemy.controller.interrupt();
+                continue;
+            }
             golemRemaining_ = 0.0F;
+            golemHitsRemaining_ = 0U;
             std::erase_if(activeSpellEffects_, [](const auto& effect) {
                 return effect.spellId == 1022U;
             });

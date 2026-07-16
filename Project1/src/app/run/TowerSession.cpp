@@ -1,4 +1,5 @@
 #include "app/run/TowerSession.hpp"
+#include "game/progression/ProgressionSystem.hpp"
 #include "game/run/DeterministicRng.hpp"
 #include "game/spells/SpellSystem.hpp"
 
@@ -15,6 +16,19 @@ constexpr std::array<game::run::ContentId, 24> NormalRewardPool {
     1001U, 1002U, 1003U, 1004U, 1005U, 1006U, 1008U, 1009U, 1011U, 1016U,
     1017U, 1018U, 1019U, 1020U, 1021U, 1022U, 1023U, 1024U, 1025U, 1026U,
     1027U, 1028U, 1029U, 1030U
+};
+constexpr std::array<game::run::ContentId, 8> ActOneRewardPool {
+    1004U, 1005U, 1006U, 1008U, 1009U, 1027U, 1028U, 1029U
+};
+constexpr std::array<game::run::ContentId, 8> ActTwoRewardPool {
+    1001U, 1011U, 1016U, 1017U, 1019U, 1020U, 1021U, 1030U
+};
+constexpr std::array<game::run::ContentId, 8> ActThreeRewardPool {
+    1002U, 1003U, 1018U, 1022U, 1023U, 1024U, 1025U, 1026U
+};
+constexpr std::array<game::run::ContentId, 16> ThroughActTwoRewardPool {
+    1004U, 1005U, 1006U, 1008U, 1009U, 1027U, 1028U, 1029U,
+    1001U, 1011U, 1016U, 1017U, 1019U, 1020U, 1021U, 1030U
 };
 constexpr std::array<game::run::ContentId, 12> DamageRewardPool {
     1003U, 1004U, 1005U, 1006U, 1009U, 1017U, 1019U, 1021U, 1024U, 1026U,
@@ -102,6 +116,29 @@ constexpr bool prefersElevatedSpawn(const game::EnemyArchetype archetype) noexce
     return archetype == game::EnemyArchetype::Richter
         || archetype == game::EnemyArchetype::Denken;
 }
+
+[[nodiscard]] std::span<const game::run::ContentId> actRewardPool(
+    const std::uint32_t act) noexcept
+{
+    if (act >= 3U) return ActThreeRewardPool;
+    if (act >= 2U) return ActTwoRewardPool;
+    return ActOneRewardPool;
+}
+
+[[nodiscard]] std::span<const game::run::ContentId> unlockedRewardPool(
+    const std::uint32_t act) noexcept
+{
+    if (act >= 3U) return NormalRewardPool;
+    if (act >= 2U) return ThroughActTwoRewardPool;
+    return ActOneRewardPool;
+}
+
+[[nodiscard]] bool spellUnlockedInAct(
+    const game::run::ContentId id, const std::uint32_t act) noexcept
+{
+    const auto pool = unlockedRewardPool(act);
+    return std::find(pool.begin(), pool.end(), id) != pool.end();
+}
 }
 
 TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config)
@@ -157,8 +194,8 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
                 }
                 const bool resolved = currentFloorType_ == game::run::FloorType::Boss
                     ? run_.resolveEncounter(result, BossRewardPool)
-                    : run_.resolveEncounter(result, NormalRewardPool,
-                        DamageRewardPool, ControlRewardPool);
+                    : run_.resolveEncounter(result, unlockedRewardPool(run_.context().act),
+                        {}, {}, actRewardPool(run_.context().act));
                 if (!resolved) throw std::logic_error("combat result was rejected by the run controller");
             }
         }
@@ -190,7 +227,7 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
         if (intent.menuSecondaryPressed && currentFloorType_ != game::run::FloorType::Boss)
         {
             static_cast<void>(run_.rerollRegularReward(DamageRewardPool, ControlRewardPool,
-                NormalRewardPool));
+                unlockedRewardPool(run_.context().act), actRewardPool(run_.context().act)));
             break;
         }
         const auto candidates = run_.rewardOffer().candidates;
@@ -200,6 +237,13 @@ void TowerSession::update(const game::PlayerIntent& intent, const float deltaSec
         }
         break;
     }
+
+    case game::run::RunPhase::Breakthrough:
+        for (std::size_t index = 0U; index < intent.spellPressed.size(); ++index)
+            if (intent.spellPressed[index]
+                && run_.chooseBreakthrough(
+                    static_cast<game::progression::BreakthroughType>(index))) break;
+        break;
 
     case game::run::RunPhase::FloorComplete:
         if (combat_) combat_->update(intent, deltaSeconds);
@@ -268,7 +312,8 @@ bool TowerSession::equipRegularSpell(const std::size_t slot, const game::run::Co
 {
     if (!run_.equip(slot, spell)) return false;
     if (combat_)
-        return combat_->equipSpell(slot, run_.player().equippedSpells[slot]);
+        return combat_->equipSpell(slot, run_.player().equippedSpells[slot],
+            game::progression::spellRank(run_.player(), spell));
     return true;
 }
 
@@ -366,11 +411,16 @@ void TowerSession::startNextFloor()
         arenaLayout_ = &game::floors::arenaLayout(floor.arenaId);
         const auto merchantSeed = game::run::deriveStreamSeed(
             run_.context().floorSeed, game::run::RandomStream::Merchant);
-        const auto spellCount = std::min<std::size_t>(3U, eligibleCount(SpellMerchantCatalog, run_.player()));
+        std::vector<game::economy::CatalogItem> spellCatalog;
+        spellCatalog.reserve(SpellMerchantCatalog.size());
+        for (const auto& item : SpellMerchantCatalog)
+            if (spellUnlockedInAct(item.id, run_.context().act)) spellCatalog.push_back(item);
+        const auto spellCount = std::min<std::size_t>(
+            3U, eligibleCount(spellCatalog, run_.player()));
         if (spellCount > 0U)
         {
             auto spells = game::economy::generateStock(
-                SpellMerchantCatalog, run_.player(), merchantSeed, spellCount);
+                spellCatalog, run_.player(), merchantSeed, spellCount);
             merchantStock_.insert(merchantStock_.end(), spells.begin(), spells.end());
         }
         const std::size_t relicCatalogCount = run_.context().act >= 3U ? 24U
@@ -397,7 +447,7 @@ void TowerSession::startNextFloor()
         const auto& floor = run_.loadFloor(currentFloorType_, {});
         arenaLayout_ = &game::floors::arenaLayout(floor.arenaId);
         eventTransaction_.emplace();
-        const auto spellOffer = game::rewards::generateOffer(NormalRewardPool,
+        const auto spellOffer = game::rewards::generateOffer(unlockedRewardPool(run_.context().act),
             run_.player().learnedSpells,
             game::run::deriveStreamSeed(run_.context().floorSeed, game::run::RandomStream::Event));
         const auto randomSpell = spellOffer.kind == game::rewards::RewardKind::SpellChoice
@@ -586,9 +636,16 @@ void TowerSession::startNextFloor()
         ? config_.bossGoldReward
         : config_.normalGoldReward;
     request.equippedSpellIds = run_.player().equippedSpells;
+    for (std::size_t index = 0U; index < request.equippedSpellIds.size(); ++index)
+        if (request.equippedSpellIds[index])
+            request.equippedSpellRanks[index] = game::progression::spellRank(
+                run_.player(), *request.equippedSpellIds[index]);
     request.equippedUltimateSpellId = run_.player().ultimateSpellUnlocked
         ? run_.player().equippedUltimateSpell
         : std::nullopt;
+    request.regularSpellDamageMultiplier = game::progression::regularDamageMultiplier(run_.player());
+    request.regularSpellCooldownMultiplier = game::progression::regularCooldownMultiplier(run_.player());
+    request.startingShield = game::progression::startingShield(run_.player());
     request.relicIds = run_.player().relics;
 
     combat_.emplace(request);

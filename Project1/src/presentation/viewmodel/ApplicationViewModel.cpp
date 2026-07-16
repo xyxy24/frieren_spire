@@ -43,12 +43,19 @@ const SpellAcquisitionViewModel& ApplicationViewModel::spellAcquisition() const 
     return spellAcquisition_;
 }
 
-std::optional<RewardViewModel> ApplicationViewModel::reward() const noexcept
+std::optional<RewardViewModel> ApplicationViewModel::reward() const
 {
     if (!model_) return std::nullopt;
     const auto candidates = model_->rewardCandidates();
     if (!candidates) return std::nullopt;
     return makeRewardViewModel(*candidates, model_->run().player());
+}
+
+std::optional<BreakthroughViewModel> ApplicationViewModel::breakthrough() const noexcept
+{
+    if (!model_ || model_->run().phase() != game::run::RunPhase::Breakthrough)
+        return std::nullopt;
+    return makeBreakthroughViewModel(model_->run().player());
 }
 
 std::optional<MerchantViewModel> ApplicationViewModel::merchant() const
@@ -107,6 +114,7 @@ void ApplicationViewModel::handlePlaying(
 
     const auto regularCount = model_->run().player().learnedSpells.size();
     const auto bossCount = model_->run().player().learnedBossSpells.size();
+    const auto masteriesBefore = model_->run().player().spellMasteries;
     model_->update(intent, deltaSeconds);
     const auto& player = model_->run().player();
     if (player.learnedBossSpells.size() > bossCount)
@@ -118,6 +126,20 @@ void ApplicationViewModel::handlePlaying(
     {
         loadout_.selectNewestRegular(player);
         spellAcquisition_.start(player.learnedSpells.back());
+    }
+    else
+    {
+        const auto previousRank = [&](const game::run::ContentId id) {
+            const auto found = std::find_if(masteriesBefore.begin(), masteriesBefore.end(),
+                [id](const auto& mastery) { return mastery.spellId == id; });
+            return found == masteriesBefore.end() ? std::uint8_t {1U} : found->rank;
+        };
+        const auto upgraded = std::find_if(player.spellMasteries.begin(),
+            player.spellMasteries.end(), [&](const auto& mastery) {
+                return mastery.rank > previousRank(mastery.spellId);
+            });
+        if (upgraded != player.spellMasteries.end())
+            spellAcquisition_.start(upgraded->spellId, upgraded->rank);
     }
 
     if (model_->run().phase() == game::run::RunPhase::Victory

@@ -59,7 +59,11 @@ struct CombatRequest
     std::vector<EnemySpawn> enemies;
     int goldReward {10};
     std::array<std::optional<std::uint32_t>, 3> equippedSpellIds;
+    std::array<std::uint8_t, 3> equippedSpellRanks {1U, 1U, 1U};
     std::optional<std::uint32_t> equippedUltimateSpellId;
+    float regularSpellDamageMultiplier {1.0F};
+    float regularSpellCooldownMultiplier {1.0F};
+    int startingShield {};
     std::vector<std::uint32_t> relicIds;
 };
 

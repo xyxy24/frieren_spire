@@ -4,6 +4,7 @@
 #include "game/economy/MerchantSystem.hpp"
 #include "game/events/EventSystem.hpp"
 #include "game/floors/FloorController.hpp"
+#include "game/progression/ProgressionSystem.hpp"
 #include "game/rewards/RewardSystem.hpp"
 
 #include <optional>
@@ -23,15 +24,18 @@ public:
     [[nodiscard]] bool resolveEncounter(const game::CombatResult& result,
         std::span<const game::run::ContentId> rewardPool,
         std::span<const game::run::ContentId> damageRewardPool = {},
-        std::span<const game::run::ContentId> controlRewardPool = {});
+        std::span<const game::run::ContentId> controlRewardPool = {},
+        std::span<const game::run::ContentId> actRewardPool = {});
     [[nodiscard]] bool completeNonCombatFloor();
     [[nodiscard]] const game::rewards::RewardOffer& rewardOffer() const;
     [[nodiscard]] bool openReward();
     [[nodiscard]] bool chooseReward(game::run::ContentId choice);
+    [[nodiscard]] bool chooseBreakthrough(game::progression::BreakthroughType choice);
     [[nodiscard]] bool claimFallbackReward();
     [[nodiscard]] bool rerollRegularReward(std::span<const game::run::ContentId> damagePool,
         std::span<const game::run::ContentId> controlPool,
-        std::span<const game::run::ContentId> fullPool);
+        std::span<const game::run::ContentId> fullPool,
+        std::span<const game::run::ContentId> actPool = {});
     [[nodiscard]] game::economy::PurchaseResult purchaseMerchantItem(
         std::vector<game::economy::StockItem>& stock, game::run::ContentId itemId);
     [[nodiscard]] game::events::EventResult chooseEvent(game::events::EventTransaction& transaction,

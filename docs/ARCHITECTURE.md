@@ -81,7 +81,7 @@ SfmlApplication (View，无玩法状态所有权)
     │   └── Open / Page / Section / Selection（仅 UI 状态）
     └── TowerSession (Model，仅在本局期间存在)
         ├── RunController
-        │   ├── PlayerProgress / EquippedSlots / Relics
+        │   ├── PlayerProgress / SpellMasteries / BreakthroughRanks / EquippedSlots / Relics
         │   └── floorIndex / bossesDefeated / runSeed
         ├── FloorScheduler
         └── CombatSession 或 ExplorationPlayer（仅当前层）
@@ -109,7 +109,9 @@ stateDiagram-v2
     LootPending --> Reward: 玩家靠近掉落物并交互
     InEncounter --> FloorComplete: 事件或商店结束
     InEncounter --> Defeat: HP = 0
-    Reward --> FloorComplete: 奖励加入已学魔法
+    Reward --> FloorComplete: 普通奖励学习或研习魔法
+    Reward --> Breakthrough: Boss 1/2 强力魔法选择完成
+    Breakthrough --> FloorComplete: 选择本局永久魔力突破
     FloorComplete --> FloorTransition: 与楼梯交互
     FloorTransition --> Victory: 已击败第三位 Boss
     FloorTransition --> FloorLoading: 仍需继续攀登
@@ -119,6 +121,10 @@ stateDiagram-v2
 ```
 
 `LootPending` 将战斗输入与奖励选择输入隔离：战斗结束后保留当前地图和玩家位置，掉落物位于最后敌人的死亡位置，只有空间相交并提交交互才进入 `Reward`。`LootBookAnimator` 加载 `128×96`、8 帧的透明像素图集，以独立表现时钟循环书页、悬浮高度和魔力光晕，不改变权威交互 AABB；成功打开奖励时，`TowerSession` 命令 `CombatSession` 将玩家落到当前 `WorldBounds` 地面并清除残余速度、冲刺、飞行和硬直，避免模态页面冻结空中状态。奖励和楼梯交互是独立状态，防止重复发放奖励或重复过层。选择奖励会先由 Model 转入 `FloorComplete` 并写入已学列表，再由 `SpellAcquisitionViewModel` 启动不属于 Model 流程状态的获取覆盖层；该层消费全部顶层输入但不回滚已结算奖励。获取演出开始 0.35 秒后，覆盖层将 `Space` 解释为仅完成表现时间轴而不关闭结果页的跳过命令，避免输入穿透和说明丢失。`LoadoutOverlay` 同样不是 Model 的流程状态，而是 `LoadoutViewModel` 可从 `InEncounter`、`LootPending`、`Reward` 或 `FloorComplete` 打开的覆盖层；打开时由它消费 UI 输入，Model 的玩法时间不推进。覆盖层内部由 `LoadoutPage::Spells/Relics` 区分两页；装备通过显式 Model 命令提交，遗物页只绑定本局遗物快照。
+
+奖励结算的现行补充规则是：普通候选既可能是未学魔法，也可能是已学魔法的下一阶研习；Model 根据 `PlayerProgress::spellMasteries` 原子地学习或升级，然后进入 `FloorComplete`。Boss 1/2 的强力魔法结算后进入 `Breakthrough`，选择 `Power/Haste/Defense` 之一才完成楼层；Boss 3 不再突破。`SpellAcquisitionViewModel` 同时监听已学列表增长和权威阶位增长，因此研习沿用注册演出但不能再次发放内容。`ProgressionSystem` 是阶位上限、研习倍率、招牌效果说明和突破倍率的唯一规则来源；ViewModel 只投影目标阶位与完整说明。
+
+奖励联动提示由 `RewardSystem::spellSynergyHints` 从同一份确定性联动目录生成，输入是候选 ID 与 `PlayerProgress` 的已学普通/Boss 魔法。目录保存真实施法顺序、触发条件和追加数值，并同时供进阶奖励的联动候选筛选使用；`RewardViewModel` 只解析搭档名称，View 不允许自行用魔法 ID 猜测组合规则。为保证三张卡在 720p 界面内可读，每张卡按目录顺序最多投影三组当前已拥有的联动。
 
 ## 7. 战斗与时间
 
@@ -213,6 +219,15 @@ SpellDefinition
 - presentationId
 - rewardTier
 
+SpellMastery (per run)
+- spellId
+- rank (I/II/III, capped by act)
+
+BreakthroughRanks (per run)
+- power
+- haste
+- defense
+
 RelicDefinition
 - id
 - displayNameKey
@@ -225,7 +240,7 @@ RelicDefinition
 
 - 内容定义只保存配置，不保存每局变化的冷却或计数。
 - 本局实例状态通过稳定 ID 引用定义。
-- `SpellSystem` 从三个普通装备 ID 和一个可空的 Boss 装备 ID 建立每场战斗运行状态；普通槽实例分别保存剩余冷却，终极运行时独立保存共享剩余冷却。定义保存名称、类别、说明、效果类型、伤害与范围。`CombatSession` 组合直接伤害、持续区域、限时祝福和主动生命消耗效果，并向表现层暴露只读持续时间与冷却状态。
+- `SpellSystem` 从三个普通装备 ID、对应权威阶位和一个可空的 Boss 装备 ID 建立每场战斗运行状态；普通槽实例分别保存剩余冷却，终极运行时独立保存共享剩余冷却。`ProgressionSystem` 在构造战斗请求时提供研习与魔力突破修正，`CombatSession` 再组合直接伤害、持续区域、限时祝福和主动生命消耗效果，并向表现层暴露只读持续时间与实际冷却状态。
 - 配置加载时验证重复 ID、缺失引用、非法数值和无法识别的效果类型。
 - 新效果应优先组合已有原子效果；只有无法表达时才增加新的行为类型。
 

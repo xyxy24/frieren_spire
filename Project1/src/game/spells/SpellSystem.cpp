@@ -1,6 +1,7 @@
 #include "game/spells/SpellSystem.hpp"
 
 #include "game/player/PlayerController.hpp"
+#include "game/progression/ProgressionSystem.hpp"
 
 #include <algorithm>
 #include <array>
@@ -62,10 +63,13 @@ bool isBossSpell(const std::uint32_t id) noexcept
 }
 
 SpellSystem::SpellSystem(const std::array<std::optional<std::uint32_t>, 3>& equippedIds,
-    const std::optional<std::uint32_t> equippedUltimateId)
+    const std::optional<std::uint32_t> equippedUltimateId,
+    const std::array<std::uint8_t, 3>& equippedRanks,
+    const float regularCooldownMultiplier)
+    : regularCooldownMultiplier_(std::max(0.1F, regularCooldownMultiplier))
 {
     for (std::size_t index = 0U; index < slots_.size(); ++index)
-        static_cast<void>(equip(index, equippedIds[index]));
+        static_cast<void>(equip(index, equippedIds[index], equippedRanks[index]));
     static_cast<void>(equipUltimate(equippedUltimateId));
 }
 
@@ -82,7 +86,8 @@ SpellCastResult SpellSystem::tryCast(const std::size_t slot, const Vec2 casterPo
 {
     if (slot >= slots_.size()) return {};
     return tryCastState(slots_[slot], slots_[slot].definition
-        ? slots_[slot].definition->cooldownSeconds : 0.0F,
+        ? slots_[slot].definition->cooldownSeconds * regularCooldownMultiplier_
+            * progression::masteryCooldownMultiplier(slots_[slot].rank) : 0.0F,
         casterPosition, facingDirection, targetBounds);
 }
 
@@ -98,6 +103,8 @@ SpellCastResult SpellSystem::tryCastState(SlotState& state, const float cooldown
 {
     if (!state.definition || state.cooldownRemaining > 0.0F) return {};
     const auto& spell = *state.definition;
+    const float areaMultiplier = spell.tier == SpellTier::Regular
+        ? progression::masteryAreaMultiplier(state.rank) : 1.0F;
     state.cooldownRemaining = cooldownSeconds;
     ++state.castSequence;
     Aabb effectBounds {casterPosition.x, casterPosition.y,
@@ -105,38 +112,46 @@ SpellCastResult SpellSystem::tryCastState(SlotState& state, const float cooldown
     if (spell.shape == SpellShape::ForwardBox)
     {
         effectBounds.left = facingDirection >= 0.0F
-            ? casterPosition.x + PlayerController::Width : casterPosition.x - spell.range;
-        effectBounds.top = casterPosition.y + (PlayerController::Height - spell.height) * 0.5F;
-        effectBounds.width = spell.range;
-        effectBounds.height = spell.height;
+            ? casterPosition.x + PlayerController::Width : casterPosition.x - spell.range * areaMultiplier;
+        effectBounds.top = casterPosition.y
+            + (PlayerController::Height - spell.height * areaMultiplier) * 0.5F;
+        effectBounds.width = spell.range * areaMultiplier;
+        effectBounds.height = spell.height * areaMultiplier;
     }
     else if (spell.shape == SpellShape::SelfArea)
     {
-        effectBounds = {casterPosition.x + PlayerController::Width * 0.5F - spell.range,
-            casterPosition.y + PlayerController::Height * 0.5F - spell.height,
-            spell.range * 2.0F, spell.height * 2.0F};
+        effectBounds = {casterPosition.x + PlayerController::Width * 0.5F
+                - spell.range * areaMultiplier,
+            casterPosition.y + PlayerController::Height * 0.5F
+                - spell.height * areaMultiplier,
+            spell.range * areaMultiplier * 2.0F, spell.height * areaMultiplier * 2.0F};
     }
     else if (spell.shape == SpellShape::TargetArea)
     {
         const float targetCenterX = targetBounds.left + targetBounds.width * 0.5F;
         const float casterCenterX = casterPosition.x + PlayerController::Width * 0.5F;
         const float centerX = std::clamp(targetCenterX,
-            casterCenterX - spell.range, casterCenterX + spell.range);
-        effectBounds = {centerX - spell.height * 0.5F,
-            targetBounds.top + targetBounds.height * 0.5F - spell.height * 0.5F,
-            spell.height, spell.height};
+            casterCenterX - spell.range * areaMultiplier,
+            casterCenterX + spell.range * areaMultiplier);
+        effectBounds = {centerX - spell.height * areaMultiplier * 0.5F,
+            targetBounds.top + targetBounds.height * 0.5F
+                - spell.height * areaMultiplier * 0.5F,
+            spell.height * areaMultiplier, spell.height * areaMultiplier};
     }
     const bool hit = intersects(effectBounds, targetBounds);
     return {true, hit, spell.damage, state.castSequence, spell.effect,
-        spell.id, effectBounds};
+        spell.id, effectBounds, state.rank, spell.tier == SpellTier::Regular
+            ? progression::masteryPowerMultiplier(state.rank) : 1.0F};
 }
 
-bool SpellSystem::equip(const std::size_t slot, const std::optional<std::uint32_t> id) noexcept
+bool SpellSystem::equip(const std::size_t slot, const std::optional<std::uint32_t> id,
+    const std::uint8_t rank) noexcept
 {
     if (slot >= slots_.size()) return false;
     const SpellDefinition* definition = id ? findDefinition(*id) : nullptr;
     if (id && (!definition || definition->tier != SpellTier::Regular)) return false;
     slots_[slot].definition = definition;
+    slots_[slot].rank = std::clamp<std::uint8_t>(rank, 1U, 3U);
     return true;
 }
 
@@ -155,7 +170,9 @@ std::array<SpellSlotView, 3> SpellSystem::view() const noexcept
     {
         const auto& slot = slots_[index];
         result[index] = {slot.definition ? std::optional<std::uint32_t> {slot.definition->id} : std::nullopt,
-            slot.cooldownRemaining, slot.definition ? slot.definition->cooldownSeconds : 0.0F};
+            slot.cooldownRemaining, slot.definition ? slot.definition->cooldownSeconds
+                * regularCooldownMultiplier_
+                * progression::masteryCooldownMultiplier(slot.rank) : 0.0F};
     }
     return result;
 }

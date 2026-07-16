@@ -557,6 +557,10 @@ void drawReveal(sf::RenderTarget& target,
     drawPixelText(target, wrapPixelText(model.content.description, 82U),
         {318.0F, 428.0F}, 0.82F,
         withAlpha(sf::Color {224, 227, 238}, textProgress * 230.0F));
+    if (!model.content.masteryDescription.empty())
+        drawPixelText(target, wrapPixelText(model.content.masteryDescription, 82U),
+            {318.0F, 510.0F}, 0.72F,
+            withAlpha(sf::Color {220, 177, 255}, textProgress * 235.0F));
     if (model.content.spell)
     {
         const std::string details = "CD "

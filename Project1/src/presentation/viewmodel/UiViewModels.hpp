@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -32,13 +33,24 @@ struct ContentSummaryViewModel
     std::string_view name {"UNKNOWN CONTENT"};
     bool bossSpell {};
     bool selected {};
+    std::uint8_t rank {};
 };
 
 struct ContentDetailViewModel
 {
+    struct SynergyHint
+    {
+        game::run::ContentId ownedSpellId {};
+        std::string_view ownedSpellName;
+        std::string_view description;
+    };
+
     ContentSummaryViewModel summary;
     std::string_view description {"NO DESCRIPTION AVAILABLE"};
     std::optional<SpellDetailViewModel> spell;
+    std::string masteryDescription;
+    std::vector<SynergyHint> synergies;
+    bool upgradeReward {};
 };
 
 struct EquippedSlotsViewModel
@@ -52,6 +64,18 @@ struct RewardViewModel
 {
     std::array<ContentDetailViewModel, 3> cards;
     bool showRerollHint {};
+};
+
+struct BreakthroughCardViewModel
+{
+    std::string_view name;
+    std::string_view description;
+    std::uint8_t currentRank {};
+};
+
+struct BreakthroughViewModel
+{
+    std::array<BreakthroughCardViewModel, 3> cards;
 };
 
 struct MerchantItemViewModel
@@ -78,13 +102,15 @@ struct LoadoutSnapshot
 };
 
 [[nodiscard]] ContentSummaryViewModel makeContentSummaryViewModel(
-    game::run::ContentId id, bool selected = false) noexcept;
+    game::run::ContentId id, bool selected = false, std::uint8_t rank = 0U) noexcept;
 [[nodiscard]] ContentDetailViewModel makeContentDetailViewModel(
-    game::run::ContentId id, bool selected = false) noexcept;
+    game::run::ContentId id, bool selected = false, std::uint8_t rank = 0U);
 [[nodiscard]] EquippedSlotsViewModel makeEquippedSlotsViewModel(
     const game::run::PlayerProgress& player) noexcept;
 [[nodiscard]] RewardViewModel makeRewardViewModel(
     const std::array<game::run::ContentId, 3>& candidates,
+    const game::run::PlayerProgress& player);
+[[nodiscard]] BreakthroughViewModel makeBreakthroughViewModel(
     const game::run::PlayerProgress& player) noexcept;
 [[nodiscard]] MerchantViewModel makeMerchantViewModel(
     std::span<const game::economy::StockItem> stock,

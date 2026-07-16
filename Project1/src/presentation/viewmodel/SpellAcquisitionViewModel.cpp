@@ -14,7 +14,8 @@ namespace
 }
 }
 
-void SpellAcquisitionViewModel::start(const game::run::ContentId spellId) noexcept
+void SpellAcquisitionViewModel::start(
+    const game::run::ContentId spellId, const std::uint8_t rank) noexcept
 {
     const auto content = makeContentSummaryViewModel(spellId);
     if (content.kind != ContentKind::Spell)
@@ -25,6 +26,7 @@ void SpellAcquisitionViewModel::start(const game::run::ContentId spellId) noexce
     spellId_ = spellId;
     elapsedSeconds_ = 0.0F;
     bossSpell_ = content.bossSpell;
+    rank_ = std::clamp<std::uint8_t>(rank, 1U, 3U);
 }
 
 void SpellAcquisitionViewModel::reset() noexcept
@@ -32,6 +34,7 @@ void SpellAcquisitionViewModel::reset() noexcept
     spellId_.reset();
     elapsedSeconds_ = 0.0F;
     bossSpell_ = false;
+    rank_ = 1U;
 }
 
 void SpellAcquisitionViewModel::update(
@@ -58,7 +61,7 @@ std::optional<SpellAcquisitionSnapshot> SpellAcquisitionViewModel::snapshot() co
 {
     if (!spellId_) return std::nullopt;
     return SpellAcquisitionSnapshot {
-        makeContentDetailViewModel(*spellId_),
+        makeContentDetailViewModel(*spellId_, false, rank_),
         elapsedSeconds_,
         elapsedSeconds_ * PlaybackRate,
         normalizedProgress(elapsedSeconds_, 0.0F, RegistrationSeconds),

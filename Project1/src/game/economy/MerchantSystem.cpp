@@ -1,4 +1,5 @@
 #include "game/economy/MerchantSystem.hpp"
+#include "game/progression/ProgressionSystem.hpp"
 #include "game/run/DeterministicRng.hpp"
 
 #include <algorithm>
@@ -23,6 +24,8 @@ PurchaseResult purchase(run::PlayerProgress& player, std::vector<StockItem>& sto
     }
     player.gold -= item->price;
     inventory.push_back(item->id);
+    if (item->kind == ItemKind::Spell)
+        progression::registerLearnedSpell(player, item->id);
     item->sold = true;
     return PurchaseResult::Success;
 }

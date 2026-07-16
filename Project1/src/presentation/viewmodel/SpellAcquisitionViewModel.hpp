@@ -37,7 +37,7 @@ public:
         + RevealDelaySeconds + RevealSeconds;
     static constexpr float SkipUnlockSeconds = 0.35F;
 
-    void start(game::run::ContentId spellId) noexcept;
+    void start(game::run::ContentId spellId, std::uint8_t rank = 1U) noexcept;
     void reset() noexcept;
     void update(const game::PlayerIntent& intent, float deltaSeconds) noexcept;
 
@@ -48,5 +48,6 @@ private:
     std::optional<game::run::ContentId> spellId_;
     float elapsedSeconds_ {};
     bool bossSpell_ {};
+    std::uint8_t rank_ {1U};
 };
 }

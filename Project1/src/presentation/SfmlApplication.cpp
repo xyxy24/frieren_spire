@@ -114,6 +114,8 @@ std::string makeWindowTitle(const ui::ApplicationViewModel& app)
             + " I=" + name((*candidates)[1])
             + " O=" + name((*candidates)[2]) + " | Tab Loadout";
     }
+    case arcane::game::run::RunPhase::Breakthrough:
+        return title + "Choose Mana Breakthrough: U Power, I Haste, O Defense";
     case arcane::game::run::RunPhase::FloorComplete:
         return title + "Move Into Staircase, E Climb (+50% Missing HP), Tab Loadout";
     case arcane::game::run::RunPhase::Victory:
@@ -247,6 +249,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
         const auto phase = tower->run().phase();
         if ((phase == arcane::game::run::RunPhase::InEncounter
             || phase == arcane::game::run::RunPhase::LootPending
+            || phase == arcane::game::run::RunPhase::Breakthrough
             || phase == arcane::game::run::RunPhase::FloorComplete) && tower->combat())
         {
             const sf::View interfaceView = window.getView();
@@ -280,6 +283,11 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
         {
             if (const auto model = app.reward())
                 drawRewardScreen(window, *model, resources.spellCards);
+        }
+        if (phase == arcane::game::run::RunPhase::Breakthrough)
+        {
+            if (const auto model = app.breakthrough())
+                drawBreakthroughScreen(window, *model);
         }
         if (phase == arcane::game::run::RunPhase::InEncounter
             && (tower->currentFloorType() == arcane::game::run::FloorType::Merchant

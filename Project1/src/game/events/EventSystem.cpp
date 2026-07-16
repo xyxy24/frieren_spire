@@ -1,4 +1,5 @@
 #include "game/events/EventSystem.hpp"
+#include "game/progression/ProgressionSystem.hpp"
 #include <algorithm>
 namespace arcane::game::events
 {
@@ -21,7 +22,11 @@ EventResult EventTransaction::choose(run::PlayerProgress& player, const std::spa
     player.currentHp = newHp;
     player.gold = newGold;
     if (choice->relicId != 0U) player.relics.push_back(choice->relicId);
-    if (choice->spellId != 0U) player.learnedSpells.push_back(choice->spellId);
+    if (choice->spellId != 0U)
+    {
+        player.learnedSpells.push_back(choice->spellId);
+        progression::registerLearnedSpell(player, choice->spellId);
+    }
     resolved_ = true;
     return EventResult::Success;
 }
