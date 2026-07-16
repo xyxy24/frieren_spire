@@ -754,13 +754,14 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 projectile.direction = projectile.velocity.x > 0.0F ? 1.0F : -1.0F;
         }
         const float travel = std::min(projectile.remainingDistance, projectile.speed * deltaSeconds);
-        if (projectile.tracksPlayer)
+        if (projectile.tracksPlayer || projectile.usesVelocity)
         {
             const float ratio = projectile.speed > 0.0F ? travel / projectile.speed : 0.0F;
             projectile.bounds.left += projectile.velocity.x * ratio;
             projectile.bounds.top += projectile.velocity.y * ratio;
-            projectile.bounds.top = std::clamp(projectile.bounds.top, 0.0F,
-                request_.worldBounds.groundTop - projectile.bounds.height);
+            if (projectile.tracksPlayer)
+                projectile.bounds.top = std::clamp(projectile.bounds.top, 0.0F,
+                    request_.worldBounds.groundTop - projectile.bounds.height);
         }
         else projectile.bounds.left += projectile.direction * travel;
         projectile.remainingDistance -= travel;
@@ -2018,9 +2019,6 @@ void CombatSession::populateEnemyStates(std::vector<EnemyStateView>& views) cons
                     : bounds.left - range,
                 bounds.top, range, bounds.height};
         }
-        if (enemy.archetype == EnemyArchetype::Revolte
-            && enemy.specialWindup > 0.0F && enemy.revolteSkill == 5)
-            skillBounds = enemy.specialTargetBounds;
         if (enemy.archetype == EnemyArchetype::StarkCopy && enemy.manualSkill == 1
             && (enemy.specialWindup > 0.0F || enemy.specialActive > 0.0F))
             skillBounds = Aabb {bounds.left - 54.0F, bounds.top,
@@ -2076,12 +2074,17 @@ void CombatSession::populateSpellEffects(std::vector<SpellEffectView>& views) co
             tornado.bounds, tornado.remaining, 7.0F});
     for (const auto& projectile : activeEnemyProjectiles_)
     {
-        const float rotation = projectile.tracksPlayer
-            ? std::atan2(projectile.velocity.y, std::abs(projectile.velocity.x))
+        const float rotation = projectile.visualId == RevolteFlyingBladeVisualId
+            ? std::atan2(projectile.velocity.y, projectile.velocity.x)
                 * 180.0F / 3.14159265358979323846F
-            : 0.0F;
-        views.push_back({projectile.bounds.height >= 96.0F ? 9302U
-                    : (projectile.bounds.width >= 54.0F ? 9102U : 9101U),
+            : (projectile.tracksPlayer
+                ? std::atan2(projectile.velocity.y, std::abs(projectile.velocity.x))
+                    * 180.0F / 3.14159265358979323846F
+                : 0.0F);
+        const std::uint32_t visualId = projectile.visualId != 0U ? projectile.visualId
+            : (projectile.bounds.height >= 96.0F ? 9302U
+                : (projectile.bounds.width >= 54.0F ? 9102U : 9101U));
+        views.push_back({visualId,
             projectile.bounds, projectile.remainingDistance / projectile.speed,
             projectile.totalDistance / projectile.speed, projectile.direction, rotation});
     }
@@ -2091,8 +2094,47 @@ void CombatSession::populateSpellEffects(std::vector<SpellEffectView>& views) co
         const float dy = beam.end.y - beam.start.y;
         const float length = std::sqrt(dx * dx + dy * dy);
         const float angle = std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F;
-        views.push_back({beam.visualId, {beam.start.x, beam.start.y - 9.0F, length, 18.0F},
-            beam.remaining, 0.6F, dx >= 0.0F ? 1.0F : -1.0F, angle});
+        views.push_back({beam.visualId, {beam.start.x,
+                beam.start.y - beam.visualThickness * 0.5F, length, beam.visualThickness},
+            beam.remaining, beam.duration, dx >= 0.0F ? 1.0F : -1.0F, angle});
+    }
+    for (const auto& enemy : enemies_)
+    {
+        if (enemy.archetype != EnemyArchetype::Revolte || !enemy.health.isAlive()
+            || enemy.revolteSkill != 5 || enemy.specialWindup <= 0.0F) continue;
+        const auto segments = revolteCrossSlashSegments(enemy.specialTarget);
+        const bool secondRound = enemy.revolteCrossSlashRound > 0U;
+        const float duration = secondRound ? RevolteCrossSlashSecondWindupSeconds
+            : RevolteCrossSlashFirstWindupSeconds;
+        for (const auto& segment : segments)
+        {
+            const float dx = segment.end.x - segment.start.x;
+            const float dy = segment.end.y - segment.start.y;
+            const float length = std::sqrt(dx * dx + dy * dy);
+            const float angle = std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F;
+            views.push_back({secondRound ? RevolteCrossSlashSecondTelegraphVisualId
+                                         : RevolteCrossSlashFirstTelegraphVisualId,
+                {segment.start.x, segment.start.y - RevolteCrossSlashHalfThickness,
+                    length, RevolteCrossSlashHalfThickness * 2.0F},
+                enemy.specialWindup, duration, 1.0F, angle});
+        }
+    }
+    for (const auto& enemy : enemies_)
+    {
+        if (enemy.archetype != EnemyArchetype::Revolte || !enemy.health.isAlive()
+            || enemy.revolteSkill != 6 || enemy.specialWindup <= 0.0F) continue;
+        for (std::size_t index = 0U; index < enemy.revolteFlyingBladeStarts.size(); ++index)
+        {
+            const Vec2 start = enemy.revolteFlyingBladeStarts[index];
+            const Vec2 target = enemy.revolteFlyingBladeTargets[index];
+            const float dx = target.x - start.x;
+            const float dy = target.y - start.y;
+            const float length = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
+            views.push_back({RevolteFlyingBladeTelegraphVisualId,
+                {start.x, start.y - 2.0F, length, 4.0F}, enemy.specialWindup,
+                RevolteFlyingBladeWindupSeconds, dx >= 0.0F ? 1.0F : -1.0F,
+                std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F});
+        }
     }
     for (const auto& lightning : pendingEnemyLightning_)
         views.push_back({lightning.telegraphVisualId, lightning.bounds,
@@ -2138,9 +2180,6 @@ EnemyStateView CombatSession::enemyState() const noexcept
             ? bounds.left + bounds.width : bounds.left - 160.0F;
         skillBounds = Aabb {left, request_.worldBounds.groundTop - 64.0F, 160.0F, 64.0F};
     }
-    if (enemy.archetype == EnemyArchetype::Revolte
-        && enemy.specialWindup > 0.0F && enemy.revolteSkill == 5)
-        skillBounds = enemy.specialTargetBounds;
     if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
         && skill != ai::EnemySkill::WolfClaw && skill != ai::EnemySkill::LeafBlade)
     {
@@ -2242,10 +2281,10 @@ void CombatSession::advanceDialogue() noexcept
         if (revolte != enemies_.end())
         {
             static_cast<void>(revolte->health.heal(
-                revolte->health.maximum() / 2 - revolte->health.current()));
+                revolte->health.maximum() - revolte->health.current()));
             revolte->revolteSecondPhase = true;
             revolte->revolteTransitionPending = false;
-            revolte->revolteCooldowns = {6.0F, 6.0F, 7.5F, 8.0F, 2.2F, 3.5F};
+            revolte->revolteCooldowns = {6.0F, 6.0F, 7.5F, 8.0F, 2.2F, 3.5F, 5.0F};
         }
     }
     if (outcomeAfterDialogue_)

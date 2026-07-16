@@ -324,6 +324,8 @@ void drawStartMenu(sf::RenderTarget& target, const bool canContinue)
     drawPixelText(target, "F3 SHOP PREVIEW", {510.0F, 470.0F}, 1.5F, sf::Color {222, 190, 125});
     drawPixelText(target, "F4 SPELL REGISTER", {495.0F, 510.0F}, 1.5F,
         sf::Color {148, 231, 224});
+    drawPixelText(target, "F5 AURA  F6 REVOLTE  F7 MIRROR", {405.0F, 560.0F}, 1.5F,
+        sf::Color {241, 151, 185});
 }
 
 void drawPauseMenu(sf::RenderTarget& target, const ui::PauseMenuItem selection)

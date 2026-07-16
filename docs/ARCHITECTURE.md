@@ -96,6 +96,8 @@ SfmlApplication (View，无玩法状态所有权)
 
 `ApplicationViewModel` 持有可选的 `TowerSession` 并管理 `Start/Playing/Pause/Result` 页面。四个页面的命令分别由 `handleStart/handlePlaying/handlePause/handleResult` 处理，避免顶层输入与玩法更新堆积在一个 Controller 分支中。暂停页由 `PauseMenuItem::ReplayCurrentFloor/SaveAndExit` 保存当前高亮项；确认后才重开本层或暂退。暂退到 Start 时保留同一个 Model 供 Continue 使用，但当前没有磁盘序列化。`TowerSession` 在每层调度前保存 `RunController` 与 `FloorScheduler` 快照，本层重开时恢复快照后重新生成同一种子楼层。
 
+开始页的 Boss 测试入口仍通过 `ApplicationViewModel` 创建真实 `TowerSession`，不允许 View 直接实例化敌人。`RunStartPosition` 只描述预览局的楼层、幕数和已击败 Boss 数；`RunController` 校验幕数与已击败 Boss 数一致，并从指定楼层派生确定性种子，`TowerSession` 再按相同层数配置调度对应 Boss 层。随后竞技场选择、Boss 战斗、奖励和胜利状态机保持权威。测试构筑由 ViewModel 在创建 Model 前写入显式 `TowerSessionConfig`，不会修改正常新局默认值。
+
 事件/商店验收入口使用 `TowerSessionConfig::firstFloorTypeOverride` 显式覆盖首层类型；正式新局不设置该字段，仍由 `FloorScheduler` 的确定性随机流和保底规则决定楼层。商店预览使用配置副本提供测试金币，不修改正式配置。预览入口只改变测试会话，不在调度器中加入环境相关的随机分支。
 
 ```mermaid
@@ -152,7 +154,7 @@ stateDiagram-v2
 
 第三幕石像鬼的激光由 `CombatSession` 维护为带起点、终点、持续时间和伤害序列的临时线段实体，领域层使用带厚度的线段与 AABB 相交测试完成命中，View 仅按 `SpellEffectView::rotationDegrees` 绘制。三头魔物的生命阶段与自愈阈值、剑之魔族对玩家魔法伤害的闪击反应均属于战斗域；表现层不得从血条或受击动画反推这些规则。
 
-雷沃戴的六组独立冷却、分阶段技能优先级、招架窗口、反击突进和二阶段标志均属于其 `EnemyRuntime`，不由 ViewModel 计时。所有敌方剑气复用战斗域临时投射物结构，并携带自身 AABB、初始/剩余距离、伤害和唯一序列；仅雷沃戴生成的实例启用追踪标志和二维速度向量。Model 每帧计算指向权威玩家 AABB 中心的期望角度，将角差归一化到 `[-π, π]`，再按各自最大角速度限制本帧转向，方向改变仍消耗同一份剩余总行程；View 只使用快照中的方向和轨迹倾角旋转剑气素材。`EnemyConfig::attackDistance` 只决定起手距离，`attackRange` 仍决定近战判定框，因此长距离追踪剑气不扩大瞬时近战伤害。二阶段“四刀坠阵”在起手时把玩家位置写入 `specialTargetBounds`，随后向通用延迟敌方冲击队列提交三条带独立延迟、伤害、序列及预警/命中视觉 ID 的 AABB；Model 不在落刀前重新采样玩家位置，View 只绘制 `9400/9402` 快照。第一次越过 5 HP 阈值由统一敌人伤害入口截断，阶段对话完成后才恢复至半血并解除过渡期免伤；死亡台词完成前不得提交 `CombatResult`。
+雷沃戴的七组独立冷却、分阶段技能优先级、招架窗口、反击突进和二阶段标志均属于其 `EnemyRuntime`，不由 ViewModel 计时。所有敌方剑气复用战斗域临时投射物结构，并携带自身 AABB、初始/剩余距离、伤害和唯一序列；曲线剑气启用追踪标志和二维速度向量，Model 每帧计算指向权威玩家 AABB 中心的期望角度，将角差归一化到 `[-π, π]`，再按各自最大角速度限制本帧转向。二阶段“三剑封途”只启用二维直线移动标志：`EnemyRuntime` 用三组 `revolteFlyingBladeStarts/Targets` 保存确定性随机出生点和玩家预测中心周围的扇形封锁点，发射后保持原速度向量，不再读取玩家位置；三剑共享同一伤害序列，避免交汇时重复结算。两类投射物的方向改变或直线移动都消耗同一份剩余总行程，View 只使用快照中的位置和倾角旋转实体剑素材。`EnemyConfig::attackDistance` 只决定起手距离，`attackRange` 仍决定近战判定框，因此远程技能不扩大瞬时近战伤害。二阶段“四刃交叉处刑”由 `EnemyRuntime::revolteCrossSlashRound` 保存当前轮次，并把每轮锁点写入 `specialTarget`；领域层从锁点派生两条经过场地边界裁切、但始终穿过锁点的斜线段，以线段-AABB 相交和 26 px 半厚度结算。两条线共享同一伤害序列，第一轮结算后才重新采样玩家中心并进入第二轮前摇，第二轮后进入统一收招。领域层把预警投影为带长度、厚度和旋转角的 `SpellEffectView`，生效时复用带可配置视觉厚度的敌方 Beam 快照。“四刃交叉处刑”使用 `9500～9503`，“三剑封途”使用 `9504～9505`，不能与芙莉莲复制体的 `9400～9402` 光束、落雷和地火共用编号；View 只按快照绘制，不计算碰撞或重新瞄准。第一次越过 5 HP 阈值由统一敌人伤害入口截断，阶段对话完成后恢复至满血再解除过渡期免伤；死亡台词完成前不得提交 `CombatResult`。
 
 拥有两个技能的普通敌人继续使用一个 `EnemyController` 管理基础追击与主要攻击，并由该敌人的 `EnemyRuntime` 保存第二技能的独立冷却、前摇和有效状态；第二技能执行期间暂停 Controller，避免两个技能重叠。混沌花的昏睡层数属于玩家本场战斗状态并集中封顶为 5；冰原狼猛扑保存前摇时锁定的方向并通过 Controller 的受控位置接口更新抛物线。
 

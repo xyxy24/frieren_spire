@@ -18,6 +18,7 @@ namespace arcane::app
 struct TowerSessionConfig
 {
     game::run::PlayerProgress initialPlayer;
+    RunStartPosition startPosition;
     game::WorldBounds worldBounds {0.0F, 1280.0F, 640.0F};
     game::Vec2 playerSpawn {160.0F, 576.0F};
     game::Vec2 enemySpawn {800.0F, 576.0F};

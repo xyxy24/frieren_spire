@@ -1,11 +1,40 @@
 #include "presentation/viewmodel/ApplicationViewModel.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <stdexcept>
 #include <utility>
 
 namespace arcane::presentation::viewmodel
 {
+namespace
+{
+void configureBossPreviewPlayer(game::run::PlayerProgress& player, const std::size_t bossIndex)
+{
+    player.learnedSpells = {1004U, 1005U, 1006U};
+    if (bossIndex >= 1U)
+        player.learnedSpells.insert(player.learnedSpells.end(), {1016U, 1017U, 1028U});
+    if (bossIndex >= 2U)
+        player.learnedSpells.insert(player.learnedSpells.end(), {1024U, 1025U, 1026U});
+    player.equippedSpells = {1004U, 1005U, 1006U};
+    player.spellMasteries.clear();
+
+    player.learnedBossSpells.clear();
+    player.equippedUltimateSpell.reset();
+    player.ultimateSpellUnlocked = bossIndex > 0U;
+    if (bossIndex >= 1U)
+    {
+        player.learnedBossSpells.push_back(2001U);
+        player.equippedUltimateSpell = 2001U;
+    }
+    if (bossIndex >= 2U)
+    {
+        player.learnedBossSpells.push_back(2007U);
+        player.equippedUltimateSpell = 2007U;
+    }
+}
+}
+
 ApplicationViewModel::ApplicationViewModel(
     const game::run::Seed seed, app::TowerSessionConfig config)
     : seed_(seed), config_(std::move(config)) {}
@@ -76,6 +105,14 @@ void ApplicationViewModel::handleStart(const game::PlayerIntent& intent)
     if (intent.debugSpellAcquisitionPreviewPressed)
     {
         startSpellAcquisitionPreview();
+        screen_ = ApplicationScreen::Playing;
+    }
+    else if (const auto boss = std::find(intent.debugBossPreviewPressed.begin(),
+                 intent.debugBossPreviewPressed.end(), true);
+        boss != intent.debugBossPreviewPressed.end())
+    {
+        startBossPreview(static_cast<std::size_t>(
+            std::distance(intent.debugBossPreviewPressed.begin(), boss)));
         screen_ = ApplicationScreen::Playing;
     }
     else if (intent.debugMerchantPreviewPressed)
@@ -223,5 +260,23 @@ void ApplicationViewModel::startSpellAcquisitionPreview()
 {
     startNewRun();
     spellAcquisition_.start(1001U);
+}
+
+void ApplicationViewModel::startBossPreview(const std::size_t bossIndex)
+{
+    if (bossIndex >= 3U) throw std::out_of_range("boss preview index is outside the tower");
+
+    app::TowerSessionConfig previewConfig = config_;
+    previewConfig.enableSpecialFloors = false;
+    previewConfig.firstFloorTypeOverride.reset();
+    previewConfig.startPosition = {
+        static_cast<std::uint32_t>((bossIndex + 1U) * previewConfig.floorsPerBoss - 1U),
+        static_cast<std::uint32_t>(bossIndex + 1U),
+        static_cast<std::uint32_t>(bossIndex)};
+    configureBossPreviewPlayer(previewConfig.initialPlayer, bossIndex);
+    model_.emplace(seed_, std::move(previewConfig));
+    loadout_.reset();
+    spellAcquisition_.reset();
+    victory_ = false;
 }
 }

@@ -26,8 +26,9 @@ struct EnemyStateTextures
     std::optional<sf::Texture> domination;
     std::optional<sf::Texture> guillotineFrame;
     std::optional<sf::Texture> guillotineBlade;
-    std::optional<sf::Texture> fallingBladeFrame;
-    std::optional<sf::Texture> fallingBlades;
+    std::optional<sf::Texture> executionSlash;
+    std::optional<sf::Texture> executionCrossImpact;
+    std::optional<sf::Texture> flyingBlade;
     std::optional<sf::Texture> initial;
     std::optional<sf::Texture> idle;
     std::optional<sf::Texture> windup;

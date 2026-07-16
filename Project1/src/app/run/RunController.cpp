@@ -11,11 +11,17 @@
 
 namespace arcane::app
 {
-RunController::RunController(const game::run::Seed seed, game::run::PlayerProgress player)
-    : context_ {seed, game::run::deriveFloorSeed(seed, 0U), 0U, 1U, 0U}, player_(std::move(player))
+RunController::RunController(const game::run::Seed seed, game::run::PlayerProgress player,
+    const RunStartPosition start)
+    : context_ {seed, game::run::deriveFloorSeed(seed, start.floorIndex), start.floorIndex,
+          start.act, start.bossesDefeated},
+      player_(std::move(player))
 {
     if (player_.maxHp <= 0 || player_.currentHp < 0 || player_.currentHp > player_.maxHp || player_.gold < 0)
         throw std::invalid_argument("invalid initial player progress");
+    if (start.act == 0U || start.act > 3U || start.bossesDefeated > 2U
+        || start.act != start.bossesDefeated + 1U)
+        throw std::invalid_argument("invalid run start position");
 }
 
 const game::run::RunContext& RunController::context() const noexcept { return context_; }

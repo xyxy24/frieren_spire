@@ -51,9 +51,19 @@ private:
     static constexpr int AttackDamage = 15;
     static constexpr float HitStunSeconds = 0.28F;
     static constexpr float KnockbackSpeed = 360.0F;
+    static constexpr float RevolteCrossSlashHalfThickness = 26.0F;
+    static constexpr float RevolteCrossSlashHalfLength = 220.0F;
+    static constexpr float RevolteCrossSlashFirstWindupSeconds = 0.58F;
+    static constexpr float RevolteCrossSlashSecondWindupSeconds = 0.62F;
+    static constexpr float RevolteCrossSlashRecoverySeconds = 0.45F;
+    static constexpr float RevolteFlyingBladeWindupSeconds = 0.55F;
+    static constexpr float RevolteFlyingBladeSpeed = 520.0F;
 
+    struct SlashSegment { Vec2 start; Vec2 end; };
     struct EnemyRuntime;
     [[nodiscard]] Aabb playerBounds() const noexcept;
+    [[nodiscard]] std::array<SlashSegment, 2> revolteCrossSlashSegments(
+        Vec2 center) const noexcept;
     [[nodiscard]] DamageResult resolvePlayerDamage(DamageRequest request) noexcept;
     [[nodiscard]] DamageResult resolveEnemyDamage(EnemyRuntime& enemy,
         DamageRequest request) noexcept;
@@ -106,11 +116,14 @@ private:
         Aabb specialTargetBounds;
         float concealmentProgress {};
         bool fogCreated {};
-        std::array<float, 6> revolteCooldowns {};
+        std::array<float, 7> revolteCooldowns {};
         int revolteSkill {-1};
         bool revolteSecondPhase {};
         bool revolteTransitionPending {};
         bool revolteCounterDashPending {};
+        std::uint8_t revolteCrossSlashRound {};
+        std::array<Vec2, 3> revolteFlyingBladeStarts;
+        std::array<Vec2, 3> revolteFlyingBladeTargets;
         float secondaryCooldown {};
         int manualSkill {-1};
         bool activated {};
@@ -156,6 +169,8 @@ private:
         bool tracksPlayer {};
         float homingTurnRateRadians {};
         Vec2 velocity;
+        std::uint32_t visualId {};
+        bool usesVelocity {};
     };
     struct ActiveEnemyBeam
     {
@@ -164,6 +179,8 @@ private:
         float remaining {0.6F};
         std::uint64_t sequence {};
         std::uint32_t visualId {9200U};
+        float visualThickness {18.0F};
+        float duration {0.6F};
     };
     struct PendingEnemyLightning
     {

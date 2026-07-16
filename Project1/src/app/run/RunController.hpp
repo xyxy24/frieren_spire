@@ -12,10 +12,18 @@
 
 namespace arcane::app
 {
+struct RunStartPosition
+{
+    std::uint32_t floorIndex {};
+    std::uint32_t act {1U};
+    std::uint32_t bossesDefeated {};
+};
+
 class RunController
 {
 public:
-    explicit RunController(game::run::Seed seed, game::run::PlayerProgress player = {});
+    explicit RunController(game::run::Seed seed, game::run::PlayerProgress player = {},
+        RunStartPosition start = {});
     [[nodiscard]] const game::run::RunContext& context() const noexcept;
     [[nodiscard]] const game::run::PlayerProgress& player() const noexcept;
     [[nodiscard]] game::run::RunPhase phase() const noexcept;

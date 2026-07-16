@@ -4,6 +4,7 @@
 #include "presentation/viewmodel/LoadoutViewModel.hpp"
 #include "presentation/viewmodel/SpellAcquisitionViewModel.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -45,6 +46,7 @@ private:
     void startEventPreview();
     void startMerchantPreview();
     void startSpellAcquisitionPreview();
+    void startBossPreview(std::size_t bossIndex);
 
     game::run::Seed seed_;
     app::TowerSessionConfig config_;

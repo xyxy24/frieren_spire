@@ -27,5 +27,6 @@ struct PlayerIntent
     bool debugEventPreviewPressed {false};
     bool debugMerchantPreviewPressed {false};
     bool debugSpellAcquisitionPreviewPressed {false};
+    std::array<bool, 3> debugBossPreviewPressed {false, false, false};
 };
 }

@@ -31,6 +31,41 @@ bool segmentIntersectsAabb(const Vec2 start, const Vec2 end, const Aabb& bounds,
 }
 }
 
+std::array<CombatSession::SlashSegment, 2> CombatSession::revolteCrossSlashSegments(
+    const Vec2 center) const noexcept
+{
+    constexpr std::array<float, 2> VerticalDirections {0.62F, -0.62F};
+    std::array<SlashSegment, 2> segments;
+    for (std::size_t index = 0U; index < segments.size(); ++index)
+    {
+        const float inverseLength = 1.0F
+            / std::sqrt(1.0F + VerticalDirections[index] * VerticalDirections[index]);
+        const Vec2 direction {inverseLength, VerticalDirections[index] * inverseLength};
+        float backward = RevolteCrossSlashHalfLength;
+        float forward = RevolteCrossSlashHalfLength;
+        backward = std::min(backward, (center.x - request_.worldBounds.left) / direction.x);
+        forward = std::min(forward, (request_.worldBounds.right - center.x) / direction.x);
+        if (direction.y > 0.0F)
+        {
+            backward = std::min(backward, center.y / direction.y);
+            forward = std::min(forward,
+                (request_.worldBounds.groundTop - center.y) / direction.y);
+        }
+        else
+        {
+            backward = std::min(backward,
+                (request_.worldBounds.groundTop - center.y) / -direction.y);
+            forward = std::min(forward, center.y / -direction.y);
+        }
+        backward = std::max(0.0F, backward);
+        forward = std::max(0.0F, forward);
+        segments[index] = {{center.x - direction.x * backward,
+                               center.y - direction.y * backward},
+            {center.x + direction.x * forward, center.y + direction.y * forward}};
+    }
+    return segments;
+}
+
 bool CombatSession::updateEnemySkills(const float deltaSeconds, const float playerCenter)
 {
     std::vector<Aabb> fogAreas;
@@ -528,25 +563,70 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                         enemy.specialActive = 196.0F / 280.0F;
                     else if (enemy.revolteSkill == 5)
                     {
-                        constexpr float BladeWidth = 84.0F;
-                        constexpr float BladeHeight = 260.0F;
-                        constexpr std::array<float, 3> Offsets {0.0F, -120.0F, 120.0F};
-                        constexpr std::array<float, 3> Delays {0.25F, 0.45F, 0.65F};
-                        const float lockedCenter = enemy.specialTargetBounds.left
-                            + enemy.specialTargetBounds.width * 0.5F;
-                        for (std::size_t index = 0U; index < Offsets.size(); ++index)
+                        const auto segments = revolteCrossSlashSegments(enemy.specialTarget);
+                        const std::uint64_t sequence = ++environmentalSequence_;
+                        bool hit = false;
+                        for (const auto& segment : segments)
                         {
-                            const float left = std::clamp(
-                                lockedCenter + Offsets[index] - BladeWidth * 0.5F,
-                                request_.worldBounds.left,
-                                request_.worldBounds.right - BladeWidth);
-                            pendingEnemyLightning_.push_back({{left,
-                                request_.worldBounds.groundTop - BladeHeight,
-                                BladeWidth, BladeHeight}, Delays[index],
-                                ++environmentalSequence_, Delays[index], 18,
-                                9400U, 9402U, 0.24F});
+                            activeEnemyBeams_.push_back({segment.start, segment.end, 0.32F,
+                                sequence, RevolteCrossSlashVisualId,
+                                RevolteCrossSlashHalfThickness * 2.0F, 0.32F});
+                            hit = hit || segmentIntersectsAabb(segment.start, segment.end,
+                                playerBounds(), RevolteCrossSlashHalfThickness);
                         }
-                        enemy.specialActive = Delays.back();
+                        activeSpellEffects_.push_back({RevolteCrossSlashImpactVisualId,
+                            {enemy.specialTarget.x - 70.0F, enemy.specialTarget.y - 70.0F,
+                                140.0F, 140.0F},
+                            0.32F, 0.32F});
+                        if (hit)
+                        {
+                            const auto result = resolvePlayerDamage({DamageSource::EnemyAttack,
+                                sequence, 22, 1.0F, relics_.incomingDamageMultiplier(), 0,
+                                player_.isShadowDashing()
+                                    || spellInvulnerableRemaining_ > 0.0F});
+                            if (result.appliedDamage > 0)
+                                player_.applyHitReaction(enemy.specialDirection * KnockbackSpeed,
+                                    playerControlDuration(HitStunSeconds));
+                        }
+
+                        if (enemy.revolteCrossSlashRound == 0U)
+                        {
+                            const auto target = playerBounds();
+                            enemy.revolteCrossSlashRound = 1U;
+                            enemy.specialTarget = {target.left + target.width * 0.5F,
+                                target.top + target.height * 0.5F};
+                            enemy.specialWindup = RevolteCrossSlashSecondWindupSeconds;
+                        }
+                        else
+                            enemy.specialActive = RevolteCrossSlashRecoverySeconds;
+                    }
+                    else if (enemy.revolteSkill == 6)
+                    {
+                        const float arenaWidth = request_.worldBounds.right
+                            - request_.worldBounds.left;
+                        const float travelDistance = std::sqrt(arenaWidth * arenaWidth
+                            + request_.worldBounds.groundTop * request_.worldBounds.groundTop)
+                            + 240.0F;
+                        const std::uint64_t sequence = ++environmentalSequence_;
+                        for (std::size_t index = 0U;
+                            index < enemy.revolteFlyingBladeStarts.size(); ++index)
+                        {
+                            const Vec2 start = enemy.revolteFlyingBladeStarts[index];
+                            const Vec2 target = enemy.revolteFlyingBladeTargets[index];
+                            const float dx = target.x - start.x;
+                            const float dy = target.y - start.y;
+                            const float length = std::max(0.001F,
+                                std::sqrt(dx * dx + dy * dy));
+                            const Vec2 velocity {dx / length * RevolteFlyingBladeSpeed,
+                                dy / length * RevolteFlyingBladeSpeed};
+                            activeEnemyProjectiles_.push_back({{start.x - 20.0F,
+                                    start.y - 20.0F, 40.0F, 40.0F},
+                                velocity.x >= 0.0F ? 1.0F : -1.0F,
+                                travelDistance, travelDistance, sequence, 18,
+                                RevolteFlyingBladeSpeed, false, 0.0F, velocity,
+                                RevolteFlyingBladeVisualId, true});
+                        }
+                        enemy.specialActive = 0.28F;
                     }
                 }
                 continue;
@@ -562,7 +642,7 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 {
                     if (enemy.revolteSkill == 4)
                         enemy.revolteCooldowns = {
-                            0.0F, 0.0F, 0.0F, 0.0F, 5.0F, 2.0F};
+                            0.0F, 0.0F, 0.0F, 0.0F, 5.0F, 2.0F, 1.5F};
                     enemy.revolteSkill = -1;
                 }
                 continue;
@@ -575,8 +655,8 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 enemy.specialWindup = 0.35F;
                 continue;
             }
-            constexpr std::array<int, 6> FirstPhasePriority {0, 1, 2, 3, 4, 5};
-            constexpr std::array<int, 6> SecondPhasePriority {5, 0, 1, 2, 3, 4};
+            constexpr std::array<int, 7> FirstPhasePriority {0, 1, 2, 3, 4, 5, 6};
+            constexpr std::array<int, 7> SecondPhasePriority {5, 6, 0, 1, 2, 3, 4};
             const auto& priority = enemy.revolteSecondPhase
                 ? SecondPhasePriority : FirstPhasePriority;
             for (const int skill : priority)
@@ -593,16 +673,84 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 if (skill == 5)
                 {
                     const auto target = playerBounds();
-                    enemy.specialTargetBounds = {
-                        target.left + target.width * 0.5F - 42.0F,
-                        request_.worldBounds.groundTop - 260.0F, 84.0F, 260.0F};
+                    enemy.revolteCrossSlashRound = 0U;
+                    enemy.specialTarget = {target.left + target.width * 0.5F,
+                        target.top + target.height * 0.5F};
+                }
+                if (skill == 6)
+                {
+                    const auto target = playerBounds();
+                    const Vec2 playerBodyCenter {target.left + target.width * 0.5F,
+                        target.top + target.height * 0.5F};
+                    const Vec2 playerVelocity = player_.velocity();
+                    const float predictedCenterX = std::clamp(playerBodyCenter.x
+                            + std::clamp(playerVelocity.x * 0.28F, -84.0F, 84.0F),
+                        request_.worldBounds.left + 80.0F,
+                        request_.worldBounds.right - 80.0F);
+                    const float predictedCenterY = std::clamp(playerBodyCenter.y
+                            + std::clamp(playerVelocity.y * 0.12F, -32.0F, 32.0F),
+                        72.0F, request_.worldBounds.groundTop - 36.0F);
+                    enemy.specialTarget = {predictedCenterX, predictedCenterY};
+                    enemy.revolteFlyingBladeTargets = {
+                        Vec2 {std::clamp(predictedCenterX - 84.0F,
+                                  request_.worldBounds.left + 36.0F,
+                                  request_.worldBounds.right - 36.0F),
+                            std::clamp(predictedCenterY - 34.0F, 48.0F,
+                                request_.worldBounds.groundTop - 28.0F)},
+                        Vec2 {std::clamp(predictedCenterX,
+                                  request_.worldBounds.left + 36.0F,
+                                  request_.worldBounds.right - 36.0F),
+                            std::clamp(predictedCenterY + 42.0F, 48.0F,
+                                request_.worldBounds.groundTop - 28.0F)},
+                        Vec2 {std::clamp(predictedCenterX + 84.0F,
+                                  request_.worldBounds.left + 36.0F,
+                                  request_.worldBounds.right - 36.0F),
+                            std::clamp(predictedCenterY - 34.0F, 48.0F,
+                                request_.worldBounds.groundTop - 28.0F)}};
+                    const std::uint64_t castIndex = static_cast<std::uint64_t>(
+                        ++enemy.summonCount);
+                    const auto unit = [](const std::uint64_t value) {
+                        return static_cast<float>(value & 0xffffULL) / 65535.0F;
+                    };
+                    const float horizontalMargin = 96.0F;
+                    const float availableWidth = std::max(1.0F,
+                        request_.worldBounds.right - request_.worldBounds.left
+                            - horizontalMargin * 2.0F);
+                    for (std::size_t index = 0U;
+                        index < enemy.revolteFlyingBladeStarts.size(); ++index)
+                    {
+                        std::uint64_t roll = request_.seed
+                            ^ ((castIndex * 2ULL + index + 1ULL)
+                                * 0x9e3779b97f4a7c15ULL);
+                        roll ^= roll >> 30U;
+                        roll *= 0xbf58476d1ce4e5b9ULL;
+                        roll ^= roll >> 27U;
+                        float spawnX = request_.worldBounds.left + horizontalMargin
+                            + unit(roll) * availableWidth;
+                        float spawnY = 72.0F + unit(roll >> 20U)
+                            * std::max(1.0F, request_.worldBounds.groundTop - 250.0F);
+                        const Vec2 lockPoint = enemy.revolteFlyingBladeTargets[index];
+                        const float separationX = spawnX - lockPoint.x;
+                        const float separationY = spawnY - lockPoint.y;
+                        if (separationX * separationX + separationY * separationY < 40000.0F)
+                        {
+                            const float midpoint = (request_.worldBounds.left
+                                + request_.worldBounds.right) * 0.5F;
+                            spawnX = lockPoint.x < midpoint
+                                ? request_.worldBounds.right - horizontalMargin
+                                : request_.worldBounds.left + horizontalMargin;
+                            spawnY = 72.0F + static_cast<float>(index) * 96.0F;
+                        }
+                        enemy.revolteFlyingBladeStarts[index] = {spawnX, spawnY};
+                    }
                 }
                 if (skill == 3) enemy.specialActive = 0.9F;
                 else enemy.specialWindup = skill < 2 ? 0.22F
-                    : (skill == 5 ? 0.50F : 0.36F);
+                    : (skill == 5 ? RevolteCrossSlashFirstWindupSeconds
+                        : (skill == 6 ? RevolteFlyingBladeWindupSeconds : 0.36F));
                 enemy.revolteCooldowns[static_cast<std::size_t>(skill)] = skill < 2 ? 6.0F
                     : (skill == 2 ? 7.5F : (skill == 3 ? 8.0F
-                        : (skill == 4 ? 5.0F : 7.0F)));
+                        : (skill == 4 ? 5.0F : (skill == 5 ? 8.0F : 6.5F))));
                 break;
             }
             if (enemy.revolteSkill >= 0) continue;

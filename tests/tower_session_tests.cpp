@@ -449,6 +449,47 @@ bool startMenuSpellPreviewOpensTheRegistrationPresentation()
         "F4 preview must start a real run under the spell-registration presentation");
 }
 
+bool startMenuBossPreviewsOpenTheRealActBosses()
+{
+    constexpr std::array archetypes {
+        arcane::game::EnemyArchetype::Aura,
+        arcane::game::EnemyArchetype::Revolte,
+        arcane::game::EnemyArchetype::WaterMirrorDemon};
+    for (std::size_t index = 0U; index < archetypes.size(); ++index)
+    {
+        ui::ApplicationViewModel app(1200U + index);
+        arcane::game::PlayerIntent preview;
+        preview.debugBossPreviewPressed[index] = true;
+        app.update(preview, 0.01F);
+        const auto* tower = app.model();
+        if (!expect(app.snapshot().screen == ui::ApplicationScreen::Playing && tower,
+                "F5-F7 preview must create a playable tower model")
+            || !expect(tower->currentFloorType() == arcane::game::run::FloorType::Boss
+                    && tower->combat(),
+                "boss preview must enter the real boss combat floor")
+            || !expect(tower->combat()->enemyState().archetype == archetypes[index],
+                "each boss preview key must select its matching boss")
+            || !expect(tower->run().context().floorIndex == index * 5U + 4U
+                    && tower->run().context().act == index + 1U
+                    && tower->run().context().bossesDefeated == index,
+                "boss preview must use the matching run progression")
+            || !expect(tower->arenaLayout().id == (index + 1U) * 100U + 15U,
+                "boss preview must use the matching act boss arena")
+            || !expect(tower->run().player().equippedSpells
+                    == std::array<std::optional<arcane::game::run::ContentId>, 3> {
+                        1004U, 1005U, 1006U},
+                "boss preview must provide the deterministic regular test loadout")) return false;
+
+        const bool shouldHaveUltimate = index > 0U;
+        if (!expect(tower->run().player().ultimateSpellUnlocked == shouldHaveUltimate
+                && tower->run().player().equippedUltimateSpell.has_value()
+                    == shouldHaveUltimate,
+            "later boss previews must expose an equipped ultimate without unlocking it early"))
+            return false;
+    }
+    return true;
+}
+
 bool defeatResultCanStartANewRun()
 {
     auto config = fastFlowConfig();
@@ -810,6 +851,7 @@ int main()
         && startMenuEventPreviewOpensAnInteractiveEventFloor()
         && startMenuMerchantPreviewOpensAnInteractiveShop()
         && startMenuSpellPreviewOpensTheRegistrationPresentation()
+        && startMenuBossPreviewsOpenTheRealActBosses()
         && defeatResultCanStartANewRun()
         && heldSpellCannotBypassLootInteraction()
         && loadoutEquipsAndCastsUnlockedUltimateSpell()

@@ -158,8 +158,8 @@ std::string desiredWindowTitle(const ui::ApplicationViewModel& app)
     const auto model = app.snapshot();
     if (model.screen == ui::ApplicationScreen::Start)
         return model.canContinue
-            ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop | F4 Spell"
-            : "Arcane Spire | START - Enter | F2 Event | F3 Shop | F4 Spell";
+            ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop | F4 Spell | F5-F7 Boss"
+            : "Arcane Spire | START - Enter | F2 Event | F3 Shop | F4 Spell | F5-F7 Boss";
     if (model.screen == ui::ApplicationScreen::Pause)
         return "Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume";
     if (model.screen == ui::ApplicationScreen::Result)
@@ -513,10 +513,12 @@ int arcane::presentation::SfmlApplication::run()
     revolteTextures.die = loadTexture("assets/enemies/revolte/die.png");
     revolteTextures.parry = loadTexture("assets/enemies/revolte/parry.png");
     revolteTextures.dash = loadTexture("assets/enemies/revolte/dash.png");
-    revolteTextures.fallingBladeFrame =
-        loadTexture("assets/enemies/revolte/falling-blade-frame.png");
-    revolteTextures.fallingBlades =
-        loadTexture("assets/enemies/revolte/falling-blades.png");
+    revolteTextures.executionSlash =
+        loadTexture("assets/enemies/revolte/execution-slash.png");
+    revolteTextures.executionCrossImpact =
+        loadTexture("assets/enemies/revolte/execution-cross-impact.png");
+    revolteTextures.flyingBlade =
+        loadTexture("assets/enemies/revolte/flying-blade.png");
     for (std::size_t index = 0U; index < revolteTextures.skillWindups.size(); ++index)
         revolteTextures.skillWindups[index] = loadTexture("assets/enemies/revolte/windup"
             + std::to_string(index + 1U) + ".png");

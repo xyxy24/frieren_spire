@@ -23,6 +23,12 @@ inline constexpr std::uint32_t MirrorArrayBreakVisualId = 9011U;
 inline constexpr std::uint32_t FrierenCopyBeamVisualId = 9400U;
 inline constexpr std::uint32_t FrierenCopyLightningVisualId = 9401U;
 inline constexpr std::uint32_t FrierenCopyGroundFireVisualId = 9402U;
+inline constexpr std::uint32_t RevolteCrossSlashFirstTelegraphVisualId = 9500U;
+inline constexpr std::uint32_t RevolteCrossSlashSecondTelegraphVisualId = 9501U;
+inline constexpr std::uint32_t RevolteCrossSlashVisualId = 9502U;
+inline constexpr std::uint32_t RevolteCrossSlashImpactVisualId = 9503U;
+inline constexpr std::uint32_t RevolteFlyingBladeTelegraphVisualId = 9504U;
+inline constexpr std::uint32_t RevolteFlyingBladeVisualId = 9505U;
 
 enum class CombatOutcome
 {

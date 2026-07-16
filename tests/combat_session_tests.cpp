@@ -1692,8 +1692,8 @@ bool revolteLocksAtFiveAndHealsForSecondPhase()
                 && combat.dialogueLine()->speaker == "REVOLTE",
             "reaching the threshold must pause combat for second-phase dialogue")) return false;
     advanceDialogue(combat);
-    if (!expect(combat.enemyState().currentHealth == 15,
-            "second-phase dialogue must restore Revolte to half maximum HP")) return false;
+    if (!expect(combat.enemyState().currentHealth == 30,
+            "second-phase dialogue must restore Revolte to full maximum HP")) return false;
     const float beforeDash = combat.enemyState().position.x;
     combat.update({}, 3.0F);
     combat.update({}, 0.5F);
@@ -1736,7 +1736,7 @@ bool revolteParryActivatesWithoutWindup()
         "Revolte parry must become active immediately without a windup state");
 }
 
-bool revolteWavesCrossTheArenaAndSecondPhaseAddsFallingBlades()
+bool revolteWavesCrossTheArenaAndSecondPhaseAddsCrossExecution()
 {
     arcane::game::CombatRequest waveRequest;
     waveRequest.playerSpawn = {160.0F, 576.0F};
@@ -1771,10 +1771,10 @@ bool revolteWavesCrossTheArenaAndSecondPhaseAddsFallingBlades()
             "Revolte's sword wave must curve toward a jump without turning instantly")) return false;
 
     arcane::game::CombatRequest phaseRequest;
-    phaseRequest.playerSpawn = {160.0F, 576.0F};
+    phaseRequest.playerSpawn = {500.0F, 576.0F};
     phaseRequest.playerMaximumHealth = 500;
     phaseRequest.playerCurrentHealth = 500;
-    phaseRequest.enemySpawn = {210.0F, 544.0F};
+    phaseRequest.enemySpawn = {450.0F, 544.0F};
     phaseRequest.enemyArchetype = arcane::game::EnemyArchetype::Revolte;
     phaseRequest.enemyMaximumHealth = 30;
     phaseRequest.enemyContactDamage = 0;
@@ -1782,40 +1782,189 @@ bool revolteWavesCrossTheArenaAndSecondPhaseAddsFallingBlades()
     arcane::game::CombatSession phase(phaseRequest);
     phase.update({}, 2.4F);
     advanceDialogue(phase);
+    arcane::game::PlayerIntent faceLeft;
+    faceLeft.moveAxis = -1.0F;
+    phase.update(faceLeft, 0.01F);
     arcane::game::PlayerIntent attack;
     attack.attackPressed = true;
     phase.update(attack, 0.01F);
     phase.update({}, 0.5F);
     phase.update(attack, 0.01F);
     if (!expect(phase.dialogueLine().has_value(),
-            "the falling-blade test must reach Revolte's second phase")) return false;
+            "the cross-execution test must reach Revolte's second phase")) return false;
     advanceDialogue(phase);
+    arcane::game::PlayerIntent faceRight;
+    faceRight.moveAxis = 1.0F;
+    phase.update(faceRight, 0.01F);
 
-    bool sawLockedWindup = false;
-    bool sawThreeTelegraphs = false;
-    bool sawImpact = false;
-    for (int step = 0; step < 180 && !sawImpact; ++step)
+    bool sawFirstWarning = false;
+    bool sawFirstSlash = false;
+    bool sawSecondWarning = false;
+    bool sawSecondSlash = false;
+    bool sawCrossImpact = false;
+    bool sawSlashGap = false;
+    bool issuedEscapeDash = false;
+    std::optional<float> firstImpactCenterX;
+    std::optional<float> secondImpactCenterX;
+    for (int step = 0; step < 220 && !sawSecondSlash; ++step)
     {
-        phase.update({}, 0.1F);
+        arcane::game::PlayerIntent movement;
+        if (sawFirstWarning && !sawFirstSlash)
+        {
+            movement.moveAxis = 1.0F;
+            if (!issuedEscapeDash)
+            {
+                movement.dashPressed = true;
+                issuedEscapeDash = true;
+            }
+        }
+        phase.update(movement, 0.1F);
         const auto state = phase.enemyState();
-        if (state.skillVariant == 5 && state.windingUp && state.skillEffectBounds)
-            sawLockedWindup = state.skillEffectBounds->width == 84.0F
-                && state.skillEffectBounds->height == 260.0F;
         const auto effects = phase.spellEffects();
-        const auto telegraphs = std::count_if(effects.begin(), effects.end(), [](const auto& effect) {
-            return effect.spellId == 9400U;
+        if (state.skillVariant == 5 && state.windingUp)
+        {
+            const std::uint32_t warningId = sawFirstSlash
+                ? arcane::game::RevolteCrossSlashSecondTelegraphVisualId
+                : arcane::game::RevolteCrossSlashFirstTelegraphVisualId;
+            std::vector<const arcane::game::SpellEffectView*> warnings;
+            for (const auto& effect : effects)
+                if (effect.spellId == warningId) warnings.push_back(&effect);
+            if (warnings.size() == 2U
+                && warnings[0]->bounds.height == 52.0F
+                && warnings[1]->bounds.height == 52.0F
+                && warnings[0]->rotationDegrees * warnings[1]->rotationDegrees < 0.0F)
+            {
+                if (!sawFirstSlash) sawFirstWarning = true;
+                else sawSecondWarning = true;
+            }
+        }
+
+        const auto slashCount = std::count_if(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::RevolteCrossSlashVisualId
+                && effect.bounds.height == 52.0F;
         });
-        sawThreeTelegraphs = sawThreeTelegraphs || telegraphs == 3;
-        sawImpact = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
-            return effect.spellId == 9402U;
-        });
+        if (sawFirstSlash && slashCount == 0) sawSlashGap = true;
+        if (slashCount == 2)
+        {
+            if (sawSecondWarning && sawSlashGap) sawSecondSlash = true;
+            else if (!sawFirstSlash) sawFirstSlash = true;
+        }
+        const auto crossImpact = std::find_if(effects.begin(), effects.end(),
+            [](const auto& effect) {
+                return effect.spellId == arcane::game::RevolteCrossSlashImpactVisualId;
+            });
+        if (crossImpact != effects.end())
+        {
+            sawCrossImpact = true;
+            const float centerX = crossImpact->bounds.left + crossImpact->bounds.width * 0.5F;
+            if (!firstImpactCenterX) firstImpactCenterX = centerX;
+            else if (sawSecondSlash) secondImpactCenterX = centerX;
+        }
     }
-    return expect(sawLockedWindup,
-            "Four-Blade Descent must lock and expose the player's original position")
-        && expect(sawThreeTelegraphs,
-            "Four-Blade Descent must create three readable sequential danger columns")
-        && expect(sawImpact,
-            "Four-Blade Descent must expose a distinct impact visual after its warning");
+    if (!(expect(sawFirstWarning,
+            "Cross Execution must expose two opposite diagonal warnings for its first X")
+        && expect(sawFirstSlash && sawCrossImpact,
+            "Cross Execution must resolve the first X with two slash visuals and a center burst")
+        && expect(sawSecondWarning
+                && firstImpactCenterX && secondImpactCenterX
+                && std::abs(*secondImpactCenterX - *firstImpactCenterX) > 40.0F,
+            "Cross Execution must retarget the moved player before warning its second X")
+        && expect(sawSecondSlash,
+            "Cross Execution must resolve a second pair of crossing diagonal slashes")))
+        return false;
+
+    arcane::game::CombatSession bladePhase(phaseRequest);
+    bladePhase.update({}, 2.4F);
+    advanceDialogue(bladePhase);
+    bladePhase.update(faceLeft, 0.01F);
+    bladePhase.update(attack, 0.01F);
+    bladePhase.update({}, 0.5F);
+    bladePhase.update(attack, 0.01F);
+    if (!expect(bladePhase.dialogueLine().has_value(),
+            "the flying-blade test must reach Revolte's second phase")) return false;
+    advanceDialogue(bladePhase);
+
+    bool sawThreeBladeWarnings = false;
+    bool sawThreeFlyingBlades = false;
+    bool movedDuringBladeWarning = false;
+    bool escapedBladeLanes = false;
+    std::optional<std::array<float, 3>> firstBladeRotations;
+    std::optional<std::array<float, 3>> secondBladeRotations;
+    std::optional<std::array<arcane::game::Vec2, 3>> firstBladeCenters;
+    std::optional<std::array<arcane::game::Vec2, 3>> secondBladeCenters;
+    for (int step = 0; step < 300 && !secondBladeCenters; ++step)
+    {
+        arcane::game::PlayerIntent movement;
+        if (sawThreeBladeWarnings)
+        {
+            movement.moveAxis = 1.0F;
+            if (!escapedBladeLanes)
+            {
+                movement.dashPressed = true;
+                escapedBladeLanes = true;
+            }
+            movedDuringBladeWarning = true;
+        }
+        bladePhase.update(movement, 0.1F);
+        const auto effects = bladePhase.spellEffects();
+        std::vector<const arcane::game::SpellEffectView*> warnings;
+        std::vector<const arcane::game::SpellEffectView*> blades;
+        for (const auto& effect : effects)
+        {
+            if (effect.spellId == arcane::game::RevolteFlyingBladeTelegraphVisualId)
+                warnings.push_back(&effect);
+            else if (effect.spellId == arcane::game::RevolteFlyingBladeVisualId)
+                blades.push_back(&effect);
+        }
+        if (warnings.size() == 3U)
+            sawThreeBladeWarnings = std::all_of(warnings.begin(), warnings.end(),
+                [&](const auto* warning) {
+                    return warning->bounds.left >= phaseRequest.worldBounds.left
+                        && warning->bounds.left <= phaseRequest.worldBounds.right
+                        && warning->bounds.top >= 0.0F
+                        && warning->bounds.top <= phaseRequest.worldBounds.groundTop;
+                }) && std::abs(warnings[0]->rotationDegrees
+                    - warnings[1]->rotationDegrees) > 1.0F
+                && std::abs(warnings[1]->rotationDegrees
+                    - warnings[2]->rotationDegrees) > 1.0F;
+
+        if (blades.size() != 3U) continue;
+        sawThreeFlyingBlades = true;
+        const std::array<arcane::game::Vec2, 3> centers {{
+            {blades[0]->bounds.left + blades[0]->bounds.width * 0.5F,
+                blades[0]->bounds.top + blades[0]->bounds.height * 0.5F},
+            {blades[1]->bounds.left + blades[1]->bounds.width * 0.5F,
+                blades[1]->bounds.top + blades[1]->bounds.height * 0.5F},
+            {blades[2]->bounds.left + blades[2]->bounds.width * 0.5F,
+                blades[2]->bounds.top + blades[2]->bounds.height * 0.5F}}};
+        const std::array<float, 3> rotations {
+            blades[0]->rotationDegrees, blades[1]->rotationDegrees,
+            blades[2]->rotationDegrees};
+        if (!firstBladeCenters)
+        {
+            firstBladeCenters = centers;
+            firstBladeRotations = rotations;
+        }
+        else if (std::abs(centers[0].x - (*firstBladeCenters)[0].x)
+                    + std::abs(centers[0].y - (*firstBladeCenters)[0].y) > 1.0F
+                && std::abs(centers[1].x - (*firstBladeCenters)[1].x)
+                    + std::abs(centers[1].y - (*firstBladeCenters)[1].y) > 1.0F
+                && std::abs(centers[2].x - (*firstBladeCenters)[2].x)
+                    + std::abs(centers[2].y - (*firstBladeCenters)[2].y) > 1.0F)
+        {
+            secondBladeCenters = centers;
+            secondBladeRotations = rotations;
+        }
+    }
+    return expect(sawThreeBladeWarnings && movedDuringBladeWarning,
+            "Revolte's three blades must reveal three distinct movement-blocking aim lines")
+        && expect(sawThreeFlyingBlades && firstBladeCenters && secondBladeCenters,
+            "all three warned swords must launch as visible two-dimensional projectiles")
+        && expect(firstBladeRotations && secondBladeRotations
+                && std::abs((*firstBladeRotations)[0] - (*secondBladeRotations)[0]) < 0.01F
+                && std::abs((*firstBladeRotations)[1] - (*secondBladeRotations)[1]) < 0.01F
+                && std::abs((*firstBladeRotations)[2] - (*secondBladeRotations)[2]) < 0.01F,
+            "all three flying blades must keep their locked directions after launch");
 }
 
 bool newLateActEnemiesExposeFogProjectileAndFlightRules()
@@ -2226,7 +2375,7 @@ int main()
         && revolteLocksAtFiveAndHealsForSecondPhase()
         && revolteParryActivatesWithoutWindup()
         && revolteRetargetsBetweenConsecutiveReadySkills()
-        && revolteWavesCrossTheArenaAndSecondPhaseAddsFallingBlades()
+        && revolteWavesCrossTheArenaAndSecondPhaseAddsCrossExecution()
         && redMirrorDragonBreathRespectsPostHitInvulnerability()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()

@@ -3,6 +3,8 @@
 #include <SFML/Window/Event.hpp>
 #include <SFML/Window/Keyboard.hpp>
 
+#include <array>
+#include <cstddef>
 #include <iostream>
 #include <string_view>
 
@@ -67,6 +69,22 @@ bool mapsSpellAcquisitionPreview()
     return expect(intent.debugSpellAcquisitionPreviewPressed,
         "F4 must expose the spell-acquisition presentation preview");
 }
+
+bool mapsEveryBossPreviewKey()
+{
+    constexpr std::array keys {
+        sf::Keyboard::Key::F5, sf::Keyboard::Key::F6, sf::Keyboard::Key::F7};
+    for (std::size_t index = 0U; index < keys.size(); ++index)
+    {
+        arcane::platform::SfmlInputMapper mapper;
+        mapper.handleEvent(keyPressed(keys[index]));
+        const auto intent = mapper.sample();
+        for (std::size_t candidate = 0U; candidate < keys.size(); ++candidate)
+            if (!expect(intent.debugBossPreviewPressed[candidate] == (candidate == index),
+                "F5-F7 must map to exactly one matching boss preview")) return false;
+    }
+    return true;
+}
 }
 
 int main()
@@ -74,6 +92,7 @@ int main()
     const bool passed = buffersShortSpellPressUntilNextSample()
         && preservesSharedPhysicalKeyBindings()
         && mapsSpellAcquisitionPreview()
+        && mapsEveryBossPreviewKey()
         && ignoresReleaseEvents();
 
     if (!passed) return 1;

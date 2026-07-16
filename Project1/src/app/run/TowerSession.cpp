@@ -142,7 +142,8 @@ constexpr bool prefersElevatedSpawn(const game::EnemyArchetype archetype) noexce
 }
 
 TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config)
-    : run_(seed, config.initialPlayer), config_(std::move(config)), scheduler_({config_.floorsPerBoss, 4U, 3U})
+    : run_(seed, config.initialPlayer, config.startPosition), config_(std::move(config)),
+      scheduler_({config_.floorsPerBoss, 4U, 3U})
 {
     if (config_.normalEnemyHealth < 0 || config_.bossEnemyHealth <= 0
         || config_.normalGoldReward < 0 || config_.bossGoldReward < 0

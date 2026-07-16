@@ -138,13 +138,36 @@
   combined into the transparent runtime atlas `loot/magic-book.png`.
 - Purpose: looping airborne spellbook reward with distinct hover, page-turn, rune, and glow frames.
 
-## Revolte character and dialogue portraits
+## Revolte character, dialogue portraits and Cross Execution effect
 
 - Files: `enemies/revolte/*.png` and `portraits/revolte/*.png`.
-- Added by: project team, 2026-07-15.
-- Source: team-provided classroom prototype artwork.
+- Added by: project team, 2026-07-15; Cross Execution effect added with OpenAI built-in
+  image generation and deterministic local cleanup, 2026-07-16.
+- Source: team-provided classroom prototype character/portrait artwork; AI-generated classroom
+  prototype skill material with no external game texture or asset pack copied.
 - Purpose: Revolte's idle, upper/lower slash, heavy strike, parry, dash and defeat poses, plus
-  the three dialogue-stage portraits used before battle, at phase two and after defeat.
+  the three dialogue-stage portraits used before battle, at phase two and after defeat. The
+  execution pose deliberately reuses the existing crossed-four-sword parry silhouette so the Boss
+  remains visually consistent.
+- Execution-slash prompt: exactly one isolated broad horizontal sword-slash streak with an
+  ivory-white cutting core, thick burgundy/violet trailing edges, pointed tip and short angular
+  pixel fragments, rendered as crisp 32-bit fantasy pixel art on flat `#00ff00`; no second slash,
+  X shape, sword object, character, frame, text or shadow.
+- Cross-impact prompt: exactly one symmetrical X-shaped collision burst made from two thick
+  diagonal ivory-white flashes, a diamond-bright center, burgundy edges and restrained violet
+  square sparks, rendered as crisp 32-bit pixel art on flat `#00ff00`; no sword, character, circle,
+  frame, smoke, text or shadow.
+- Processing: the image-generation skill's chroma-key helper removed each flat background. Alpha
+  bounds were cropped and nearest-neighbor normalized to transparent `256x64` horizontal-slash
+  and `128x128` crossing-impact canvases. Runtime code rotates the same horizontal slash along the
+  two authoritative segments of each X and draws the impact only at their shared lock point.
+- Reused flying-blade file: `enemies/revolte/flying-blade.png`, recovered from the earlier
+  team-directed OpenAI built-in image-generation iteration. The original generation direction was
+  one isolated long silver execution sword with a small red pommel and gold guard on transparency.
+  Runtime code rotates the complete entity sword along each authoritative straight velocity and
+  adds a short procedural violet afterimage; it no longer crops `falling-blades.png`, whose four
+  luminous marks are slash effects rather than sword objects. No external source was introduced
+  for the “Three-Blade Lockdown” skill.
 
 ## Denken character and tornado effects
 

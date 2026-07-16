@@ -42,6 +42,9 @@ void SfmlInputMapper::handleEvent(const sf::Event& event)
     case sf::Keyboard::Key::F4:
         pendingIntent_.debugSpellAcquisitionPreviewPressed = true;
         break;
+    case sf::Keyboard::Key::F5: pendingIntent_.debugBossPreviewPressed[0] = true; break;
+    case sf::Keyboard::Key::F6: pendingIntent_.debugBossPreviewPressed[1] = true; break;
+    case sf::Keyboard::Key::F7: pendingIntent_.debugBossPreviewPressed[2] = true; break;
     default: break;
     }
 }
