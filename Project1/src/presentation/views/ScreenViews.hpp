@@ -15,6 +15,8 @@ namespace arcane::presentation::views
 {
 void drawRewardScreen(sf::RenderTarget& target, const viewmodel::RewardViewModel& model,
     const SpellCardArt& spellCards);
+void drawBreakthroughScreen(sf::RenderTarget& target,
+    const viewmodel::BreakthroughViewModel& model);
 void drawMerchantScreen(sf::RenderTarget& target, const viewmodel::MerchantViewModel& model,
     const SpellCardArt& spellCards);
 void drawEventScreen(sf::RenderTarget& target, const app::TowerSession& tower);

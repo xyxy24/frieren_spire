@@ -3,12 +3,16 @@
 #include "game/economy/MerchantSystem.hpp"
 #include "game/events/EventSystem.hpp"
 #include "game/floors/FloorScheduler.hpp"
+#include "game/progression/ProgressionSystem.hpp"
+#include "game/rewards/RewardSystem.hpp"
 #include "game/run/DeterministicRng.hpp"
 #include "game/relics/RelicSystem.hpp"
+#include "game/spells/SpellSystem.hpp"
 #include "presentation/viewmodel/LoadoutViewModel.hpp"
 
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <string_view>
 #include <vector>
@@ -48,6 +52,75 @@ bool deterministicStreamsAreIsolated()
     return expect(floorA == floorB, "same run and floor seeds must reproduce")
         && expect(deriveStreamSeed(floorA, RandomStream::Reward)
             != deriveStreamSeed(floorA, RandomStream::Layout), "random channels must be isolated");
+}
+
+bool progressionRewardsAndPowerGrowthAreDeterministic()
+{
+    using namespace arcane::game;
+    constexpr std::array<run::ContentId, 8> actTwo {
+        1001U, 1011U, 1016U, 1017U, 1019U, 1020U, 1021U, 1030U};
+    constexpr std::array<run::ContentId, 16> unlocked {
+        1004U, 1005U, 1006U, 1008U, 1009U, 1027U, 1028U, 1029U,
+        1001U, 1011U, 1016U, 1017U, 1019U, 1020U, 1021U, 1030U};
+    run::PlayerProgress player;
+    player.learnedSpells = {1004U, 1005U, 1006U};
+    player.spellMasteries = {{1004U, 1U}, {1005U, 1U}, {1006U, 1U}};
+    player.equippedSpells = {1004U, 1005U, 1006U};
+
+    const auto left = rewards::generateProgressionOffer(actTwo, unlocked, player, 2U, 991U);
+    const auto right = rewards::generateProgressionOffer(actTwo, unlocked, player, 2U, 991U);
+    const bool containsUpgrade = std::any_of(left.candidates.begin(), left.candidates.end(),
+        [&](const auto id) { return std::find(player.equippedSpells.begin(),
+            player.equippedSpells.end(), id) != player.equippedSpells.end(); });
+    const bool containsActTwoSpell = std::any_of(left.candidates.begin(), left.candidates.end(),
+        [&](const auto id) { return std::find(actTwo.begin(), actTwo.end(), id) != actTwo.end(); });
+    if (!expect(left.candidates == right.candidates,
+            "progression rewards must reproduce for the same seed")
+        || !expect(containsUpgrade,
+            "Act II rewards must include an upgrade for an equipped spell")
+        || !expect(containsActTwoSpell,
+            "Act II rewards must include newly unlocked Act II magic")
+        || !expect(!progression::upgradeSpell(player, 1004U, 1U),
+            "Act I must keep regular spells at rank one")
+        || !expect(progression::upgradeSpell(player, 1004U, 2U)
+                && progression::spellRank(player, 1004U) == 2U,
+            "Act II must unlock rank-two mastery")
+        || !expect(!progression::upgradeSpell(player, 1004U, 2U),
+            "Act II must not grant rank three early")
+        || !expect(progression::upgradeSpell(player, 1004U, 3U)
+                && progression::spellRank(player, 1004U) == 3U,
+            "Act III must unlock rank-three mastery")) return false;
+
+    const std::array<std::optional<std::uint32_t>, 3> ids {1004U, std::nullopt, std::nullopt};
+    spells::SpellSystem base(ids, std::nullopt, {1U, 1U, 1U});
+    spells::SpellSystem mastered(ids, std::nullopt, {3U, 1U, 1U});
+    const Aabb target {100.0F, 0.0F, 40.0F, 64.0F};
+    const auto baseCast = base.tryCast(0U, {0.0F, 0.0F}, 1.0F, target);
+    const auto masteredCast = mastered.tryCast(0U, {0.0F, 0.0F}, 1.0F, target);
+    if (!expect(masteredCast.masteryPowerMultiplier > baseCast.masteryPowerMultiplier
+            && masteredCast.effectBounds.width > baseCast.effectBounds.width
+            && mastered.view()[0].cooldownDuration < base.view()[0].cooldownDuration,
+        "mastery must increase power and area while reducing cooldown")) return false;
+
+    run::PlayerProgress power;
+    run::PlayerProgress haste;
+    run::PlayerProgress defense;
+    return expect(progression::applyBreakthrough(power,
+            progression::BreakthroughType::Power)
+            && progression::applyBreakthrough(power, progression::BreakthroughType::Power)
+            && std::abs(progression::regularDamageMultiplier(power) - 1.17F) < 0.001F,
+            "two power breakthroughs must use the documented diminishing total")
+        && expect(progression::applyBreakthrough(haste,
+            progression::BreakthroughType::Haste)
+            && progression::regularCooldownMultiplier(haste) < 1.0F,
+            "haste breakthrough must shorten regular cooldowns")
+        && expect(progression::applyBreakthrough(defense,
+            progression::BreakthroughType::Defense)
+            && progression::applyBreakthrough(defense,
+                progression::BreakthroughType::Defense)
+            && defense.maxHp == 125 && defense.currentHp == 125
+            && progression::startingShield(defense) == 14,
+            "defense breakthroughs must grant persistent HP and combat shield growth");
 }
 
 bool completesFiveFloorLoops()
@@ -106,6 +179,11 @@ bool bossRewardUnlocksOnlyTheUltimateCollection()
         || !expect(run.openReward(), "boss loot must open its reward")
         || !expect(run.chooseReward(run.rewardOffer().candidates[0]),
             "boss spell choice must apply")) return false;
+    if (!expect(run.phase() == arcane::game::run::RunPhase::Breakthrough,
+            "the first Boss spell must be followed by a mana breakthrough")
+        || !expect(run.chooseBreakthrough(
+            arcane::game::progression::BreakthroughType::Power),
+            "a mana breakthrough choice must complete Boss progression")) return false;
 
     const auto selected = run.player().learnedBossSpells[0];
     return expect(run.player().ultimateSpellUnlocked,
@@ -229,7 +307,10 @@ bool thirdBossVictorySettlesOnce()
     {
         static_cast<void>(run.loadFloor(arcane::game::run::FloorType::Boss, boss));
         if (!run.resolveEncounter(victoryResult(99U, 0), rewards)) return false;
-        if (!run.openReward() || !run.chooseReward(run.rewardOffer().candidates[0]) || !run.useStairs()) return false;
+        if (!run.openReward() || !run.chooseReward(run.rewardOffer().candidates[0])) return false;
+        if (defeated < 2 && !run.chooseBreakthrough(
+                arcane::game::progression::BreakthroughType::Power)) return false;
+        if (!run.useStairs()) return false;
     }
     return expect(run.context().bossesDefeated == 3U, "boss progress must advance once per boss floor")
         && expect(run.phase() == arcane::game::run::RunPhase::Victory, "third boss must end the run in victory")
@@ -455,7 +536,9 @@ bool towerSessionKeepsLoadoutOptionalAndRequiresSpatialStairsInteraction()
 
 int main()
 {
-    const bool passed = deterministicStreamsAreIsolated() && firstClassBadgeRerollsOncePerAct()
+    const bool passed = deterministicStreamsAreIsolated()
+        && progressionRewardsAndPowerGrowthAreDeterministic()
+        && firstClassBadgeRerollsOncePerAct()
         && categorizedRewardsGuaranteeCombatRoles()
         && completesFiveFloorLoops()
         && healsHalfMissingRoundedUp() && bossRewardUnlocksOnlyTheUltimateCollection()

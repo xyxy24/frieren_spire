@@ -31,7 +31,8 @@ public:
     [[nodiscard]] const app::TowerSession* model() const noexcept;
     [[nodiscard]] const LoadoutViewModel& loadout() const noexcept;
     [[nodiscard]] const SpellAcquisitionViewModel& spellAcquisition() const noexcept;
-    [[nodiscard]] std::optional<RewardViewModel> reward() const noexcept;
+    [[nodiscard]] std::optional<RewardViewModel> reward() const;
+    [[nodiscard]] std::optional<BreakthroughViewModel> breakthrough() const noexcept;
     [[nodiscard]] std::optional<MerchantViewModel> merchant() const;
     [[nodiscard]] std::optional<EquippedSlotsViewModel> equippedSlots() const noexcept;
 

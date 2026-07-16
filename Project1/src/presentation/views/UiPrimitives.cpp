@@ -195,7 +195,14 @@ void drawCard(
         artPanel.setOutlineColor(sf::Color {accent.r, accent.g, accent.b, 170});
         artPanel.setOutlineThickness(std::max(1.0F, inset * 0.18F));
         target.draw(artPanel);
-        if (spellCards->draw(target, id, artPosition, artSize)) return;
+        if (spellCards->draw(target, id, artPosition, artSize))
+        {
+            if (content.rank > 0U)
+                drawPixelText(target, "R" + std::to_string(content.rank),
+                    {position.x + size.x - 34.0F, position.y + 8.0F}, 0.75F,
+                    sf::Color {255, 241, 178});
+            return;
+        }
     }
 
     sf::CircleShape sigil(size.x * 0.18F, 6U);
@@ -203,6 +210,10 @@ void drawCard(
     sigil.setPosition({position.x + size.x * 0.5F, position.y + size.y * 0.42F});
     sigil.setFillColor(sf::Color {245, 245, 255, 190});
     target.draw(sigil);
+    if (content.rank > 0U)
+        drawPixelText(target, "R" + std::to_string(content.rank),
+            {position.x + size.x - 34.0F, position.y + 8.0F}, 0.75F,
+            sf::Color {255, 241, 178});
 }
 
 void drawCard(
@@ -238,9 +249,14 @@ void drawEquippedSlots(sf::RenderTarget& target, const ui::EquippedSlotsViewMode
         slot.setOutlineThickness(3.0F);
         target.draw(slot);
         if (model.regular[index])
+        {
             static_cast<void>(spellCards.draw(target, model.regular[index]->id,
                 {startX + static_cast<float>(index) * (SlotSize + Gap) + 4.0F, 634.0F},
                 {SlotSize - 8.0F, SlotSize - 8.0F}));
+            drawPixelText(target, "R" + std::to_string(model.regular[index]->rank),
+                {startX + static_cast<float>(index) * (SlotSize + Gap) + 42.0F, 638.0F},
+                0.58F, sf::Color {255, 241, 178});
+        }
         if (combatView && combatView->spellSlots[index].cooldownDuration > 0.0F)
         {
             const float ratio = std::clamp(combatView->spellSlots[index].cooldownRemaining

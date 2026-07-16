@@ -1,6 +1,8 @@
 #include "presentation/viewmodel/UiViewModels.hpp"
 
+#include "game/progression/ProgressionSystem.hpp"
 #include "game/relics/RelicSystem.hpp"
+#include "game/rewards/RewardSystem.hpp"
 #include "game/spells/SpellSystem.hpp"
 
 #include <algorithm>
@@ -25,28 +27,46 @@ SpellRangeKind toRangeKind(const game::spells::SpellShape shape) noexcept
 }
 
 ContentSummaryViewModel makeContentSummaryViewModel(
-    const game::run::ContentId id, const bool selected) noexcept
+    const game::run::ContentId id, const bool selected, const std::uint8_t rank) noexcept
 {
     if (const auto* spell = game::spells::findDefinition(id))
     {
         return {id, ContentKind::Spell, spell->name,
-            spell->tier == game::spells::SpellTier::Boss, selected};
+            spell->tier == game::spells::SpellTier::Boss, selected, rank};
     }
     if (const auto* relic = game::relics::findDefinition(id))
-        return {id, ContentKind::Relic, relic->name, false, selected};
-    return {id, ContentKind::Unknown, "UNKNOWN CONTENT", false, selected};
+        return {id, ContentKind::Relic, relic->name, false, selected, 0U};
+    return {id, ContentKind::Unknown, "UNKNOWN CONTENT", false, selected, 0U};
 }
 
 ContentDetailViewModel makeContentDetailViewModel(
-    const game::run::ContentId id, const bool selected) noexcept
+    const game::run::ContentId id, const bool selected, const std::uint8_t rank)
 {
     ContentDetailViewModel model;
-    model.summary = makeContentSummaryViewModel(id, selected);
+    model.summary = makeContentSummaryViewModel(id, selected, rank);
     if (const auto* spell = game::spells::findDefinition(id))
     {
         model.description = spell->description;
+        const float cooldownMultiplier = spell->tier == game::spells::SpellTier::Regular
+            ? game::progression::masteryCooldownMultiplier(rank) : 1.0F;
+        const float areaMultiplier = spell->tier == game::spells::SpellTier::Regular
+            ? game::progression::masteryAreaMultiplier(rank) : 1.0F;
         model.spell = SpellDetailViewModel {
-            spell->cooldownSeconds, toRangeKind(spell->shape), spell->range, spell->height};
+            spell->cooldownSeconds * cooldownMultiplier, toRangeKind(spell->shape),
+            spell->range * areaMultiplier, spell->height * areaMultiplier};
+        if (spell->tier == game::spells::SpellTier::Regular && rank > 0U)
+        {
+            if (rank == 1U)
+                model.masteryDescription = "RANK I - BASE FORMULA";
+            else
+            {
+                model.masteryDescription = rank >= 3U
+                    ? "RANK III: +30% POWER, +16% AREA, -15% COOLDOWN. "
+                    : "RANK II: +15% POWER, +8% AREA, -8% COOLDOWN.";
+                if (rank >= 3U)
+                    model.masteryDescription += game::progression::rankThreeSignature(id);
+            }
+        }
     }
     else if (const auto* relic = game::relics::findDefinition(id))
         model.description = relic->description;
@@ -59,7 +79,8 @@ EquippedSlotsViewModel makeEquippedSlotsViewModel(
     EquippedSlotsViewModel model;
     for (std::size_t index = 0U; index < player.equippedSpells.size(); ++index)
         if (player.equippedSpells[index])
-            model.regular[index] = makeContentSummaryViewModel(*player.equippedSpells[index]);
+            model.regular[index] = makeContentSummaryViewModel(*player.equippedSpells[index],
+                false, game::progression::spellRank(player, *player.equippedSpells[index]));
     if (player.equippedUltimateSpell)
         model.ultimate = makeContentSummaryViewModel(*player.equippedUltimateSpell);
     model.ultimateUnlocked = player.ultimateSpellUnlocked;
@@ -68,13 +89,43 @@ EquippedSlotsViewModel makeEquippedSlotsViewModel(
 
 RewardViewModel makeRewardViewModel(
     const std::array<game::run::ContentId, 3>& candidates,
-    const game::run::PlayerProgress& player) noexcept
+    const game::run::PlayerProgress& player)
 {
     RewardViewModel model;
     for (std::size_t index = 0U; index < candidates.size(); ++index)
-        model.cards[index] = makeContentDetailViewModel(candidates[index]);
+    {
+        const auto currentRank = game::progression::spellRank(player, candidates[index]);
+        const std::uint8_t displayRank = currentRank > 0U
+            ? static_cast<std::uint8_t>(std::min<int>(3, currentRank + 1))
+            : std::uint8_t {1U};
+        model.cards[index] = makeContentDetailViewModel(candidates[index], false, displayRank);
+        if (model.cards[index].spell && !model.cards[index].summary.bossSpell)
+            model.cards[index].spell->cooldownSeconds *=
+                game::progression::regularCooldownMultiplier(player);
+        for (const auto& synergy : game::rewards::spellSynergyHints(player, candidates[index]))
+            if (const auto* owned = game::spells::findDefinition(synergy.ownedSpellId))
+                model.cards[index].synergies.push_back(
+                    {synergy.ownedSpellId, owned->name, synergy.description});
+        model.cards[index].upgradeReward = currentRank > 0U;
+    }
     model.showRerollHint = std::find(player.relics.begin(), player.relics.end(),
         game::relics::FirstClassBadgeId) != player.relics.end();
+    return model;
+}
+
+BreakthroughViewModel makeBreakthroughViewModel(
+    const game::run::PlayerProgress& player) noexcept
+{
+    BreakthroughViewModel model;
+    const auto& definitions = game::progression::breakthroughDefinitions();
+    for (std::size_t index = 0U; index < definitions.size(); ++index)
+    {
+        const auto rank = player.breakthroughRanks[index];
+        model.cards[index] = {definitions[index].name,
+            rank == 0U ? definitions[index].firstDescription
+                       : definitions[index].secondDescription,
+            rank};
+    }
     return model;
 }
 
@@ -104,7 +155,8 @@ LoadoutSnapshot makeLoadoutSnapshot(
     model.regularSpells.reserve(player.learnedSpells.size());
     for (const auto id : player.learnedSpells)
         model.regularSpells.push_back(makeContentSummaryViewModel(
-            id, section == SpellSection::Regular && selectedSpell == id));
+            id, section == SpellSection::Regular && selectedSpell == id,
+            game::progression::spellRank(player, id)));
     model.bossSpells.reserve(player.learnedBossSpells.size());
     for (const auto id : player.learnedBossSpells)
         model.bossSpells.push_back(makeContentSummaryViewModel(
@@ -114,7 +166,14 @@ LoadoutSnapshot makeLoadoutSnapshot(
         model.relics.push_back(makeContentSummaryViewModel(id, selectedRelic == id));
 
     const auto detailId = page == LoadoutPage::Relics ? selectedRelic : selectedSpell;
-    if (detailId) model.selectedDetail = makeContentDetailViewModel(*detailId, true);
+    if (detailId)
+    {
+        model.selectedDetail = makeContentDetailViewModel(*detailId, true,
+            game::progression::spellRank(player, *detailId));
+        if (model.selectedDetail->spell && !model.selectedDetail->summary.bossSpell)
+            model.selectedDetail->spell->cooldownSeconds *=
+                game::progression::regularCooldownMultiplier(player);
+    }
     model.equipped = makeEquippedSlotsViewModel(player);
     return model;
 }

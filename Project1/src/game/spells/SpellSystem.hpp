@@ -54,6 +54,8 @@ struct SpellCastResult
     SpellEffect effect {SpellEffect::DirectDamage};
     std::uint32_t spellId {};
     Aabb effectBounds;
+    std::uint8_t rank {1U};
+    float masteryPowerMultiplier {1.0F};
 };
 
 [[nodiscard]] const SpellDefinition* findDefinition(std::uint32_t id) noexcept;
@@ -65,7 +67,9 @@ public:
     static constexpr float UltimateCooldownSeconds = 18.0F;
 
     explicit SpellSystem(const std::array<std::optional<std::uint32_t>, 3>& equippedIds = {},
-        std::optional<std::uint32_t> equippedUltimateId = std::nullopt);
+        std::optional<std::uint32_t> equippedUltimateId = std::nullopt,
+        const std::array<std::uint8_t, 3>& equippedRanks = {1U, 1U, 1U},
+        float regularCooldownMultiplier = 1.0F);
     void update(float deltaSeconds) noexcept;
     [[nodiscard]] SpellCastResult tryCast(std::size_t slot, Vec2 casterPosition,
         float facingDirection, const Aabb& targetBounds) noexcept;
@@ -73,7 +77,8 @@ public:
         float facingDirection, const Aabb& targetBounds) noexcept;
     [[nodiscard]] std::array<SpellSlotView, 3> view() const noexcept;
     [[nodiscard]] SpellSlotView ultimateView() const noexcept;
-    [[nodiscard]] bool equip(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
+    [[nodiscard]] bool equip(std::size_t slot, std::optional<std::uint32_t> id,
+        std::uint8_t rank = 1U) noexcept;
     [[nodiscard]] bool equipUltimate(std::optional<std::uint32_t> id) noexcept;
     void reduceLongestRegularCooldown(float seconds) noexcept;
     void reduceRegularCooldown(std::size_t slot, float seconds) noexcept;
@@ -87,11 +92,13 @@ private:
         const SpellDefinition* definition {};
         float cooldownRemaining {};
         std::uint64_t castSequence {};
+        std::uint8_t rank {1U};
     };
     [[nodiscard]] static SpellCastResult tryCastState(SlotState& state, float cooldownSeconds,
         Vec2 casterPosition, float facingDirection, const Aabb& targetBounds) noexcept;
     std::array<SlotState, 3> slots_;
     SlotState ultimate_;
     float ultimateCooldownSeconds_ {UltimateCooldownSeconds};
+    float regularCooldownMultiplier_ {1.0F};
 };
 }

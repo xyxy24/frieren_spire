@@ -39,7 +39,8 @@ public:
     [[nodiscard]] const std::optional<CombatResult>& result() const noexcept;
     [[nodiscard]] std::optional<CombatDialogueLineView> dialogueLine() const noexcept;
     [[nodiscard]] std::optional<BossIntroView> bossIntro() const noexcept;
-    [[nodiscard]] bool equipSpell(std::size_t slot, std::optional<std::uint32_t> id) noexcept;
+    [[nodiscard]] bool equipSpell(std::size_t slot, std::optional<std::uint32_t> id,
+        std::uint8_t rank = 1U) noexcept;
     [[nodiscard]] bool equipUltimateSpell(std::optional<std::uint32_t> id) noexcept;
     void settlePlayerForReward() noexcept;
 
@@ -90,6 +91,7 @@ private:
         float markedRemaining {};
         float frozenRemaining {};
         float goldenBindRemaining {};
+        bool goldenBindMastered {};
         float skillSealRemaining {};
         bool controlRelicTriggered {};
         float relicComboWindow {};
@@ -211,6 +213,9 @@ private:
     float flowerFieldRemaining_ {};
     float flowerFieldCenterX_ {};
     float flowerHealingAccumulator_ {};
+    float flowerHealingRate_ {3.0F};
+    bool flowerFieldMastered_ {};
+    float flowerFieldDamageMultiplier_ {1.0F};
     float burningFlowerRemaining_ {};
     float burningFlowerAccumulator_ {};
     std::uint64_t burningFlowerSequenceBase_ {};
@@ -219,19 +224,26 @@ private:
     float burningFlowerMultiplier_ {1.0F};
     float phantomRemaining_ {};
     Aabb phantomBounds_;
+    bool phantomExpiryBurst_ {};
+    float phantomDamageMultiplier_ {1.0F};
     float postDashComboRemaining_ {};
     float spellInvulnerableRemaining_ {};
     float sleepRemaining_ {};
     bool flightBoostAvailable_ {};
+    float flightBoostMultiplier_ {1.15F};
     float lightningStaffRemaining_ {};
     std::uint32_t lightningStaffCharges_ {};
+    float lightningStaffDamageMultiplier_ {1.0F};
+    int lightningStaffBurstDamage_ {12};
     std::uint64_t handledLightningAttackSequence_ {};
     float golemRemaining_ {};
     Aabb golemBounds_;
     DamageSource golemSource_ {DamageSource::PlayerSpell0};
     float golemMultiplier_ {1.0F};
     std::uint64_t golemSequence_ {};
+    std::uint32_t golemHitsRemaining_ {1U};
     int barrierShield_ {};
+    int barrierBreakDamage_ {12};
     int persistentShield_ {};
     float barrierRemaining_ {};
     float gravityWellRemaining_ {};
@@ -239,6 +251,8 @@ private:
     Aabb gravityWellBounds_;
     DamageSource gravityWellSource_ {DamageSource::PlayerSpell0};
     float gravityWellMultiplier_ {1.0F};
+    float gravityWellPullSpeed_ {90.0F};
+    int gravityWellTickDamage_ {6};
     std::uint64_t gravityWellSequenceBase_ {};
     std::uint32_t gravityWellTick_ {};
     float hellfireRemaining_ {};

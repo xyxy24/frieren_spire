@@ -38,7 +38,8 @@ const game::run::FloorDescriptor& RunController::loadFloor(const game::run::Floo
 bool RunController::resolveEncounter(const game::CombatResult& result,
     const std::span<const game::run::ContentId> rewardPool,
     const std::span<const game::run::ContentId> damageRewardPool,
-    const std::span<const game::run::ContentId> controlRewardPool)
+    const std::span<const game::run::ContentId> controlRewardPool,
+    const std::span<const game::run::ContentId> actRewardPool)
 {
     const bool isCombatFloor = currentFloorType_ == game::run::FloorType::Combat
         || currentFloorType_ == game::run::FloorType::Boss;
@@ -68,10 +69,14 @@ bool RunController::resolveEncounter(const game::CombatResult& result,
     const auto& ownedSpells = currentFloorType_ == game::run::FloorType::Boss
         ? player_.learnedBossSpells
         : player_.learnedSpells;
-    const game::rewards::RewardOffer offer = damageRewardPool.empty() || controlRewardPool.empty()
-        ? game::rewards::generateOffer(rewardPool, ownedSpells, seed)
-        : game::rewards::generateCategorizedOffer(damageRewardPool, controlRewardPool,
-            rewardPool, ownedSpells, seed);
+    const game::rewards::RewardOffer offer = currentFloorType_ != game::run::FloorType::Boss
+            && !actRewardPool.empty()
+        ? game::rewards::generateProgressionOffer(
+            actRewardPool, rewardPool, player_, context_.act, seed)
+        : (damageRewardPool.empty() || controlRewardPool.empty()
+            ? game::rewards::generateOffer(rewardPool, ownedSpells, seed)
+            : game::rewards::generateCategorizedOffer(damageRewardPool, controlRewardPool,
+                rewardPool, ownedSpells, seed));
 
     floor_.markEncounterComplete();
     if (currentFloorType_ == game::run::FloorType::Boss) ++context_.bossesDefeated;
@@ -114,11 +119,36 @@ bool RunController::chooseReward(const game::run::ContentId choice)
     const bool bossReward = currentFloorType_ == game::run::FloorType::Boss;
     const auto* definition = game::spells::findDefinition(choice);
     if (definition && bossReward != (definition->tier == game::spells::SpellTier::Boss)) return false;
-    const auto rewardType = bossReward
-        ? game::rewards::SpellRewardType::Boss
-        : game::rewards::SpellRewardType::Regular;
-    if (!game::rewards::applySpellChoice(player_, *reward_, choice, rewardType)) return false;
+    bool applied = false;
+    if (!bossReward && std::find(player_.learnedSpells.begin(), player_.learnedSpells.end(), choice)
+        != player_.learnedSpells.end())
+    {
+        if (std::find(reward_->candidates.begin(), reward_->candidates.end(), choice)
+            == reward_->candidates.end()) return false;
+        applied = game::progression::upgradeSpell(player_, choice, context_.act);
+    }
+    else
+    {
+        const auto rewardType = bossReward
+            ? game::rewards::SpellRewardType::Boss
+            : game::rewards::SpellRewardType::Regular;
+        applied = game::rewards::applySpellChoice(player_, *reward_, choice, rewardType);
+    }
+    if (!applied) return false;
     rewardApplied_ = true;
+    phase_ = bossReward && context_.bossesDefeated < 3U
+        ? game::run::RunPhase::Breakthrough
+        : game::run::RunPhase::FloorComplete;
+    return true;
+}
+
+bool RunController::chooseBreakthrough(const game::progression::BreakthroughType choice)
+{
+    if (phase_ != game::run::RunPhase::Breakthrough || !rewardApplied_
+        || currentFloorType_ != game::run::FloorType::Boss
+        || context_.bossesDefeated == 0U || context_.bossesDefeated >= 3U)
+        return false;
+    if (!game::progression::applyBreakthrough(player_, choice)) return false;
     phase_ = game::run::RunPhase::FloorComplete;
     return true;
 }
@@ -136,7 +166,8 @@ bool RunController::claimFallbackReward()
 
 bool RunController::rerollRegularReward(const std::span<const game::run::ContentId> damagePool,
     const std::span<const game::run::ContentId> controlPool,
-    const std::span<const game::run::ContentId> fullPool)
+    const std::span<const game::run::ContentId> fullPool,
+    const std::span<const game::run::ContentId> actPool)
 {
     const std::size_t actIndex = context_.act > 0U ? context_.act - 1U : 0U;
     if (phase_ != game::run::RunPhase::Reward || !reward_ || rewardApplied_
@@ -146,8 +177,11 @@ bool RunController::rerollRegularReward(const std::span<const game::run::Content
             == player_.relics.end()) return false;
     const auto seed = game::run::deriveStreamSeed(context_.floorSeed,
         game::run::RandomStream::Reward) ^ 0xd1b54a32d192ed03ULL;
-    *reward_ = game::rewards::generateCategorizedOffer(damagePool, controlPool, fullPool,
-        player_.learnedSpells, seed);
+    *reward_ = actPool.empty()
+        ? game::rewards::generateCategorizedOffer(damagePool, controlPool, fullPool,
+            player_.learnedSpells, seed)
+        : game::rewards::generateProgressionOffer(
+            actPool, fullPool, player_, context_.act, seed);
     player_.rewardRerollUsed[actIndex] = true;
     return true;
 }

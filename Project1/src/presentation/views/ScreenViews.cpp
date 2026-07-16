@@ -13,13 +13,26 @@
 namespace arcane::presentation::views
 {
 namespace ui = viewmodel;
+namespace
+{
+float drawWrappedBlock(sf::RenderTarget& target, const std::string_view text,
+    const sf::Vector2f position, const std::size_t width, const float scale,
+    const sf::Color color = sf::Color::White)
+{
+    const auto wrapped = wrapPixelText(text, width);
+    drawPixelText(target, wrapped, position, scale, color);
+    const auto lines = 1U + static_cast<std::size_t>(
+        std::count(wrapped.begin(), wrapped.end(), '\n'));
+    return position.y + static_cast<float>(lines) * 9.0F * scale;
+}
+}
 
 void drawRewardScreen(sf::RenderTarget& target, const ui::RewardViewModel& model,
     const arcane::presentation::SpellCardArt& spellCards)
 {
-    drawPixelText(target, "CHOOSE ONE SPELLBOOK", {465.0F, 70.0F}, 2.0F,
+    drawPixelText(target, "CHOOSE NEW MAGIC OR MASTERY", {390.0F, 54.0F}, 2.0F,
         sf::Color {255, 231, 145});
-    drawPixelText(target, "READ THE EFFECT THEN PRESS U I OR O", {390.0F, 110.0F}, 1.3F,
+    drawPixelText(target, "READ THE COMPLETE EFFECT THEN PRESS U I OR O", {335.0F, 94.0F}, 1.2F,
         sf::Color {182, 174, 215});
     if (model.showRerollHint)
         drawPixelText(target, "R REROLL - ONCE PER ACT", {510.0F, 132.0F}, 0.9F,
@@ -30,28 +43,94 @@ void drawRewardScreen(sf::RenderTarget& target, const ui::RewardViewModel& model
     for (std::size_t index = 0; index < model.cards.size(); ++index)
     {
         const auto& card = model.cards[index];
-        drawPixelText(target, Keys[index], {CardX[index] + 96.0F, 150.0F}, 1.5F,
+        drawPixelText(target, Keys[index], {CardX[index] + 96.0F, 134.0F}, 1.5F,
             sf::Color {255, 231, 145});
-        drawCard(target, card.summary, {CardX[index], 180.0F}, {210.0F, 340.0F},
+        drawCard(target, card.summary, {CardX[index], 145.0F}, {210.0F, 475.0F},
             false, &spellCards);
         if (card.spell)
         {
-            sf::RectangleShape informationPanel({194.0F, 154.0F});
-            informationPanel.setPosition({CardX[index] + 8.0F, 358.0F});
+            sf::RectangleShape informationPanel({194.0F, 310.0F});
+            informationPanel.setPosition({CardX[index] + 8.0F, 302.0F});
             informationPanel.setFillColor(sf::Color {15, 17, 29, 220});
             informationPanel.setOutlineColor(sf::Color {225, 220, 240, 180});
             informationPanel.setOutlineThickness(2.0F);
             target.draw(informationPanel);
 
-            drawPixelText(target, card.summary.name, {CardX[index] + 8.0F, 370.0F}, 1.05F,
+            drawPixelText(target, card.summary.name, {CardX[index] + 8.0F, 312.0F}, 0.9F,
                 sf::Color {255, 238, 173});
-            drawPixelText(target, wrapPixelText(card.description, 38U),
-                {CardX[index] + 8.0F, 394.0F}, 0.80F);
+            drawPixelText(target, card.upgradeReward
+                    ? "MASTERY -> RANK " + std::to_string(card.summary.rank)
+                    : "NEW SPELL - RANK I",
+                {CardX[index] + 8.0F, 330.0F}, 0.68F,
+                card.upgradeReward ? sf::Color {220, 177, 255} : sf::Color {174, 242, 184});
+            float nextY = drawWrappedBlock(target, card.description,
+                {CardX[index] + 8.0F, 349.0F}, 44U, 0.56F) + 4.0F;
+            if (!card.masteryDescription.empty())
+            {
+                drawPixelText(target, "MASTERY", {CardX[index] + 8.0F, nextY}, 0.56F,
+                    sf::Color {220, 177, 255});
+                nextY = drawWrappedBlock(target, card.masteryDescription,
+                    {CardX[index] + 8.0F, nextY + 8.0F}, 47U, 0.49F,
+                    sf::Color {220, 177, 255}) + 3.0F;
+            }
+            if (!card.synergies.empty())
+            {
+                drawPixelText(target, "COMBOS WITH OWNED MAGIC",
+                    {CardX[index] + 8.0F, nextY}, 0.56F, sf::Color {255, 198, 105});
+                nextY += 9.0F;
+                for (const auto& synergy : card.synergies)
+                {
+                    drawPixelText(target, "+ " + std::string(synergy.ownedSpellName),
+                        {CardX[index] + 8.0F, nextY}, 0.52F, sf::Color {255, 220, 138});
+                    nextY = drawWrappedBlock(target, synergy.description,
+                        {CardX[index] + 8.0F, nextY + 7.0F}, 50U, 0.43F,
+                        sf::Color {232, 224, 205}) + 2.0F;
+                }
+            }
             drawPixelText(target, "CD " + formatTenths(card.spell->cooldownSeconds) + " SEC",
-                {CardX[index] + 8.0F, 472.0F}, 0.95F, sf::Color {145, 218, 255});
+                {CardX[index] + 8.0F, 581.0F}, 0.72F, sf::Color {145, 218, 255});
             drawPixelText(target, spellRangeText(*card.spell),
-                {CardX[index] + 8.0F, 492.0F}, 0.85F, sf::Color {174, 242, 184});
+                {CardX[index] + 8.0F, 596.0F}, 0.63F, sf::Color {174, 242, 184});
         }
+    }
+}
+
+void drawBreakthroughScreen(sf::RenderTarget& target,
+    const ui::BreakthroughViewModel& model)
+{
+    sf::RectangleShape backdrop({1120.0F, 610.0F});
+    backdrop.setPosition({80.0F, 55.0F});
+    backdrop.setFillColor(sf::Color {12, 13, 28, 246});
+    backdrop.setOutlineColor(sf::Color {188, 147, 255});
+    backdrop.setOutlineThickness(4.0F);
+    target.draw(backdrop);
+    drawPixelText(target, "MANA BREAKTHROUGH", {430.0F, 82.0F}, 2.2F,
+        sf::Color {255, 231, 145});
+    drawPixelText(target, "BOSS KNOWLEDGE BECOMES PERMANENT POWER - PRESS U I OR O",
+        {270.0F, 128.0F}, 1.05F, sf::Color {182, 174, 215});
+
+    constexpr std::array<float, 3> CardX {150.0F, 475.0F, 800.0F};
+    constexpr std::array<std::string_view, 3> Keys {"U", "I", "O"};
+    constexpr std::array<sf::Color, 3> Colors {
+        sf::Color {225, 101, 112}, sf::Color {106, 202, 255}, sf::Color {124, 224, 168}};
+    for (std::size_t index = 0U; index < model.cards.size(); ++index)
+    {
+        const auto& card = model.cards[index];
+        sf::RectangleShape panel({280.0F, 360.0F});
+        panel.setPosition({CardX[index], 190.0F});
+        panel.setFillColor(sf::Color {24, 26, 45, 245});
+        panel.setOutlineColor(Colors[index]);
+        panel.setOutlineThickness(4.0F);
+        target.draw(panel);
+        drawPixelText(target, Keys[index], {CardX[index] + 128.0F, 160.0F}, 1.5F,
+            sf::Color {255, 231, 145});
+        drawPixelText(target, card.name, {CardX[index] + 25.0F, 230.0F}, 1.25F,
+            Colors[index]);
+        drawPixelText(target, "CURRENT RANK " + std::to_string(card.currentRank),
+            {CardX[index] + 25.0F, 278.0F}, 0.95F,
+            sf::Color {182, 174, 215});
+        drawPixelText(target, wrapPixelText(card.description, 34U),
+            {CardX[index] + 25.0F, 330.0F}, 0.95F);
     }
 }
 
@@ -359,10 +438,13 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const ui::LoadoutSnapshot& mod
                 sf::Color {255, 231, 145});
             drawPixelText(target, wrapPixelText(detail.description, 105U),
                 {120.0F, 528.0F}, 0.85F);
+            if (!detail.masteryDescription.empty())
+                drawPixelText(target, wrapPixelText(detail.masteryDescription, 110U),
+                    {120.0F, 570.0F}, 0.72F, sf::Color {220, 177, 255});
             drawPixelText(target, "CD " + formatTenths(detail.spell->cooldownSeconds) + " SEC",
-                {120.0F, 590.0F}, 0.95F, sf::Color {145, 218, 255});
+                {120.0F, 610.0F}, 0.95F, sf::Color {145, 218, 255});
             drawPixelText(target, spellRangeText(*detail.spell),
-                {420.0F, 590.0F}, 0.90F, sf::Color {174, 242, 184});
+                {420.0F, 610.0F}, 0.90F, sf::Color {174, 242, 184});
         }
     }
 }

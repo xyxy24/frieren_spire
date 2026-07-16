@@ -4,6 +4,7 @@
 #include "presentation/viewmodel/UiViewModels.hpp"
 #include "presentation/viewmodel/CombatFeedbackViewModel.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <array>
 #include <cmath>
@@ -72,6 +73,14 @@ void collectNearbyLoot(arcane::app::TowerSession& tower, const bool jumpBeforeIn
         tower.update(jump, 0.01F);
     }
     interact(tower);
+}
+
+void choosePowerBreakthrough(arcane::app::TowerSession& tower)
+{
+    if (tower.run().phase() != arcane::game::run::RunPhase::Breakthrough) return;
+    arcane::game::PlayerIntent intent;
+    intent.spellPressed[0] = true;
+    tower.update(intent, 0.01F);
 }
 
 bool combatRewardLoadoutAndStairsFormOneFlow()
@@ -192,6 +201,7 @@ bool thirdBossEndsInVictory()
         if (!expect(tower.run().phase() == arcane::game::run::RunPhase::Reward,
                 "each boss loot interaction must enter reward")) return false;
         chooseLeftReward(tower);
+        choosePowerBreakthrough(tower);
         interact(tower);
     }
     return expect(tower.run().context().bossesDefeated == 3U, "exactly three bosses must be counted")
@@ -711,6 +721,47 @@ bool viewModelsProjectAuthoritativeContentWithoutRenderingRules()
             "reward view model must resolve spell details from the authoritative registry")
         || !expect(reward.cards[2].summary.bossSpell,
             "reward view model must identify boss spells")) return false;
+
+    auto comboPlayer = player;
+    comboPlayer.learnedSpells.push_back(1001U);
+    comboPlayer.learnedSpells.push_back(1016U);
+    const std::array<arcane::game::run::ContentId, 3> comboCandidates {
+        1006U, 1028U, 2007U};
+    const auto comboReward = ui::makeRewardViewModel(comboCandidates, comboPlayer);
+    const auto hasPartner = [](const auto& hints, const auto id) {
+        return std::any_of(hints.begin(), hints.end(),
+            [id](const auto& hint) { return hint.ownedSpellId == id; });
+    };
+    if (!expect(comboReward.cards[0].synergies.size() == 2U
+            && hasPartner(comboReward.cards[0].synergies, 1001U)
+            && hasPartner(comboReward.cards[0].synergies, 1005U),
+            "reward cards must list every relevant owned combo for Flame Burst")
+        || !expect(std::any_of(comboReward.cards[0].synergies.begin(),
+                comboReward.cards[0].synergies.end(), [](const auto& hint) {
+                    return hint.description.find("2 second") != std::string_view::npos;
+                }),
+            "combo hints must explain the implemented trigger order and result")
+        || !expect(comboReward.cards[1].synergies.empty(),
+            "reward cards must not invent a combo for unrelated owned magic")
+        || !expect(comboReward.cards[2].synergies.size() == 1U
+                && comboReward.cards[2].synergies[0].ownedSpellId == 1016U
+                && comboReward.cards[2].synergies[0].description.find("40 percent")
+                    != std::string_view::npos,
+            "Boss reward cards must explain interactions with owned regular magic")) return false;
+
+    const std::array<arcane::game::run::ContentId, 3> setupCandidates {
+        1002U, 1023U, 2012U};
+    const auto setupReward = ui::makeRewardViewModel(setupCandidates, player);
+    if (!expect(!setupReward.cards[0].synergies.empty()
+            && setupReward.cards[0].synergies[0].ownedSpellId == 1004U,
+            "a newly offered damage buff must identify compatible owned attacks")
+        || !expect(!setupReward.cards[1].synergies.empty()
+                && setupReward.cards[1].synergies[0].ownedSpellId == 1004U,
+            "a newly offered Flight Magic must explain its first-spell combo")
+        || !expect(!setupReward.cards[2].synergies.empty()
+                && setupReward.cards[2].synergies[0].description.find("90 percent")
+                    != std::string_view::npos,
+            "a newly offered Mirror Array must explain copied owned spells")) return false;
 
     const std::array stock {
         arcane::game::economy::StockItem {1004U,
