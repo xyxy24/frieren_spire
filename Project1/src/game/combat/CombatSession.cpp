@@ -764,7 +764,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         lightning.delayRemaining -= deltaSeconds;
         if (lightning.delayRemaining <= 0.0F && lightning.delayRemaining + deltaSeconds > 0.0F)
         {
-            activeSpellEffects_.push_back({9300U, lightning.bounds, 0.6F, 0.6F});
+            activeSpellEffects_.push_back(
+                {FrierenCopyLightningVisualId, lightning.bounds, 0.6F, 0.6F});
             if (intersects(lightning.bounds, playerBounds()))
                 static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
                     lightning.sequence, 20, 1.0F, relics_.incomingDamageMultiplier(), 0,
@@ -2040,13 +2041,14 @@ void CombatSession::populateSpellEffects(std::vector<SpellEffectView>& views) co
         const float dy = beam.end.y - beam.start.y;
         const float length = std::sqrt(dx * dx + dy * dy);
         const float angle = std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F;
-        views.push_back({9200U, {beam.start.x, beam.start.y - 9.0F, length, 18.0F},
+        views.push_back({beam.visualId, {beam.start.x, beam.start.y - 9.0F, length, 18.0F},
             beam.remaining, 0.6F, dx >= 0.0F ? 1.0F : -1.0F, angle});
     }
     for (const auto& lightning : pendingEnemyLightning_)
-        views.push_back({9300U, lightning.bounds, lightning.delayRemaining, 0.4F});
+        views.push_back({FrierenCopyLightningVisualId, lightning.bounds,
+            lightning.delayRemaining, 0.4F});
     for (const auto& fire : activeEnemyGroundFire_)
-        views.push_back({9301U, fire.bounds, fire.remaining, 5.0F});
+        views.push_back({FrierenCopyGroundFireVisualId, fire.bounds, fire.remaining, 5.0F});
     for (const auto& enemy : enemies_)
         if (enemy.archetype == EnemyArchetype::Heimon && enemy.health.isAlive()
             && enemy.fogCreated)

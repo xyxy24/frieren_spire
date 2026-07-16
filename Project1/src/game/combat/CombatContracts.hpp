@@ -20,6 +20,9 @@ inline constexpr std::uint32_t StoneGolemResolveVisualId = 9008U;
 inline constexpr std::uint32_t LightningStaffDischargeVisualId = 9009U;
 inline constexpr std::uint32_t DefensiveBarrierBreakVisualId = 9010U;
 inline constexpr std::uint32_t MirrorArrayBreakVisualId = 9011U;
+inline constexpr std::uint32_t FrierenCopyBeamVisualId = 9400U;
+inline constexpr std::uint32_t FrierenCopyLightningVisualId = 9401U;
+inline constexpr std::uint32_t FrierenCopyGroundFireVisualId = 9402U;
 
 enum class CombatOutcome
 {

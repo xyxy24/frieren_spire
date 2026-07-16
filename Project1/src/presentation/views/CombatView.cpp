@@ -114,6 +114,11 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& laufenTextures,
     const EnemyStateTextures& starkCopyTextures,
     const std::optional<sf::Texture>& starkSlashTexture,
+    const EnemyStateTextures& frierenCopyTextures,
+    const EnemyStateTextures& fernCopyTextures,
+    const std::array<std::optional<sf::Texture>, 2>& frierenBeamTextures,
+    const std::array<std::optional<sf::Texture>, 2>& frierenLightningTextures,
+    const std::optional<sf::Texture>& frierenFireTexture,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -161,6 +166,61 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
 
     for (const arcane::game::SpellEffectView effect : spellEffects)
     {
+        if (effect.spellId == arcane::game::FrierenCopyBeamVisualId)
+        {
+            const std::size_t frame = effect.remaining > effect.duration * 0.5F ? 0U : 1U;
+            if (frierenBeamTextures[frame])
+            {
+                const sf::Texture& texture = *frierenBeamTextures[frame];
+                sf::Sprite beam(texture);
+                const auto size = texture.getSize();
+                beam.setOrigin({0.0F, static_cast<float>(size.y) * 0.5F});
+                beam.setPosition({effect.bounds.left,
+                    effect.bounds.top + effect.bounds.height * 0.5F});
+                beam.setRotation(sf::degrees(effect.rotationDegrees));
+                beam.setScale({effect.bounds.width / static_cast<float>(size.x), 1.0F});
+                target.draw(beam);
+                continue;
+            }
+        }
+        if (effect.spellId == arcane::game::FrierenCopyLightningVisualId)
+        {
+            const std::size_t frame = effect.remaining > effect.duration * 0.5F ? 0U : 1U;
+            if (frierenLightningTextures[frame])
+            {
+                const sf::Texture& texture = *frierenLightningTextures[frame];
+                sf::Sprite lightning(texture);
+                const auto size = texture.getSize();
+                lightning.setOrigin({static_cast<float>(size.x) * 0.5F,
+                    static_cast<float>(size.y)});
+                lightning.setPosition({effect.bounds.left + effect.bounds.width * 0.5F,
+                    effect.bounds.top + effect.bounds.height});
+                lightning.setScale({effect.bounds.width / static_cast<float>(size.x),
+                    effect.bounds.height / static_cast<float>(size.y)});
+                target.draw(lightning);
+                continue;
+            }
+        }
+        if (effect.spellId == arcane::game::FrierenCopyGroundFireVisualId
+            && frierenFireTexture)
+        {
+            const sf::Texture& texture = *frierenFireTexture;
+            const auto size = texture.getSize();
+            const float tileWidth = static_cast<float>(size.x);
+            for (float left = effect.bounds.left;
+                left < effect.bounds.left + effect.bounds.width; left += tileWidth)
+            {
+                const float visibleWidth = std::min(tileWidth,
+                    effect.bounds.left + effect.bounds.width - left);
+                sf::Sprite fire(texture);
+                fire.setTextureRect(sf::IntRect {{0, 0},
+                    {static_cast<int>(visibleWidth), static_cast<int>(size.y)}});
+                fire.setPosition({left, effect.bounds.top + effect.bounds.height
+                    - static_cast<float>(size.y)});
+                target.draw(fire);
+            }
+            continue;
+        }
         if (effect.spellId == 9001U)
         {
             const float elapsed = effect.duration - effect.remaining;
@@ -365,6 +425,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &laufenTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy)
             stateTextures = &starkCopyTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::FrierenCopy)
+            stateTextures = &frierenCopyTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::FernCopy)
+            stateTextures = &fernCopyTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -444,6 +508,10 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 && enemy.attackActive && enemy.skillVariant == 1
                 && stateTextures->skillAttacks[1])
                 texture = &*stateTextures->skillAttacks[1];
+            else if (enemy.archetype == arcane::game::EnemyArchetype::FrierenCopy
+                && enemy.windingUp && enemy.skillVariant >= 0 && enemy.skillVariant <= 1
+                && stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)])
+                texture = &*stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)];
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;

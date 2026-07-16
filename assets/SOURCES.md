@@ -252,3 +252,19 @@
   transparent `128x48` canvas; runtime code keeps the frame fixed and moves only the blade.
 - Purpose: provide the polished surface art for Aura's Soul Guillotine while keeping its
   authoritative range, warning time, hit timing and full-height drop in gameplay code.
+
+## Frieren copy
+
+- Files: `enemies/frieren_copy/*.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: idle, cast and attack poses plus two-frame beam/lightning effects and a repeating
+  ground-fire tile for the final Boss encounter's Frieren copy.
+
+## Fern copy
+
+- Files: `enemies/fern_copy/*.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: idle, windup and attack poses for the final Boss encounter's Fern copy; her beam
+  reuses the Frieren copy's two-frame effect.

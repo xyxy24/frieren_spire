@@ -201,6 +201,11 @@ struct RenderResources
     const EnemyStateTextures& laufen;
     const EnemyStateTextures& starkCopy;
     const std::optional<sf::Texture>& starkSlash;
+    const EnemyStateTextures& frierenCopy;
+    const EnemyStateTextures& fernCopy;
+    const std::array<std::optional<sf::Texture>, 2>& frierenBeam;
+    const std::array<std::optional<sf::Texture>, 2>& frierenLightning;
+    const std::optional<sf::Texture>& frierenFire;
     const std::optional<sf::Texture>& slash;
     const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
@@ -267,6 +272,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.richter, resources.pillar,
                 resources.laufen,
                 resources.starkCopy, resources.starkSlash,
+                resources.frierenCopy, resources.fernCopy, resources.frierenBeam,
+                resources.frierenLightning, resources.frierenFire,
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
@@ -437,6 +444,26 @@ int arcane::presentation::SfmlApplication::run()
     starkCopyTextures.skillAttacks[1] = loadTexture("assets/enemies/stark_copy/attack2.png");
     const std::optional<sf::Texture> starkSlashTexture =
         loadTexture("assets/enemies/stark_copy/slash.png");
+    EnemyStateTextures frierenCopyTextures;
+    frierenCopyTextures.idle = loadTexture("assets/enemies/frieren_copy/idle.png");
+    frierenCopyTextures.attack = loadTexture("assets/enemies/frieren_copy/attack.png");
+    frierenCopyTextures.windup = loadTexture("assets/enemies/frieren_copy/windup_attack.png");
+    frierenCopyTextures.skillWindups[0] = loadTexture(
+        "assets/enemies/frieren_copy/lightning-windup.png");
+    frierenCopyTextures.skillWindups[1] = loadTexture(
+        "assets/enemies/frieren_copy/fire_windup.png");
+    const std::array<std::optional<sf::Texture>, 2> frierenBeamTextures {
+        loadTexture("assets/enemies/frieren_copy/skill1.png"),
+        loadTexture("assets/enemies/frieren_copy/skill2.png")};
+    const std::array<std::optional<sf::Texture>, 2> frierenLightningTextures {
+        loadTexture("assets/enemies/frieren_copy/lightning1.png"),
+        loadTexture("assets/enemies/frieren_copy/lightning2.png")};
+    const std::optional<sf::Texture> frierenFireTexture =
+        loadTexture("assets/enemies/frieren_copy/fire.png");
+    EnemyStateTextures fernCopyTextures;
+    fernCopyTextures.idle = loadTexture("assets/enemies/fern_copy/idle.png");
+    fernCopyTextures.windup = loadTexture("assets/enemies/fern_copy/windup.png");
+    fernCopyTextures.attack = loadTexture("assets/enemies/fern_copy/attack.png");
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -514,6 +541,8 @@ int arcane::presentation::SfmlApplication::run()
         richterTextures, pillarTextures,
         laufenTextures,
         starkCopyTextures, starkSlashTexture,
+        frierenCopyTextures, fernCopyTextures, frierenBeamTextures, frierenLightningTextures,
+        frierenFireTexture,
         slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,

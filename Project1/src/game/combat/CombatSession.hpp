@@ -160,6 +160,7 @@ private:
         Vec2 end;
         float remaining {0.6F};
         std::uint64_t sequence {};
+        std::uint32_t visualId {9200U};
     };
     struct PendingEnemyLightning
     {

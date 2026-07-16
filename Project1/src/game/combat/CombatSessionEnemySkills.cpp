@@ -390,7 +390,8 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                     const Vec2 end {start.x + dx / length * 256.0F,
                         start.y + dy / length * 256.0F};
                     const auto sequence = ++environmentalSequence_;
-                    activeEnemyBeams_.push_back({start, end, 0.6F, sequence});
+                    activeEnemyBeams_.push_back({start, end, 0.6F, sequence,
+                        FrierenCopyBeamVisualId});
                     if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
                         static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
                             sequence, 15, 1.0F, relics_.incomingDamageMultiplier()}));
@@ -450,7 +451,8 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                         const Vec2 end {start.x + dx / length * 256.0F,
                             start.y + dy / length * 256.0F};
                         const auto sequence = ++environmentalSequence_;
-                        activeEnemyBeams_.push_back({start, end, 0.6F, sequence});
+                        activeEnemyBeams_.push_back({start, end, 0.6F, sequence,
+                            FrierenCopyBeamVisualId});
                         if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
                             static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
                                 sequence, 15, 1.0F, relics_.incomingDamageMultiplier()}));
