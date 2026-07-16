@@ -4,7 +4,7 @@
 namespace arcane::game::events
 {
 EventResult EventTransaction::choose(run::PlayerProgress& player, const std::span<const EventChoice> choices,
-    const run::ContentId choiceId)
+    const run::ContentId choiceId, const std::uint32_t act)
 {
     if (resolved_) return EventResult::AlreadyResolved;
     const auto choice = std::find_if(choices.begin(), choices.end(), [choiceId](const EventChoice& value) { return value.id == choiceId; });
@@ -18,6 +18,8 @@ EventResult EventTransaction::choose(run::PlayerProgress& player, const std::spa
     if (choice->spellId != 0U
         && std::find(player.learnedSpells.begin(), player.learnedSpells.end(), choice->spellId)
             != player.learnedSpells.end()) return EventResult::AlreadyOwned;
+    if (choice->finalBossDamageBoost && player.southernHeroBossDamageBoost)
+        return EventResult::AlreadyOwned;
     player.maxHp = newMaxHp;
     player.currentHp = newHp;
     player.gold = newGold;
@@ -27,6 +29,10 @@ EventResult EventTransaction::choose(run::PlayerProgress& player, const std::spa
         player.learnedSpells.push_back(choice->spellId);
         progression::registerLearnedSpell(player, choice->spellId);
     }
+    if (choice->finalBossDamageBoost) player.southernHeroBossDamageBoost = true;
+    if (choice->upgradeAllSpells)
+        for (const auto spellId : player.learnedSpells)
+            static_cast<void>(progression::upgradeSpell(player, spellId, act));
     resolved_ = true;
     return EventResult::Success;
 }

@@ -523,7 +523,7 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                     }
                     else if (enemy.revolteSkill == 3) enemy.specialActive = 1.2F;
                     else if (enemy.revolteSkill == 4)
-                        enemy.specialActive = 144.0F / 220.0F;
+                        enemy.specialActive = 196.0F / 280.0F;
                 }
                 continue;
             }
@@ -532,7 +532,7 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 const float activeDelta = std::min(deltaSeconds, enemy.specialActive);
                 if (enemy.revolteSkill == 4)
                     enemy.controller.translateHorizontal(
-                        enemy.specialDirection * 220.0F * activeDelta, movementBoundsFor(enemy));
+                        enemy.specialDirection * 280.0F * activeDelta, movementBoundsFor(enemy));
                 enemy.specialActive -= activeDelta;
                 if (enemy.specialActive <= 0.0F)
                 {

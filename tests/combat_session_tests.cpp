@@ -1698,8 +1698,8 @@ bool revolteLocksAtFiveAndHealsForSecondPhase()
     combat.update({}, 3.0F);
     combat.update({}, 0.5F);
     combat.update({}, 0.7F);
-    return expect(std::abs(combat.enemyState().position.x - beforeDash) >= 143.9F,
-        "second-phase dash must travel 144 pixels as soon as its cooldown is ready");
+    return expect(std::abs(combat.enemyState().position.x - beforeDash) >= 195.9F,
+        "second-phase dash must travel 196 pixels as soon as its cooldown is ready");
 }
 
 bool denkenExposesCremationPoseWhenTornadoEvolves()

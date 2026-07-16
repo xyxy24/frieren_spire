@@ -51,6 +51,7 @@ struct PlayerProgress
     std::array<bool, 3> rewardRerollUsed {};
     // Power, Haste and Defense. Only the first two Boss victories offer a choice.
     std::array<std::uint8_t, 3> breakthroughRanks {};
+    bool southernHeroBossDamageBoost {};
 };
 
 struct RunContext
@@ -60,7 +61,7 @@ struct RunContext
     std::uint32_t floorIndex {};
     std::uint32_t act {1};
     std::uint32_t bossesDefeated {};
-    std::array<bool, 3> triggeredEvents {};
+    std::array<bool, 4> triggeredEvents {};
 };
 
 struct FloorDescriptor

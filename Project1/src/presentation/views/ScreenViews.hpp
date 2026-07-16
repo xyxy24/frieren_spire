@@ -23,14 +23,18 @@ void drawBreakthroughScreen(sf::RenderTarget& target,
 void drawMerchantScreen(sf::RenderTarget& target, const viewmodel::MerchantViewModel& model,
     const SpellCardArt& spellCards);
 void drawEventScreen(sf::RenderTarget& target, const app::TowerSession& tower,
-    const std::array<std::optional<sf::Texture>, 3>& meteorCards);
+    const std::array<std::optional<sf::Texture>, 3>& meteorCards,
+    const std::array<std::optional<sf::Texture>, 3>& ordenCards,
+    const std::array<std::optional<sf::Texture>, 3>& swordVillageCards);
 void drawPlayer(sf::RenderTarget& target, const PlayerAnimator& animator,
     const PlayerVisualState& state, sf::Color fallbackColor,
     sf::Color spriteTint = sf::Color::White);
 void drawSpecialFloor(sf::RenderTarget& target, const app::TowerSession& tower,
     const PlayerAnimator& playerAnimator, const ShadeChargeAnimator& shadeChargeAnimator,
     const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures,
-    const std::optional<sf::Texture>& meteorNpcTexture);
+    const std::optional<sf::Texture>& meteorNpcTexture,
+    const std::optional<sf::Texture>& ordenNpcTexture,
+    const std::optional<sf::Texture>& swordVillageNpcTexture);
 void drawLoadoutOverlay(sf::RenderTarget& target, const viewmodel::LoadoutSnapshot& model,
     const SpellCardArt& spellCards);
 void drawLootDrop(sf::RenderTarget& target, game::Aabb bounds,

@@ -285,6 +285,33 @@ bool meteorRestChoiceRestoresToMaximum()
             "meteor rest choice must restore current HP to maximum");
 }
 
+bool southernHeroChoicesApplyPersistentProgression()
+{
+    using namespace arcane::game;
+    run::PlayerProgress boosted;
+    events::EventTransaction weakness;
+    const std::array weaknessChoice {events::EventChoice {
+        5301U, 0, 0, 0U, 0, 0U, false, true, false}};
+    if (!expect(weakness.choose(boosted, weaknessChoice, 5301U, 2U)
+            == events::EventResult::Success && boosted.southernHeroBossDamageBoost,
+            "Southern Hero weakness answer must persist the final-boss damage boost"))
+        return false;
+
+    run::PlayerProgress spells;
+    spells.learnedSpells = {1001U, 1002U};
+    progression::registerLearnedSpell(spells, 1001U);
+    progression::registerLearnedSpell(spells, 1002U);
+    events::EventTransaction mastery;
+    const std::array masteryChoice {events::EventChoice {
+        5302U, 0, 0, 0U, 0, 0U, false, false, true}};
+    return expect(mastery.choose(spells, masteryChoice, 5302U, 2U)
+            == events::EventResult::Success,
+            "Southern Hero magic answer must resolve")
+        && expect(progression::spellRank(spells, 1001U) == 2U
+                && progression::spellRank(spells, 1002U) == 2U,
+            "Southern Hero magic answer must upgrade every learned spell once");
+}
+
 bool runTracksTriggeredEventsWithoutDuplicates()
 {
     arcane::app::RunController run(808U);
@@ -545,6 +572,7 @@ int main()
         && failureIsTerminal() && nonCombatFloorsSkipCombatRewards()
         && merchantPurchaseIsAtomic()
         && eventChoiceIsAtomic() && meteorRestChoiceRestoresToMaximum()
+        && southernHeroChoicesApplyPersistentProgression()
         && runTracksTriggeredEventsWithoutDuplicates() && thirdBossVictorySettlesOnce()
         && depletedRewardUsesGoldFallback() && merchantStockAndFloorScheduleReproduce()
         && defaultScheduleBuildsThreeFiveFloorActs()

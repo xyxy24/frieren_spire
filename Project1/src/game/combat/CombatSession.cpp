@@ -405,6 +405,8 @@ DamageResult CombatSession::resolvePlayerDamage(DamageRequest request) noexcept
 DamageResult CombatSession::resolveEnemyDamage(EnemyRuntime& enemy,
     DamageRequest request) noexcept
 {
+    if (isPlayerDamage(request.source))
+        request.sourceMultiplier *= request_.playerDamageMultiplier;
     if (sleepRemaining_ > 0.0F && isPlayerDamage(request.source))
         request.sourceMultiplier *= 0.7F;
     if (enemy.concealmentProgress >= 1.0F) request.blocked = true;

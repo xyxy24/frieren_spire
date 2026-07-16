@@ -66,6 +66,7 @@ struct CombatRequest
     std::optional<std::uint32_t> equippedUltimateSpellId;
     float regularSpellDamageMultiplier {1.0F};
     float regularSpellCooldownMultiplier {1.0F};
+    float playerDamageMultiplier {1.0F};
     int startingShield {};
     std::vector<std::uint32_t> relicIds;
 };

@@ -393,10 +393,15 @@ void TowerSession::startNextFloor()
             ? scheduler_.next(run_.context())
             : ((run_.context().floorIndex + 1U) % config_.floorsPerBoss == 0U
                 ? game::run::FloorType::Boss : game::run::FloorType::Combat);
-    if (currentFloorType_ == game::run::FloorType::Event
-        && std::all_of(run_.context().triggeredEvents.begin(),
-            run_.context().triggeredEvents.end(), [](const bool triggered) { return triggered; }))
-        currentFloorType_ = game::run::FloorType::Combat;
+    if (currentFloorType_ == game::run::FloorType::Event)
+    {
+        const std::size_t eligibleEvents = run_.context().act >= 2U ? 4U : 3U;
+        if (std::all_of(run_.context().triggeredEvents.begin(),
+                run_.context().triggeredEvents.begin()
+                    + static_cast<std::ptrdiff_t>(eligibleEvents),
+                [](const bool triggered) { return triggered; }))
+            currentFloorType_ = game::run::FloorType::Combat;
+    }
     merchantStock_.clear();
     eventTransaction_.reset();
     combat_.reset();
@@ -454,9 +459,10 @@ void TowerSession::startNextFloor()
             ? spellOffer.candidates[0] : 0U;
         game::run::DeterministicRng eventRng(game::run::deriveStreamSeed(
             run_.context().floorSeed, game::run::RandomStream::Event));
-        std::array<std::size_t, 3> availableEvents {};
+        std::array<std::size_t, 4> availableEvents {};
         std::size_t availableCount = 0U;
-        for (std::size_t index = 0U; index < availableEvents.size(); ++index)
+        const std::size_t eligibleEvents = run_.context().act >= 2U ? 4U : 3U;
+        for (std::size_t index = 0U; index < eligibleEvents; ++index)
             if (!run_.eventTriggered(index)) availableEvents[availableCount++] = index;
         if (availableCount == 0U)
             throw std::logic_error("event floor has no untriggered event");
@@ -464,7 +470,8 @@ void TowerSession::startNextFloor()
             static_cast<std::uint32_t>(availableCount))];
         run_.markEventTriggered(eventIndex);
         eventKind_ = eventIndex == 0U ? EventKind::AldenBall
-            : (eventIndex == 1U ? EventKind::HalfCenturyMeteorShower : EventKind::SwordVillage);
+            : (eventIndex == 1U ? EventKind::HalfCenturyMeteorShower
+                : (eventIndex == 2U ? EventKind::SwordVillage : EventKind::SouthernHero));
         if (eventKind_ == EventKind::AldenBall)
             eventChoices_ = {{
                 game::events::EventChoice {5001U, 0, 0, 0U, 30, 0U, false},
@@ -477,11 +484,17 @@ void TowerSession::startNextFloor()
                 game::events::EventChoice {5102U, 0, 0, 0U, 0, 0U, true},
                 game::events::EventChoice {5103U, 0, eventRng.index(2U) == 0U ? 99 : 0, 0U, 0, 0U, false}
             }};
-        else
+        else if (eventKind_ == EventKind::SwordVillage)
             eventChoices_ = {{
                 game::events::EventChoice {5201U, 0, 0, game::relics::HeroSwordId, 0, 0U, false},
                 game::events::EventChoice {5202U, 0, 0, game::relics::TrueHeroSwordId, 0, 0U, false},
                 game::events::EventChoice {5203U, 0, 50, 0U, 0, 0U, false}
+            }};
+        else
+            eventChoices_ = {{
+                game::events::EventChoice {5301U, 0, 0, 0U, 0, 0U, false, true, false},
+                game::events::EventChoice {5302U, 0, 0, 0U, 0, 0U, false, false, true},
+                game::events::EventChoice {5303U, 0, 0, 0U, 50, 0U, false}
             }};
         explorationPlayer_.emplace(config_.playerSpawn);
         return;
@@ -645,6 +658,10 @@ void TowerSession::startNextFloor()
         : std::nullopt;
     request.regularSpellDamageMultiplier = game::progression::regularDamageMultiplier(run_.player());
     request.regularSpellCooldownMultiplier = game::progression::regularCooldownMultiplier(run_.player());
+    if (currentFloorType_ == game::run::FloorType::Boss
+        && run_.context().bossesDefeated == 2U
+        && run_.player().southernHeroBossDamageBoost)
+        request.playerDamageMultiplier = 1.25F;
     request.startingShield = game::progression::startingShield(run_.player());
     request.relicIds = run_.player().relics;
 

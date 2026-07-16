@@ -284,3 +284,19 @@
 - Added by: project team, 2026-07-16.
 - Original source/license: team-provided classroom prototype artwork.
 - Purpose: the three event-choice cards and the spatial NPC for the Half-Century Meteor Shower.
+
+## Lord Orden's Ball event
+
+- Files: `events/lord_orden_ball/5001.png` through `5003.png` and
+  `npcs/lord_orden.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: the three event-choice cards and the spatial NPC for Lord Orden's Ball.
+
+## Village of the Sword event
+
+- Files: `events/village_of_the_sword/5201.png` through `5203.png` and
+  `npcs/sword_village_keeper.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: the three event-choice cards and the spatial NPC for Village of the Sword.

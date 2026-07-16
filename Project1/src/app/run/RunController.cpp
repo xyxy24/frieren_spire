@@ -199,7 +199,7 @@ game::events::EventResult RunController::chooseEvent(game::events::EventTransact
 {
     if (phase_ != game::run::RunPhase::InEncounter || currentFloorType_ != game::run::FloorType::Event)
         return game::events::EventResult::ChoiceNotFound;
-    return transaction.choose(player_, choices, choiceId);
+    return transaction.choose(player_, choices, choiceId, context_.act);
 }
 
 bool RunController::equip(const std::size_t slot, const game::run::ContentId spell)

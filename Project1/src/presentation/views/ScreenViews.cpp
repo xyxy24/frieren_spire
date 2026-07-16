@@ -203,7 +203,9 @@ void drawMerchantScreen(sf::RenderTarget& target, const ui::MerchantViewModel& m
 }
 
 void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
-    const std::array<std::optional<sf::Texture>, 3>& meteorCards)
+    const std::array<std::optional<sf::Texture>, 3>& meteorCards,
+    const std::array<std::optional<sf::Texture>, 3>& ordenCards,
+    const std::array<std::optional<sf::Texture>, 3>& swordVillageCards)
 {
     sf::RectangleShape panel({1120.0F, 650.0F});
     panel.setPosition({80.0F, 45.0F});
@@ -213,35 +215,48 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     target.draw(panel);
     const bool meteor = tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower;
     const bool swordVillage = tower.eventKind() == arcane::app::EventKind::SwordVillage;
-    const std::string_view title = swordVillage ? "VILLAGE OF THE SWORD"
-        : (meteor ? "HALF CENTURY METEOR SHOWER" : "LORD ORDEN'S BALL");
-    drawPixelText(target, title, {swordVillage ? 405.0F : (meteor ? 315.0F : 430.0F), 70.0F},
+    const bool southernHero = tower.eventKind() == arcane::app::EventKind::SouthernHero;
+    const std::string_view title = southernHero ? "HERO OF THE SOUTH"
+        : (swordVillage ? "VILLAGE OF THE SWORD"
+            : (meteor ? "HALF CENTURY METEOR SHOWER" : "LORD ORDEN'S BALL"));
+    drawPixelText(target, title, {southernHero ? 430.0F
+            : (swordVillage ? 405.0F : (meteor ? 315.0F : 430.0F)), 70.0F},
         2.1F, sf::Color {255, 231, 145});
-    drawPixelText(target, swordVillage
+    drawPixelText(target, southernHero
+        ? "THE ADVENTURER BEFORE YOU CLAIMS HE CAN SEE THE FUTURE."
+        : (swordVillage
         ? "A HERO'S SWORD LIES SEALED HERE. ONLY A TRUE HERO MAY DRAW IT."
         : (meteor ? "A METEOR SHOWER SEEN ONCE IN FIFTY YEARS PASSES ABOVE."
-            : "LORD ORDEN ASKS STARK TO POSE AS HIS SON AT A SOCIAL BALL."),
+            : "LORD ORDEN ASKS STARK TO POSE AS HIS SON AT A SOCIAL BALL.")),
         {175.0F, 115.0F}, 1.15F);
-    drawPixelText(target, swordVillage
+    drawPixelText(target, southernHero
+        ? "HE OFFERS TO ANSWER ONE QUESTION. WHAT WILL YOU ASK?"
+        : (swordVillage
         ? "HIMMEL COULD NOT DRAW IT. WHAT DO YOU THINK?"
         : (meteor ? "TO YOU IT IS NOT SO RARE. HOW WILL YOU SPEND THE NIGHT?"
-            : "HE PROMISES YOU A REWARD. YOUR CHOICE IS:"),
+            : "HE PROMISES YOU A REWARD. YOUR CHOICE IS:")),
         {245.0F, 145.0F}, 1.15F);
 
-    const std::array<std::string_view, 3> effects = swordVillage
+    const std::array<std::string_view, 3> effects = southernHero
+        ? std::array<std::string_view, 3> {"FINAL BOSS DAMAGE +25%",
+            "ALL OWNED SPELL RANKS +1", "+50 MAX HP"}
+        : (swordVillage
         ? std::array<std::string_view, 3> {"GAIN HERO SWORD", "GAIN TRUE HERO SWORD", "+50 GOLD"}
         : (meteor
             ? std::array<std::string_view, 3> {"GAIN A RANDOM SPELLBOOK", "RESTORE HP TO MAX", "50 PERCENT CHANCE OF 99 GOLD"}
-            : std::array<std::string_view, 3> {"+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"});
+            : std::array<std::string_view, 3> {"+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"}));
     if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
     {
         if (tower.eventResultChoice())
         {
-            const auto base = swordVillage ? 5201U : (meteor ? 5101U : 5001U);
+            const auto base = southernHero ? 5301U
+                : (swordVillage ? 5201U : (meteor ? 5101U : 5001U));
             const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - base);
-            if (meteor && choiceIndex < meteorCards.size() && meteorCards[choiceIndex])
+            const auto& eventCards = swordVillage ? swordVillageCards
+                : (meteor ? meteorCards : ordenCards);
+            if (!southernHero && choiceIndex < eventCards.size() && eventCards[choiceIndex])
             {
-                sf::Sprite card(*meteorCards[choiceIndex]);
+                sf::Sprite card(*eventCards[choiceIndex]);
                 card.setPosition({535.0F, 205.0F});
                 target.draw(card);
             }
@@ -264,9 +279,11 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     const auto choices = tower.eventChoices();
     for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
     {
-        if (meteor && meteorCards[index])
+        const auto& eventCards = swordVillage ? swordVillageCards
+            : (meteor ? meteorCards : ordenCards);
+        if (!southernHero && eventCards[index])
         {
-            sf::Sprite card(*meteorCards[index]);
+            sf::Sprite card(*eventCards[index]);
             card.setPosition({CardX[index], 205.0F});
             target.draw(card);
         }
@@ -307,7 +324,9 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures,
-    const std::optional<sf::Texture>& meteorNpcTexture)
+    const std::optional<sf::Texture>& meteorNpcTexture,
+    const std::optional<sf::Texture>& ordenNpcTexture,
+    const std::optional<sf::Texture>& swordVillageNpcTexture)
 {
     drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
     drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
@@ -325,14 +344,21 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
         shadeChargeAnimator.drawFront(target, bottomCenter);
     }
     const auto npc = tower.npcBounds();
+    const std::optional<sf::Texture>* eventNpcTexture = nullptr;
+    if (tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower)
+        eventNpcTexture = &meteorNpcTexture;
+    else if (tower.eventKind() == arcane::app::EventKind::AldenBall)
+        eventNpcTexture = &ordenNpcTexture;
+    else if (tower.eventKind() == arcane::app::EventKind::SwordVillage)
+        eventNpcTexture = &swordVillageNpcTexture;
     if (tower.currentFloorType() == arcane::game::run::FloorType::Event
-        && tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower
-        && meteorNpcTexture)
+        && eventNpcTexture && *eventNpcTexture)
     {
-        sf::Sprite npcSprite(*meteorNpcTexture);
+        const sf::Texture& texture = **eventNpcTexture;
+        sf::Sprite npcSprite(texture);
         npcSprite.setPosition({npc.left + (npc.width
-                - static_cast<float>(meteorNpcTexture->getSize().x)) * 0.5F,
-            npc.top + npc.height - static_cast<float>(meteorNpcTexture->getSize().y)});
+                - static_cast<float>(texture.getSize().x)) * 0.5F,
+            npc.top + npc.height - static_cast<float>(texture.getSize().y)});
         target.draw(npcSprite);
         return;
     }

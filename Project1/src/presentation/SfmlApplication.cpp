@@ -223,6 +223,10 @@ struct RenderResources
     const StaircaseTextures& staircases;
     const std::array<std::optional<sf::Texture>, 3>& meteorCards;
     const std::optional<sf::Texture>& meteorNpc;
+    const std::array<std::optional<sf::Texture>, 3>& ordenCards;
+    const std::optional<sf::Texture>& ordenNpc;
+    const std::array<std::optional<sf::Texture>, 3>& swordVillageCards;
+    const std::optional<sf::Texture>& swordVillageNpc;
     const arcane::presentation::EnemyAnimator& enemyAnimator;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
@@ -306,7 +310,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
         {
             drawSpecialFloor(window, *tower, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.arena, resources.staircases,
-                resources.meteorNpc);
+                resources.meteorNpc, resources.ordenNpc, resources.swordVillageNpc);
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
             {
@@ -315,7 +319,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             }
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Event)
-                drawEventScreen(window, *tower, resources.meteorCards);
+                drawEventScreen(window, *tower, resources.meteorCards, resources.ordenCards,
+                    resources.swordVillageCards);
         }
         int health = tower->run().player().currentHp;
         std::optional<arcane::game::PlayerStateView> combatView;
@@ -539,6 +544,18 @@ int arcane::presentation::SfmlApplication::run()
         loadTexture("assets/events/half_century_meteor_shower/5103.png")};
     const std::optional<sf::Texture> meteorNpcTexture =
         loadTexture("assets/npcs/meteor_observer.png");
+    const std::array<std::optional<sf::Texture>, 3> ordenCardTextures {
+        loadTexture("assets/events/lord_orden_ball/5001.png"),
+        loadTexture("assets/events/lord_orden_ball/5002.png"),
+        loadTexture("assets/events/lord_orden_ball/5003.png")};
+    const std::optional<sf::Texture> ordenNpcTexture =
+        loadTexture("assets/npcs/lord_orden.png");
+    const std::array<std::optional<sf::Texture>, 3> swordVillageCardTextures {
+        loadTexture("assets/events/village_of_the_sword/5201.png"),
+        loadTexture("assets/events/village_of_the_sword/5202.png"),
+        loadTexture("assets/events/village_of_the_sword/5203.png")};
+    const std::optional<sf::Texture> swordVillageNpcTexture =
+        loadTexture("assets/npcs/sword_village_keeper.png");
     arcane::presentation::EnemyAnimator enemyAnimator;
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
@@ -566,6 +583,8 @@ int arcane::presentation::SfmlApplication::run()
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,
         denkenTextures, tornadoTextures, dialoguePortraits,
         arenaTextures, staircaseTextures, meteorCardTextures, meteorNpcTexture,
+        ordenCardTextures, ordenNpcTexture,
+        swordVillageCardTextures, swordVillageNpcTexture,
         enemyAnimator, lootBookAnimator, playerAnimator,
         shadeChargeAnimator, spellCards,
         spellEffectAnimator};
