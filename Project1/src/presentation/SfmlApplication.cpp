@@ -229,6 +229,7 @@ struct RenderResources
     const std::optional<sf::Texture>& swordVillageNpc;
     const std::array<std::optional<sf::Texture>, 3>& southernHeroCards;
     const std::optional<sf::Texture>& southernHeroNpc;
+    const std::optional<sf::Texture>& merchantNpc;
     const arcane::presentation::EnemyAnimator& enemyAnimator;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
@@ -313,7 +314,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             drawSpecialFloor(window, *tower, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.arena, resources.staircases,
                 resources.meteorNpc, resources.ordenNpc, resources.swordVillageNpc,
-                resources.southernHeroNpc);
+                resources.southernHeroNpc, resources.merchantNpc);
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
             {
@@ -569,6 +570,8 @@ int arcane::presentation::SfmlApplication::run()
         loadTexture("assets/events/hero_of_the_south/5303.png")};
     const std::optional<sf::Texture> southernHeroNpcTexture =
         loadTexture("assets/npcs/hero_of_the_south.png");
+    const std::optional<sf::Texture> merchantNpcTexture =
+        loadTexture("assets/npcs/merchant.png");
     arcane::presentation::EnemyAnimator enemyAnimator;
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
@@ -599,6 +602,7 @@ int arcane::presentation::SfmlApplication::run()
         ordenCardTextures, ordenNpcTexture,
         swordVillageCardTextures, swordVillageNpcTexture,
         southernHeroCardTextures, southernHeroNpcTexture,
+        merchantNpcTexture,
         enemyAnimator, lootBookAnimator, playerAnimator,
         shadeChargeAnimator, spellCards,
         spellEffectAnimator};

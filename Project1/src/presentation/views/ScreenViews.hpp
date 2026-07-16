@@ -36,7 +36,8 @@ void drawSpecialFloor(sf::RenderTarget& target, const app::TowerSession& tower,
     const std::optional<sf::Texture>& meteorNpcTexture,
     const std::optional<sf::Texture>& ordenNpcTexture,
     const std::optional<sf::Texture>& swordVillageNpcTexture,
-    const std::optional<sf::Texture>& southernHeroNpcTexture);
+    const std::optional<sf::Texture>& southernHeroNpcTexture,
+    const std::optional<sf::Texture>& merchantNpcTexture);
 void drawLoadoutOverlay(sf::RenderTarget& target, const viewmodel::LoadoutSnapshot& model,
     const SpellCardArt& spellCards);
 void drawLootDrop(sf::RenderTarget& target, game::Aabb bounds,

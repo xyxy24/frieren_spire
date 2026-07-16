@@ -309,3 +309,10 @@
 - Original source/license: team-provided classroom prototype artwork.
 - Purpose: the three event-choice cards and the spatial NPC for Hero of the South. The high
   resolution card art is scaled to the standard `210x280` event-card area at runtime.
+
+## Merchant NPC
+
+- File: `npcs/merchant.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: replace the geometric merchant placeholder in spatial merchant rooms.

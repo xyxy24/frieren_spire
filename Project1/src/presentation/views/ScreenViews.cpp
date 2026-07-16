@@ -336,7 +336,8 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     const std::optional<sf::Texture>& meteorNpcTexture,
     const std::optional<sf::Texture>& ordenNpcTexture,
     const std::optional<sf::Texture>& swordVillageNpcTexture,
-    const std::optional<sf::Texture>& southernHeroNpcTexture)
+    const std::optional<sf::Texture>& southernHeroNpcTexture,
+    const std::optional<sf::Texture>& merchantNpcTexture)
 {
     drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
     drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
@@ -354,6 +355,17 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
         shadeChargeAnimator.drawFront(target, bottomCenter);
     }
     const auto npc = tower.npcBounds();
+    if (tower.currentFloorType() == arcane::game::run::FloorType::Merchant
+        && merchantNpcTexture)
+    {
+        sf::Sprite npcSprite(*merchantNpcTexture);
+        const auto size = merchantNpcTexture->getSize();
+        npcSprite.setPosition({npc.left
+                + (npc.width - static_cast<float>(size.x)) * 0.5F,
+            npc.top + npc.height - static_cast<float>(size.y)});
+        target.draw(npcSprite);
+        return;
+    }
     const std::optional<sf::Texture>* eventNpcTexture = nullptr;
     if (tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower)
         eventNpcTexture = &meteorNpcTexture;
