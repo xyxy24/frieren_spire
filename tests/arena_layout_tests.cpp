@@ -92,6 +92,38 @@ bool auraBossPlatformsRemainClearlyAboveGround()
     return true;
 }
 
+bool finalBossPlatformsClearGroundCopiesAndReachFrieren()
+{
+    constexpr float GroundTop = 640.0F;
+    constexpr float CopyHeight = 72.0F;
+    constexpr float FrierenHoverHeight = 160.0F;
+    constexpr float PlayerHeight = 64.0F;
+    constexpr float AttackVerticalOffset = 14.0F;
+    constexpr float AttackHeight = 36.0F;
+    constexpr float MaximumNormalJumpRise = 132.0F;
+    const auto& boss = arcane::game::floors::arenaLayout(315U);
+    if (!expect(boss.oneWayPlatforms.size() == 2U,
+        "Water Mirror boss room should retain two symmetric side platforms"))
+        return false;
+    for (const auto& platform : boss.oneWayPlatforms)
+    {
+        const float rise = GroundTop - platform.top;
+        const float frierenTop = GroundTop - FrierenHoverHeight - CopyHeight;
+        const float frierenBottom = frierenTop + CopyHeight;
+        const float platformAttackTop = platform.top - PlayerHeight + AttackVerticalOffset;
+        const float platformAttackBottom = platformAttackTop + AttackHeight;
+        if (!expect(platform.top <= GroundTop - CopyHeight,
+                "final boss platforms must keep a standing player above ground-copy hitboxes")
+            || !expect(rise <= MaximumNormalJumpRise,
+                "final boss platforms must remain reachable with a normal jump")
+            || !expect(platformAttackTop < frierenBottom
+                    && platformAttackBottom > frierenTop,
+                "the raised Frieren copy must remain reachable by a platform basic attack"))
+            return false;
+    }
+    return true;
+}
+
 bool tacticalSpawnPointsFollowPlatformGeometry()
 {
     const auto& layout = arcane::game::floors::arenaLayout(214U);
@@ -140,6 +172,7 @@ int main()
         && specialFloorsAlwaysUseSafeRooms()
         && combatAndBossSelectionsStayInsideTheirAct()
         && auraBossPlatformsRemainClearlyAboveGround()
+        && finalBossPlatformsClearGroundCopiesAndReachFrieren()
         && tacticalSpawnPointsFollowPlatformGeometry();
     if (!passed) return 1;
     std::cout << "All arena layout tests passed.\n";

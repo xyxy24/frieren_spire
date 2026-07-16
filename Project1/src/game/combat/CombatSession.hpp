@@ -58,9 +58,24 @@ private:
     static constexpr float RevolteCrossSlashRecoverySeconds = 0.45F;
     static constexpr float RevolteFlyingBladeWindupSeconds = 0.55F;
     static constexpr float RevolteFlyingBladeSpeed = 520.0F;
+    static constexpr float StarkCopyShockwaveHeight = 220.0F;
+    static constexpr float FernCopyFirstBeamWindupSeconds = 0.55F;
+    static constexpr float FernCopyFollowupBeamWindupSeconds = 0.42F;
+    static constexpr float CopyBeamTravelDistance = 1600.0F;
+    static constexpr float CopyBeamTravelSpeed = 3000.0F;
+    static constexpr float CopyBeamVisualLength = 144.0F;
+    static constexpr float CopyBeamDuration =
+        (CopyBeamTravelDistance + CopyBeamVisualLength) / CopyBeamTravelSpeed;
+    static constexpr float FrierenCopyLightningWindupSeconds = 0.7F;
+    static constexpr float FrierenCopyLightningHeight = 240.0F;
+    static constexpr float FrierenCopyHoverHeight = 160.0F;
+    static constexpr float FrierenCopyGroundFireWindupSeconds = 0.8F;
+    static constexpr float FrierenCopyBeamWindupSeconds = 0.55F;
 
     struct SlashSegment { Vec2 start; Vec2 end; };
     struct EnemyRuntime;
+    [[nodiscard]] static bool segmentIntersectsAabb(Vec2 start, Vec2 end,
+        const Aabb& bounds, float halfThickness) noexcept;
     [[nodiscard]] Aabb playerBounds() const noexcept;
     [[nodiscard]] std::array<SlashSegment, 2> revolteCrossSlashSegments(
         Vec2 center) const noexcept;
@@ -122,6 +137,7 @@ private:
         bool revolteTransitionPending {};
         bool revolteCounterDashPending {};
         std::uint8_t revolteCrossSlashRound {};
+        std::uint8_t fernVolleyShots {};
         std::array<Vec2, 3> revolteFlyingBladeStarts;
         std::array<Vec2, 3> revolteFlyingBladeTargets;
         float secondaryCooldown {};
@@ -171,6 +187,7 @@ private:
         Vec2 velocity;
         std::uint32_t visualId {};
         bool usesVelocity {};
+        float homingDelayRemaining {};
     };
     struct ActiveEnemyBeam
     {
@@ -181,6 +198,11 @@ private:
         std::uint32_t visualId {9200U};
         float visualThickness {18.0F};
         float duration {0.6F};
+        bool propagatesFromCaster {};
+        float travelSpeed {};
+        float maximumVisualLength {};
+        int damage {};
+        bool damageResolved {};
     };
     struct PendingEnemyLightning
     {

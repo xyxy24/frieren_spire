@@ -232,11 +232,15 @@ CombatSession::CombatSession(CombatRequest request)
             || spawn.archetype == EnemyArchetype::WaterMirrorDemon)
             position.y = request_.worldBounds.groundTop - config.height;
         if (config.flying)
+        {
+            const float defaultHoverHeight = spawn.archetype == EnemyArchetype::LargeBirdDemon
+                ? 144.0F
+                : (spawn.archetype == EnemyArchetype::FrierenCopy
+                        ? FrierenCopyHoverHeight : 132.0F);
             position.y = spawn.flyingPlacement
                 ? spawn.position.y - config.height * 0.5F
-                : request_.worldBounds.groundTop
-                    - (spawn.archetype == EnemyArchetype::LargeBirdDemon ? 144.0F : 132.0F)
-                        - config.height;
+                : request_.worldBounds.groundTop - defaultHoverHeight - config.height;
+        }
         if (spawn.archetype == EnemyArchetype::WaterMirrorDemon)
         {
             position.x = (request_.worldBounds.left + request_.worldBounds.right
@@ -730,7 +734,14 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     std::erase_if(activeTornadoes_, [](const auto& tornado) { return tornado.remaining <= 0.0F; });
     for (auto& projectile : activeEnemyProjectiles_)
     {
-        if (projectile.tracksPlayer)
+        float homingDelta = deltaSeconds;
+        if (projectile.homingDelayRemaining > 0.0F)
+        {
+            const float consumed = std::min(homingDelta, projectile.homingDelayRemaining);
+            projectile.homingDelayRemaining -= consumed;
+            homingDelta -= consumed;
+        }
+        if (projectile.tracksPlayer && homingDelta > 0.0F)
         {
             const auto target = playerBounds();
             const float targetCenterX = target.left + target.width * 0.5F;
@@ -746,7 +757,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             constexpr float Pi = 3.14159265358979323846F;
             while (angleDifference > Pi) angleDifference -= Pi * 2.0F;
             while (angleDifference < -Pi) angleDifference += Pi * 2.0F;
-            const float maximumTurn = projectile.homingTurnRateRadians * deltaSeconds;
+            const float maximumTurn = projectile.homingTurnRateRadians * homingDelta;
             currentAngle += std::clamp(angleDifference, -maximumTurn, maximumTurn);
             projectile.velocity = {std::cos(currentAngle) * projectile.speed,
                 std::sin(currentAngle) * projectile.speed};
@@ -781,7 +792,38 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         return projectile.remainingDistance <= 0.0F;
     });
     for (auto& beam : activeEnemyBeams_)
+    {
+        const float previousElapsed = std::max(0.0F, beam.duration - beam.remaining);
         beam.remaining = std::max(0.0F, beam.remaining - deltaSeconds);
+        if (!beam.propagatesFromCaster || beam.damageResolved) continue;
+
+        const float elapsed = std::max(0.0F, beam.duration - beam.remaining);
+        const float pathDx = beam.end.x - beam.start.x;
+        const float pathDy = beam.end.y - beam.start.y;
+        const float pathLength = std::max(0.001F, std::sqrt(pathDx * pathDx + pathDy * pathDy));
+        const float inversePathLength = 1.0F / pathLength;
+        const float previousTailDistance = std::clamp(
+            previousElapsed * beam.travelSpeed - beam.maximumVisualLength,
+            0.0F, pathLength);
+        const float currentHeadDistance = std::clamp(
+            elapsed * beam.travelSpeed, 0.0F, pathLength);
+        const Vec2 sweptStart {beam.start.x + pathDx * inversePathLength * previousTailDistance,
+            beam.start.y + pathDy * inversePathLength * previousTailDistance};
+        const Vec2 sweptEnd {beam.start.x + pathDx * inversePathLength * currentHeadDistance,
+            beam.start.y + pathDy * inversePathLength * currentHeadDistance};
+        if (currentHeadDistance <= previousTailDistance
+            || !segmentIntersectsAabb(sweptStart, sweptEnd, playerBounds(),
+                beam.visualThickness * 0.5F)) continue;
+
+        const float direction = beam.end.x >= beam.start.x ? 1.0F : -1.0F;
+        const auto result = resolvePlayerDamage({DamageSource::EnemyAttack,
+            beam.sequence, beam.damage, 1.0F, relics_.incomingDamageMultiplier(), 0,
+            player_.isShadowDashing() || spellInvulnerableRemaining_ > 0.0F});
+        if (result.appliedDamage > 0)
+            player_.applyHitReaction(direction * KnockbackSpeed,
+                playerControlDuration(HitStunSeconds));
+        beam.damageResolved = true;
+    }
     std::erase_if(activeEnemyBeams_, [](const auto& beam) { return beam.remaining <= 0.0F; });
     for (auto& storm : activeEnemyLightningStorms_)
     {
@@ -790,7 +832,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
         {
             const auto target = playerBounds();
             pendingEnemyLightning_.push_back({{target.left + target.width * 0.5F - 42.0F,
-                request_.worldBounds.groundTop - 180.0F, 84.0F, 180.0F},
+                request_.worldBounds.groundTop - FrierenCopyLightningHeight,
+                84.0F, FrierenCopyLightningHeight},
                 0.4F + deltaSeconds, ++environmentalSequence_});
             --storm.strikesRemaining;
             storm.nextStrikeRemaining += 0.8F;
@@ -1795,7 +1838,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
             static_cast<void>(waterMirror->health.damage(waterMirror->health.current() / 2));
             const auto config = enemyConfigFor(EnemyArchetype::FrierenCopy);
             Vec2 position {820.0F,
-                request_.worldBounds.groundTop - 48.0F - config.height};
+                request_.worldBounds.groundTop - FrierenCopyHoverHeight - config.height};
             const int copyHealth = waterMirror->health.maximum() == 200
                 ? 350 : waterMirror->health.maximum();
             enemies_.push_back({EnemyArchetype::FrierenCopy,
@@ -2090,12 +2133,34 @@ void CombatSession::populateSpellEffects(std::vector<SpellEffectView>& views) co
     }
     for (const auto& beam : activeEnemyBeams_)
     {
-        const float dx = beam.end.x - beam.start.x;
-        const float dy = beam.end.y - beam.start.y;
+        Vec2 visibleStart = beam.start;
+        Vec2 visibleEnd = beam.end;
+        if (beam.propagatesFromCaster)
+        {
+            const float elapsed = std::max(0.0F, beam.duration - beam.remaining);
+            const float pathDx = beam.end.x - beam.start.x;
+            const float pathDy = beam.end.y - beam.start.y;
+            const float pathLength = std::max(
+                0.001F, std::sqrt(pathDx * pathDx + pathDy * pathDy));
+            const float inversePathLength = 1.0F / pathLength;
+            const float travelDistance = elapsed * beam.travelSpeed;
+            const float headDistance = std::clamp(travelDistance, 0.0F, pathLength);
+            const float tailDistance = std::clamp(
+                travelDistance - beam.maximumVisualLength, 0.0F, pathLength);
+            visibleStart = {beam.start.x + pathDx * inversePathLength * tailDistance,
+                beam.start.y + pathDy * inversePathLength * tailDistance};
+            visibleEnd = {beam.start.x + pathDx * inversePathLength * headDistance,
+                beam.start.y + pathDy * inversePathLength * headDistance};
+        }
+        const float dx = visibleEnd.x - visibleStart.x;
+        const float dy = visibleEnd.y - visibleStart.y;
         const float length = std::sqrt(dx * dx + dy * dy);
-        const float angle = std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F;
-        views.push_back({beam.visualId, {beam.start.x,
-                beam.start.y - beam.visualThickness * 0.5F, length, beam.visualThickness},
+        const float originalDx = beam.end.x - beam.start.x;
+        const float originalDy = beam.end.y - beam.start.y;
+        const float angle = std::atan2(originalDy, originalDx)
+            * 180.0F / 3.14159265358979323846F;
+        views.push_back({beam.visualId, {visibleStart.x,
+                visibleStart.y - beam.visualThickness * 0.5F, length, beam.visualThickness},
             beam.remaining, beam.duration, dx >= 0.0F ? 1.0F : -1.0F, angle});
     }
     for (const auto& enemy : enemies_)
@@ -2135,6 +2200,38 @@ void CombatSession::populateSpellEffects(std::vector<SpellEffectView>& views) co
                 RevolteFlyingBladeWindupSeconds, dx >= 0.0F ? 1.0F : -1.0F,
                 std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F});
         }
+    }
+    for (const auto& enemy : enemies_)
+    {
+        const bool fernBeam = enemy.archetype == EnemyArchetype::FernCopy
+            && enemy.manualSkill == 2;
+        const bool frierenBeam = enemy.archetype == EnemyArchetype::FrierenCopy
+            && enemy.manualSkill == 2;
+        if (!enemy.health.isAlive() || enemy.specialWindup <= 0.0F
+            || (!fernBeam && !frierenBeam)) continue;
+        const auto caster = enemy.controller.bounds();
+        const Vec2 start {caster.left + caster.width * 0.5F,
+            caster.top + caster.height * 0.4F};
+        const float dx = enemy.specialTarget.x - start.x;
+        const float dy = enemy.specialTarget.y - start.y;
+        constexpr float length = CopyBeamTravelDistance;
+        const float duration = fernBeam
+            ? (enemy.fernVolleyShots == 0U ? FernCopyFirstBeamWindupSeconds
+                                           : FernCopyFollowupBeamWindupSeconds)
+            : FrierenCopyBeamWindupSeconds;
+        views.push_back({CopyBeamTelegraphVisualId,
+            {start.x, start.y - 2.0F, length, 4.0F}, enemy.specialWindup, duration,
+            dx >= 0.0F ? 1.0F : -1.0F,
+            std::atan2(dy, dx) * 180.0F / 3.14159265358979323846F});
+    }
+    for (const auto& enemy : enemies_)
+    {
+        if (enemy.archetype != EnemyArchetype::FrierenCopy || !enemy.health.isAlive()
+            || enemy.manualSkill != 1 || enemy.specialWindup <= 0.0F) continue;
+        views.push_back({FrierenCopyGroundFireTelegraphVisualId,
+            {request_.worldBounds.left, request_.worldBounds.groundTop - 24.0F,
+                request_.worldBounds.right - request_.worldBounds.left, 24.0F},
+            enemy.specialWindup, FrierenCopyGroundFireWindupSeconds});
     }
     for (const auto& lightning : pendingEnemyLightning_)
         views.push_back({lightning.telegraphVisualId, lightning.bounds,

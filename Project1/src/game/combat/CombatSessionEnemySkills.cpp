@@ -5,9 +5,7 @@
 
 namespace arcane::game
 {
-namespace
-{
-bool segmentIntersectsAabb(const Vec2 start, const Vec2 end, const Aabb& bounds,
+bool CombatSession::segmentIntersectsAabb(const Vec2 start, const Vec2 end, const Aabb& bounds,
     const float halfThickness) noexcept
 {
     const float left = bounds.left - halfThickness;
@@ -28,7 +26,6 @@ bool segmentIntersectsAabb(const Vec2 start, const Vec2 end, const Aabb& bounds,
         return minimum <= maximum;
     };
     return clip(start.x, dx, left, right) && clip(start.y, dy, top, bottom);
-}
 }
 
 std::array<CombatSession::SlashSegment, 2> CombatSession::revolteCrossSlashSegments(
@@ -345,12 +342,17 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                             static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
                                 ++environmentalSequence_, 20, 1.0F,
                                 relics_.incomingDamageMultiplier()}));
-                        const float left = enemy.specialDirection > 0.0F
-                            ? landed.left + landed.width : landed.left - 32.0F;
-                        activeEnemyProjectiles_.push_back({{left,
-                            request_.worldBounds.groundTop - 96.0F, 32.0F, 96.0F},
-                            enemy.specialDirection, 300.0F, 300.0F,
-                            ++environmentalSequence_, 20, 220.0F});
+                        const auto shockwaveSequence = ++environmentalSequence_;
+                        for (const float direction : {-1.0F, 1.0F})
+                        {
+                            const float left = direction > 0.0F
+                                ? landed.left + landed.width : landed.left - 32.0F;
+                            activeEnemyProjectiles_.push_back({{left,
+                                request_.worldBounds.groundTop - StarkCopyShockwaveHeight,
+                                32.0F, StarkCopyShockwaveHeight},
+                                direction, 300.0F, 300.0F,
+                                shockwaveSequence, 20, 220.0F});
+                        }
                         enemy.manualSkill = 2;
                         enemy.specialActive = 0.6F;
                     }
@@ -418,31 +420,45 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                     const auto caster = enemy.controller.bounds();
                     const Vec2 start {caster.left + caster.width * 0.5F,
                         caster.top + caster.height * 0.4F};
-                    const auto target = playerBounds();
-                    const float dx = target.left + target.width * 0.5F - start.x;
-                    const float dy = target.top + target.height * 0.5F - start.y;
+                    const float dx = enemy.specialTarget.x - start.x;
+                    const float dy = enemy.specialTarget.y - start.y;
                     const float length = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
-                    const Vec2 end {start.x + dx / length * 256.0F,
-                        start.y + dy / length * 256.0F};
+                    const Vec2 end {start.x + dx / length * CopyBeamTravelDistance,
+                        start.y + dy / length * CopyBeamTravelDistance};
                     const auto sequence = ++environmentalSequence_;
-                    activeEnemyBeams_.push_back({start, end, 0.6F, sequence,
-                        FrierenCopyBeamVisualId});
-                    if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
-                        static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
-                            sequence, 15, 1.0F, relics_.incomingDamageMultiplier()}));
+                    activeEnemyBeams_.push_back({start, end, CopyBeamDuration, sequence,
+                        FrierenCopyBeamVisualId, 18.0F, CopyBeamDuration, true,
+                        CopyBeamTravelSpeed, CopyBeamVisualLength, 15});
                     ++enemy.summonCount;
+                    ++enemy.fernVolleyShots;
                     const std::uint64_t roll = request_.seed
                         ^ (static_cast<std::uint64_t>(enemy.summonCount)
                             * 0x9e3779b97f4a7c15ULL);
-                    if ((roll & 3ULL) != 0ULL) enemy.specialWindup = 0.4F;
-                    else enemy.specialCooldown = 6.0F;
+                    if (enemy.fernVolleyShots < 3U && (roll & 3ULL) != 0ULL)
+                    {
+                        const auto nextTarget = playerBounds();
+                        enemy.specialTarget = {
+                            nextTarget.left + nextTarget.width * 0.5F,
+                            nextTarget.top + nextTarget.height * 0.5F};
+                        enemy.specialWindup = FernCopyFollowupBeamWindupSeconds;
+                    }
+                    else
+                    {
+                        enemy.specialCooldown = 6.0F;
+                        enemy.manualSkill = -1;
+                    }
                     enemy.specialActive = 0.6F;
                 }
                 continue;
             }
             if (enemy.specialCooldown <= 0.0F)
             {
-                enemy.specialWindup = 0.4F;
+                const auto target = playerBounds();
+                enemy.specialTarget = {target.left + target.width * 0.5F,
+                    target.top + target.height * 0.5F};
+                enemy.fernVolleyShots = 0U;
+                enemy.manualSkill = 2;
+                enemy.specialWindup = FernCopyFirstBeamWindupSeconds;
                 continue;
             }
         }
@@ -461,7 +477,6 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 enemy.specialWindup = std::max(0.0F, enemy.specialWindup - deltaSeconds);
                 if (enemy.specialWindup <= 0.0F)
                 {
-                    const auto target = playerBounds();
                     if (enemy.manualSkill == 0)
                     {
                         activeEnemyLightningStorms_.push_back({5U, 0.0F});
@@ -480,17 +495,15 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                         const auto caster = enemy.controller.bounds();
                         const Vec2 start {caster.left + caster.width * 0.5F,
                             caster.top + caster.height * 0.4F};
-                        const float dx = target.left + target.width * 0.5F - start.x;
-                        const float dy = target.top + target.height * 0.5F - start.y;
+                        const float dx = enemy.specialTarget.x - start.x;
+                        const float dy = enemy.specialTarget.y - start.y;
                         const float length = std::max(0.001F, std::sqrt(dx * dx + dy * dy));
-                        const Vec2 end {start.x + dx / length * 256.0F,
-                            start.y + dy / length * 256.0F};
+                        const Vec2 end {start.x + dx / length * CopyBeamTravelDistance,
+                            start.y + dy / length * CopyBeamTravelDistance};
                         const auto sequence = ++environmentalSequence_;
-                        activeEnemyBeams_.push_back({start, end, 0.6F, sequence,
-                            FrierenCopyBeamVisualId});
-                        if (segmentIntersectsAabb(start, end, playerBounds(), 9.0F))
-                            static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
-                                sequence, 15, 1.0F, relics_.incomingDamageMultiplier()}));
+                        activeEnemyBeams_.push_back({start, end, CopyBeamDuration, sequence,
+                            FrierenCopyBeamVisualId, 18.0F, CopyBeamDuration, true,
+                            CopyBeamTravelSpeed, CopyBeamVisualLength, 15});
                         enemy.revolteCooldowns[2] = 3.0F;
                     }
                     enemy.specialActive = enemy.manualSkill == 0 ? 0.0F : 0.6F;
@@ -502,7 +515,16 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 if (enemy.revolteCooldowns[static_cast<std::size_t>(skill)] <= 0.0F)
                 {
                     enemy.manualSkill = skill;
-                    enemy.specialWindup = skill == 2 ? 0.3F : 0.5F;
+                    if (skill == 2)
+                    {
+                        const auto target = playerBounds();
+                        enemy.specialTarget = {target.left + target.width * 0.5F,
+                            target.top + target.height * 0.5F};
+                    }
+                    enemy.specialWindup = skill == 0
+                        ? FrierenCopyLightningWindupSeconds
+                        : (skill == 1 ? FrierenCopyGroundFireWindupSeconds
+                                      : FrierenCopyBeamWindupSeconds);
                     break;
                 }
             if (enemy.specialWindup > 0.0F) continue;
@@ -543,7 +565,8 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                             - (enemy.revolteSkill == 0 ? 84.0F : 42.0F);
                         activeEnemyProjectiles_.push_back({{left, top, 32.0F, 42.0F},
                             direction, 480.0F, 480.0F, ++environmentalSequence_, 20,
-                            300.0F, true, 1.65F, {direction * 300.0F, 0.0F}});
+                            315.0F, true, 1.15F, {direction * 315.0F, 0.0F},
+                            0U, false, 0.15F});
                         enemy.specialActive = 0.42F;
                     }
                     else if (enemy.revolteSkill == 2)
@@ -551,11 +574,12 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                         hitPlayer(64.0F, 25);
                         const float left = direction > 0.0F
                             ? caster.left + caster.width + 37.0F
-                            : caster.left - 64.0F - 37.0F;
+                            : caster.left - 46.0F - 37.0F;
                         activeEnemyProjectiles_.push_back({{left,
-                            request_.worldBounds.groundTop - 72.0F, 54.0F, 72.0F},
+                            request_.worldBounds.groundTop - 64.0F, 46.0F, 64.0F},
                             direction, 560.0F, 560.0F, ++environmentalSequence_, 25,
-                            330.0F, true, 1.25F, {direction * 330.0F, 0.0F}});
+                            315.0F, true, 0.8F, {direction * 315.0F, 0.0F},
+                            9102U, false, 0.15F});
                         enemy.specialActive = 0.42F;
                     }
                     else if (enemy.revolteSkill == 3) enemy.specialActive = 0.9F;
@@ -642,7 +666,7 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 {
                     if (enemy.revolteSkill == 4)
                         enemy.revolteCooldowns = {
-                            0.0F, 0.0F, 0.0F, 0.0F, 5.0F, 2.0F, 1.5F};
+                            0.8F, 0.8F, 1.2F, 0.0F, 5.0F, 2.0F, 1.5F};
                     enemy.revolteSkill = -1;
                 }
                 continue;
@@ -745,9 +769,9 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                     }
                 }
                 if (skill == 3) enemy.specialActive = 0.9F;
-                else enemy.specialWindup = skill < 2 ? 0.22F
+                else enemy.specialWindup = skill < 2 ? 0.32F
                     : (skill == 5 ? RevolteCrossSlashFirstWindupSeconds
-                        : (skill == 6 ? RevolteFlyingBladeWindupSeconds : 0.36F));
+                        : (skill == 6 ? RevolteFlyingBladeWindupSeconds : 0.50F));
                 enemy.revolteCooldowns[static_cast<std::size_t>(skill)] = skill < 2 ? 6.0F
                     : (skill == 2 ? 7.5F : (skill == 3 ? 8.0F
                         : (skill == 4 ? 5.0F : (skill == 5 ? 8.0F : 6.5F))));

@@ -1748,26 +1748,35 @@ bool revolteWavesCrossTheArenaAndSecondPhaseAddsCrossExecution()
     wave.update({}, 2.4F);
     advanceDialogue(wave);
     wave.update({}, 3.51F);
-    wave.update({}, 0.31F);
+    wave.update({}, 0.33F);
     const auto waveEffects = wave.spellEffects();
     const auto slash = std::find_if(waveEffects.begin(), waveEffects.end(), [](const auto& effect) {
         return effect.spellId == 9101U;
     });
-    if (!expect(slash != waveEffects.end() && slash->duration > 1.59F
-            && slash->duration < 1.61F,
-            "Revolte's light sword wave must retain a finite 480-pixel path at 300 px/s"))
+    if (!expect(slash != waveEffects.end() && slash->duration > 1.52F
+            && slash->duration < 1.53F,
+            "Revolte's light sword wave must retain a finite 480-pixel path at 315 px/s"))
         return false;
     const float initialWaveTop = slash->bounds.top;
     arcane::game::PlayerIntent jump;
     jump.jumpPressed = true;
-    wave.update(jump, 0.20F);
+    wave.update(jump, 0.10F);
+    const auto armingEffects = wave.spellEffects();
+    const auto armingSlash = std::find_if(armingEffects.begin(), armingEffects.end(),
+        [](const auto& effect) { return effect.spellId == 9101U; });
+    if (!expect(armingSlash != armingEffects.end()
+            && std::abs(armingSlash->bounds.top - initialWaveTop) < 0.5F
+            && std::abs(armingSlash->rotationDegrees) < 0.5F,
+            "Revolte's sword wave must fly straight during its 0.15-second arming window"))
+        return false;
+    wave.update({}, 0.25F);
     const auto trackingEffects = wave.spellEffects();
     const auto trackingSlash = std::find_if(trackingEffects.begin(), trackingEffects.end(),
         [](const auto& effect) { return effect.spellId == 9101U; });
     if (!expect(trackingSlash != trackingEffects.end()
             && trackingSlash->bounds.top < initialWaveTop - 8.0F
             && std::abs(trackingSlash->rotationDegrees) > 5.0F
-            && std::abs(trackingSlash->rotationDegrees) <= 19.0F,
+            && std::abs(trackingSlash->rotationDegrees) <= 16.0F,
             "Revolte's sword wave must curve toward a jump without turning instantly")) return false;
 
     arcane::game::CombatRequest phaseRequest;
@@ -2156,11 +2165,16 @@ bool revolteRetargetsBetweenConsecutiveReadySkills()
     arcane::game::PlayerIntent crossBehind;
     crossBehind.moveAxis = 1.0F;
     combat.update(crossBehind, 0.60F);
-    combat.update({}, 0.01F);
+    const auto firstSlash = combat.enemyStates().front();
+    if (!expect(firstSlash.skillVariant == 0 && firstSlash.specialAttackActive,
+            "Revolte must finish the extended first slash before selecting another skill")) {
+        return false;
+    }
+    combat.update({}, 0.42F);
     combat.update({}, 0.01F);
     const auto state = combat.enemyStates().front();
     return expect(state.skillVariant == 1 && state.windingUp,
-            "Revolte must immediately select the other ready slash")
+            "Revolte must select the other ready slash after the first attack finishes")
         && expect(state.skillEffectBounds
                 && state.skillEffectBounds->left >= state.position.x + state.width,
             "Revolte must retarget the next consecutive skill after the player crosses behind");
@@ -2230,10 +2244,161 @@ bool starkCopyLandingExposesStretchedLinieEffect()
     combat.update({}, 0.80F);
     combat.update({}, 1.05F);
     const auto effects = combat.spellEffects();
+    const auto shockwaveCount = std::count_if(effects.begin(), effects.end(), [](const auto& effect) {
+        return effect.spellId == 9302U && effect.bounds.width == 32.0F
+            && effect.bounds.height == 220.0F;
+    });
     return expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
         return effect.spellId == 9303U && effect.bounds.width == 288.0F
             && effect.bounds.height == 72.0F;
-    }), "Stark's landing must expose the stretched Linie landing-effect bounds");
+    }), "Stark's landing must expose the stretched Linie landing-effect bounds")
+        && expect(shockwaveCount == 2,
+            "Stark's landing must launch one 220-pixel shockwave in each direction")
+        && expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == 9302U && effect.facingDirection < 0.0F;
+            }) && std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == 9302U && effect.facingDirection > 0.0F;
+            }), "Stark's paired shockwaves must travel left and right");
+}
+
+bool copyMageSpellsExposeLockedWarningsAndFernCapsHerVolley()
+{
+    arcane::game::CombatRequest fernRequest;
+    fernRequest.seed = 0U;
+    fernRequest.playerSpawn = {180.0F, 576.0F};
+    fernRequest.playerMaximumHealth = 1000;
+    fernRequest.playerCurrentHealth = 1000;
+    fernRequest.enemies = {{arcane::game::EnemyArchetype::FernCopy, {700.0F, 0.0F}}};
+    arcane::game::CombatSession fern(fernRequest);
+    bool sawLockedWarning = false;
+    bool sawExtendedFernRange = false;
+    bool movedAfterLock = false;
+    bool previousBeam = false;
+    bool sawBeamAtCaster = false;
+    bool sawBeamExtend = false;
+    bool beamStayedCompact = true;
+    int beamCount = 0;
+    std::optional<float> lockedRotation;
+    for (int step = 0; step < 55; ++step)
+    {
+        arcane::game::PlayerIntent movement;
+        if (lockedRotation && beamCount == 0)
+        {
+            movement.moveAxis = -1.0F;
+            movedAfterLock = true;
+        }
+        fern.update(movement, 0.1F);
+        const auto effects = fern.spellEffects();
+        const auto warning = std::find_if(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::CopyBeamTelegraphVisualId;
+        });
+        if (warning != effects.end() && beamCount == 0)
+        {
+            if (warning->bounds.width == 1600.0F) sawExtendedFernRange = true;
+            if (!lockedRotation) lockedRotation = warning->rotationDegrees;
+            else if (movedAfterLock
+                && std::abs(warning->rotationDegrees - *lockedRotation) < 0.01F)
+                sawLockedWarning = true;
+        }
+        const auto beamEffect = std::find_if(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::FrierenCopyBeamVisualId;
+        });
+        const bool beam = beamEffect != effects.end();
+        if (beam)
+        {
+            if (beamEffect->bounds.width < 2.0F) sawBeamAtCaster = true;
+            if (sawBeamAtCaster && beamEffect->bounds.width > 120.0F) sawBeamExtend = true;
+            if (beamEffect->bounds.width > 144.1F) beamStayedCompact = false;
+        }
+        if (beam && !previousBeam) ++beamCount;
+        previousBeam = beam;
+    }
+    if (!expect(sawLockedWarning,
+            "Fern must expose a fixed aim line that does not follow movement during windup")
+        || !expect(sawExtendedFernRange,
+            "Fern's warning must extend along the full off-screen beam path")
+        || !expect(beamCount >= 1 && beamCount <= 3,
+            "Fern's deterministic opening volley must stop after at most three beams")
+        || !expect(sawBeamAtCaster && sawBeamExtend,
+            "Copy beams must visibly propagate outward from the caster")
+        || !expect(beamStayedCompact,
+            "travelling copy beams must retain their compact 144-pixel visual length"))
+        return false;
+
+    arcane::game::CombatRequest travellingBeamRequest;
+    travellingBeamRequest.seed = 0U;
+    travellingBeamRequest.playerSpawn = {20.0F, 576.0F};
+    travellingBeamRequest.playerMaximumHealth = 100;
+    travellingBeamRequest.playerCurrentHealth = 100;
+    travellingBeamRequest.enemies = {
+        {arcane::game::EnemyArchetype::FernCopy, {1100.0F, 0.0F}}};
+    arcane::game::CombatSession travellingBeam(travellingBeamRequest);
+    bool foundTravellingBeam = false;
+    for (int step = 0; step < 120 && !foundTravellingBeam; ++step)
+    {
+        travellingBeam.update({}, 0.05F);
+        const auto effects = travellingBeam.spellEffects();
+        foundTravellingBeam = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::FrierenCopyBeamVisualId;
+        });
+    }
+    if (!expect(foundTravellingBeam && travellingBeam.playerState().currentHealth == 100,
+            "Copy beam damage must not arrive before its visible leading edge")) return false;
+    travellingBeam.update({}, 0.30F);
+    if (!expect(travellingBeam.playerState().currentHealth == 85,
+            "Copy beam must keep travelling beyond the former range and hit along its swept path"))
+        return false;
+
+    arcane::game::CombatRequest frierenRequest;
+    frierenRequest.playerSpawn = {180.0F, 576.0F};
+    frierenRequest.playerMaximumHealth = 1000;
+    frierenRequest.playerCurrentHealth = 1000;
+    frierenRequest.enemies = {{arcane::game::EnemyArchetype::FrierenCopy, {760.0F, 0.0F}}};
+    arcane::game::CombatSession frieren(frierenRequest);
+    bool sawBeamWarning = false;
+    bool sawStrengthenedFrierenBeam = false;
+    bool sawLightningWarning = false;
+    bool sawRaisedLightning = false;
+    bool sawGroundFireWarning = false;
+    for (int step = 0; step < 120
+        && !(sawBeamWarning && sawLightningWarning && sawGroundFireWarning); ++step)
+    {
+        frieren.update({}, 0.1F);
+        const auto effects = frieren.spellEffects();
+        sawBeamWarning = sawBeamWarning || std::any_of(effects.begin(), effects.end(),
+            [](const auto& effect) {
+                return effect.spellId == arcane::game::CopyBeamTelegraphVisualId;
+            });
+        sawStrengthenedFrierenBeam = sawStrengthenedFrierenBeam
+            || std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == arcane::game::CopyBeamTelegraphVisualId
+                    && effect.bounds.width == 1600.0F && effect.duration == 0.55F;
+            });
+        sawLightningWarning = sawLightningWarning || std::any_of(effects.begin(), effects.end(),
+            [](const auto& effect) {
+                return effect.spellId == arcane::game::FrierenCopyLightningVisualId;
+            });
+        sawRaisedLightning = sawRaisedLightning || std::any_of(effects.begin(), effects.end(),
+            [](const auto& effect) {
+                return effect.spellId == arcane::game::FrierenCopyLightningVisualId
+                    && effect.bounds.top == 400.0F && effect.bounds.height == 240.0F;
+            });
+        sawGroundFireWarning = sawGroundFireWarning || std::any_of(effects.begin(), effects.end(),
+            [](const auto& effect) {
+                return effect.spellId
+                    == arcane::game::FrierenCopyGroundFireTelegraphVisualId;
+            });
+    }
+    return expect(sawBeamWarning,
+            "Frieren's direct beam must expose a locked pre-fire aim line")
+        && expect(sawStrengthenedFrierenBeam,
+            "Frieren's direct beam must use the strengthened windup and range")
+        && expect(sawLightningWarning,
+            "Frieren's lightning must retain a visible locked strike warning")
+        && expect(sawRaisedLightning,
+            "Frieren's lightning must extend above the raised final-boss platforms")
+        && expect(sawGroundFireWarning,
+            "Frieren's full-floor fire must warn the ground before ignition");
 }
 
 bool waterMirrorBossAdvancesThroughBothCopyPhases()
@@ -2267,6 +2432,8 @@ bool waterMirrorBossAdvancesThroughBothCopyPhases()
             {
                 intent.moveAxis = targetCenter > playerCenter ? 1.0F : -1.0F;
                 intent.attackPressed = true;
+                if (archetype == arcane::game::EnemyArchetype::FrierenCopy)
+                    intent.jumpPressed = true;
             }
             combat.update(intent, 0.05F);
         }
@@ -2282,8 +2449,13 @@ bool waterMirrorBossAdvancesThroughBothCopyPhases()
     const auto mirror = std::find_if(secondPhase.begin(), secondPhase.end(), [](const auto& enemy) {
         return enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon;
     });
+    const auto frierenCopy = std::find_if(secondPhase.begin(), secondPhase.end(), [](const auto& enemy) {
+        return enemy.archetype == arcane::game::EnemyArchetype::FrierenCopy;
+    });
     if (!expect(mirror != secondPhase.end() && mirror->currentHealth == 1,
-            "the phase transition must halve the Water Mirror Demon's health")) return false;
+            "the phase transition must halve the Water Mirror Demon's health")
+        || !expect(frierenCopy != secondPhase.end() && frierenCopy->position.y == 408.0F,
+            "the Frieren copy must hover 160 pixels above the arena floor")) return false;
     advanceDialogue(combat);
     if (!expect(defeat(arcane::game::EnemyArchetype::FrierenCopy),
             "the Frieren copy must be the second-phase target")) return false;
@@ -2398,6 +2570,7 @@ int main()
         && waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
         && starkCopyWhirlwindSlashHitsBehindOnce()
         && starkCopyLandingExposesStretchedLinieEffect()
+        && copyMageSpellsExposeLockedWarningsAndFernCapsHerVolley()
         && waterMirrorBossAdvancesThroughBothCopyPhases()
         && tacticalSpawnsPreserveElevatedLanesAndFlyingAltitude()
         && combatSessionAppliesEquippedSpellDamage()

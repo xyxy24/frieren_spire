@@ -53,7 +53,7 @@ const std::array<ArenaLayout, 18> Layouts {{
         {230.0F, 560.0F, 220.0F, 28.0F}, {490.0F, 480.0F, 370.0F, 28.0F},
         {900.0F, 560.0F, 220.0F, 28.0F}}},
     {315U, ArenaTheme::MageExam, false, {
-        {280.0F, 576.0F, 260.0F, 28.0F}, {840.0F, 576.0F, 260.0F, 28.0F}}}
+        {280.0F, 520.0F, 260.0F, 28.0F}, {840.0F, 520.0F, 260.0F, 28.0F}}}
 }};
 
 std::uint32_t actNumber(const run::RunContext& context) noexcept

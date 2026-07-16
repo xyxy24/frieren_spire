@@ -167,6 +167,48 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
 
     for (const arcane::game::SpellEffectView effect : spellEffects)
     {
+        if (effect.spellId == arcane::game::CopyBeamTelegraphVisualId)
+        {
+            const float progress = effect.duration > 0.0F
+                ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
+                : 1.0F;
+            const float pulse = 0.5F + 0.5F
+                * std::sin(progress * 8.0F * 3.14159265358979323846F);
+            const sf::Vector2f start {effect.bounds.left,
+                effect.bounds.top + effect.bounds.height * 0.5F};
+            sf::RectangleShape warning({effect.bounds.width, 10.0F});
+            warning.setOrigin({0.0F, 5.0F});
+            warning.setPosition(start);
+            warning.setRotation(sf::degrees(effect.rotationDegrees));
+            warning.setFillColor(sf::Color {104, 194, 255,
+                static_cast<std::uint8_t>(20.0F + pulse * 24.0F)});
+            target.draw(warning, sf::RenderStates {sf::BlendAdd});
+            sf::RectangleShape core({effect.bounds.width, 2.0F});
+            core.setOrigin({0.0F, 1.0F});
+            core.setPosition(start);
+            core.setRotation(sf::degrees(effect.rotationDegrees));
+            core.setFillColor(sf::Color {215, 242, 255,
+                static_cast<std::uint8_t>(130.0F + pulse * 110.0F)});
+            target.draw(core, sf::RenderStates {sf::BlendAdd});
+            continue;
+        }
+        if (effect.spellId == arcane::game::FrierenCopyGroundFireTelegraphVisualId)
+        {
+            const float progress = effect.duration > 0.0F
+                ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
+                : 1.0F;
+            const float pulse = 0.5F + 0.5F
+                * std::sin(progress * 9.0F * 3.14159265358979323846F);
+            sf::RectangleShape warning({effect.bounds.width, effect.bounds.height});
+            warning.setPosition({effect.bounds.left, effect.bounds.top});
+            warning.setFillColor(sf::Color {255, 62, 26,
+                static_cast<std::uint8_t>(35.0F + pulse * 45.0F)});
+            warning.setOutlineColor(sf::Color {255, 174, 74,
+                static_cast<std::uint8_t>(145.0F + pulse * 100.0F)});
+            warning.setOutlineThickness(3.0F);
+            target.draw(warning, sf::RenderStates {sf::BlendAdd});
+            continue;
+        }
         if (effect.spellId == arcane::game::FrierenCopyBeamVisualId)
         {
             const std::size_t frame = effect.remaining > effect.duration * 0.5F ? 0U : 1U;
@@ -181,6 +223,33 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 beam.setRotation(sf::degrees(effect.rotationDegrees));
                 beam.setScale({effect.bounds.width / static_cast<float>(size.x), 1.0F});
                 target.draw(beam);
+
+                const float progress = effect.duration > 0.0F
+                    ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
+                    : 1.0F;
+                const float headFade = 1.0F
+                    - std::clamp((progress - 0.5F) / 0.35F, 0.0F, 1.0F);
+                if (effect.bounds.width > 2.0F && headFade > 0.0F)
+                {
+                    constexpr float Pi = 3.14159265358979323846F;
+                    const float radians = effect.rotationDegrees * Pi / 180.0F;
+                    const sf::Vector2f head {
+                        effect.bounds.left + std::cos(radians) * effect.bounds.width,
+                        effect.bounds.top + effect.bounds.height * 0.5F
+                            + std::sin(radians) * effect.bounds.width};
+                    sf::CircleShape halo(11.0F);
+                    halo.setOrigin({11.0F, 11.0F});
+                    halo.setPosition(head);
+                    halo.setFillColor(sf::Color {104, 228, 255,
+                        static_cast<std::uint8_t>(110.0F * headFade)});
+                    target.draw(halo, sf::RenderStates {sf::BlendAdd});
+                    sf::CircleShape core(4.0F);
+                    core.setOrigin({4.0F, 4.0F});
+                    core.setPosition(head);
+                    core.setFillColor(sf::Color {235, 252, 255,
+                        static_cast<std::uint8_t>(255.0F * headFade)});
+                    target.draw(core, sf::RenderStates {sf::BlendAdd});
+                }
                 continue;
             }
         }
