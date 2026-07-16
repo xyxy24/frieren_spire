@@ -221,6 +221,24 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             target.draw(laser);
             continue;
         }
+        if (effect.spellId == 9303U)
+        {
+            const std::size_t frame = effect.remaining > effect.duration * 0.5F ? 0U : 1U;
+            if (linieSkillTextures[frame])
+            {
+                const sf::Texture& texture = *linieSkillTextures[frame];
+                sf::Sprite landing(texture);
+                const auto size = texture.getSize();
+                landing.setOrigin({static_cast<float>(size.x) * 0.5F,
+                    static_cast<float>(size.y)});
+                landing.setPosition({effect.bounds.left + effect.bounds.width * 0.5F,
+                    effect.bounds.top + effect.bounds.height});
+                landing.setScale({effect.bounds.width / static_cast<float>(size.x),
+                    effect.bounds.height / static_cast<float>(size.y)});
+                target.draw(landing);
+                continue;
+            }
+        }
         const std::optional<sf::Texture>* projectileTexture = nullptr;
         if (effect.spellId == 9101U) projectileTexture = &slashTexture;
         else if (effect.spellId == 9102U) projectileTexture = &largeSlashTexture;
@@ -479,7 +497,6 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 sprite.move({0.0F, 10.0F});
             float horizontalScale = enemy.facingDirection > 0.0F ? -1.0F : 1.0F;
             if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
-                || enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
                 || (enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight
                     && usingWalkAnimation))
                 horizontalScale = -horizontalScale;

@@ -1755,6 +1755,31 @@ bool swordDemonSlashUsesOneInstantDamageWindow()
         "Sword Demon slash attack pose must not repeat its instant damage check");
 }
 
+bool revolteRetargetsBetweenConsecutiveReadySkills()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {400.0F, 576.0F};
+    request.enemySpawn = {500.0F, 544.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::Revolte;
+    request.enemyMaximumHealth = 300;
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.4F);
+    advanceDialogue(combat);
+    combat.update({}, 3.51F);
+    combat.update({}, 0.30F);
+    arcane::game::PlayerIntent crossBehind;
+    crossBehind.moveAxis = 1.0F;
+    combat.update(crossBehind, 0.60F);
+    combat.update({}, 0.01F);
+    combat.update({}, 0.01F);
+    const auto state = combat.enemyStates().front();
+    return expect(state.skillVariant == 1 && state.windingUp,
+            "Revolte must immediately select the other ready slash")
+        && expect(state.skillEffectBounds
+                && state.skillEffectBounds->left >= state.position.x + state.width,
+            "Revolte must retarget the next consecutive skill after the player crosses behind");
+}
+
 bool waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
 {
     arcane::game::CombatRequest request;
@@ -1805,6 +1830,22 @@ bool starkCopyWhirlwindSlashHitsBehindOnce()
     combat.update({}, 0.30F);
     return expect(combat.playerState().currentHealth == 80,
         "the whirlwind attack pose must not repeat its instant damage check");
+}
+
+bool starkCopyLandingExposesStretchedLinieEffect()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {20.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::StarkCopy, {700.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 4.01F);
+    combat.update({}, 0.80F);
+    combat.update({}, 1.05F);
+    const auto effects = combat.spellEffects();
+    return expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+        return effect.spellId == 9303U && effect.bounds.width == 288.0F
+            && effect.bounds.height == 72.0F;
+    }), "Stark's landing must expose the stretched Linie landing-effect bounds");
 }
 
 bool waterMirrorBossAdvancesThroughBothCopyPhases()
@@ -1912,6 +1953,7 @@ int main()
         && defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
         && revolteLocksAtFiveAndHealsForSecondPhase()
         && revolteParryActivatesWithoutWindup()
+        && revolteRetargetsBetweenConsecutiveReadySkills()
         && redMirrorDragonBreathRespectsPostHitInvulnerability()
         && enemyDirectionLocksWhenWindupBegins()
         && secondActEnemiesExposeConfiguredContent()
@@ -1933,6 +1975,7 @@ int main()
         && swordDemonSlashUsesOneInstantDamageWindow()
         && waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
         && starkCopyWhirlwindSlashHitsBehindOnce()
+        && starkCopyLandingExposesStretchedLinieEffect()
         && waterMirrorBossAdvancesThroughBothCopyPhases()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()

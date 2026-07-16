@@ -1076,6 +1076,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                         const auto landed = enemy.controller.bounds();
                         const Aabb impact {landed.left + landed.width * 0.5F - 144.0F,
                             request_.worldBounds.groundTop - 144.0F, 288.0F, 144.0F};
+                        activeSpellEffects_.push_back({9303U,
+                            {impact.left, request_.worldBounds.groundTop - 72.0F,
+                                impact.width, 72.0F},
+                            0.6F, 0.6F});
                         if (intersects(impact, playerBounds()))
                             static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
                                 ++environmentalSequence_, 20, 1.0F,
@@ -1326,7 +1330,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                 if (skill < 2 && distance > bounds.width * 0.5F + 124.0F) continue;
                 if (skill == 2 && distance > bounds.width * 0.5F + 464.0F / 3.0F) continue;
                 enemy.revolteSkill = skill;
-                enemy.specialDirection = enemy.controller.facingDirection();
+                enemy.specialDirection = playerCenter
+                        >= bounds.left + bounds.width * 0.5F ? 1.0F : -1.0F;
                 if (skill == 3) enemy.specialActive = 1.2F;
                 else enemy.specialWindup = skill < 2 ? 0.3F : 0.5F;
                 enemy.revolteCooldowns[static_cast<std::size_t>(skill)] =
