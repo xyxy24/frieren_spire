@@ -607,6 +607,30 @@ bool combatFeedbackTracksAuthoritativeHealthDeltas()
             "combat delta time must resume after hit stop expires");
 }
 
+bool bossHitStopKeepsImpactWithoutLookingLikeAFrameHitch()
+{
+    ui::CombatFeedbackViewModel feedback;
+    arcane::game::PlayerStateView player;
+    player.position = {100.0F, 500.0F};
+    player.currentHealth = 100;
+    arcane::game::EnemyStateView boss;
+    boss.archetype = arcane::game::EnemyArchetype::Aura;
+    boss.position = {700.0F, 500.0F};
+    boss.currentHealth = 225;
+    boss.maximumHealth = 225;
+    boss.alive = true;
+    std::array enemies {boss};
+    feedback.update(player, enemies, 0.01F);
+
+    enemies[0].currentHealth = 155;
+    feedback.update(player, enemies, 0.01F);
+    const float remaining = feedback.snapshot().hitStopRemaining;
+    return expect(remaining > 0.0F,
+            "damaging a boss must retain a brief hit-stop response")
+        && expect(remaining <= 0.0551F,
+            "boss hit stop must be capped so repeated attacks do not look like frame hitches");
+}
+
 bool applicationViewModelSelectsNewRewardWithoutAutoEquipping()
 {
     auto config = fastFlowConfig();
@@ -842,6 +866,7 @@ int main()
         && applicationViewModelSelectsNewRewardWithoutAutoEquipping()
         && spellAcquisitionReproducesRegistrationCadence()
         && combatFeedbackTracksAuthoritativeHealthDeltas()
+        && bossHitStopKeepsImpactWithoutLookingLikeAFrameHitch()
         && contactDefeatEndsTheTowerFlow()
         && thirdBossEndsInVictory()
         && firstBossIsAlwaysAura()

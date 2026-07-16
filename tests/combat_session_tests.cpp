@@ -1696,10 +1696,20 @@ bool revolteLocksAtFiveAndHealsForSecondPhase()
             "second-phase dialogue must restore Revolte to full maximum HP")) return false;
     const float beforeDash = combat.enemyState().position.x;
     combat.update({}, 3.0F);
-    combat.update({}, 0.5F);
+    arcane::game::PlayerIntent crossBehind;
+    crossBehind.moveAxis = 1.0F;
+    combat.update(crossBehind, 0.5F);
+    const auto releaseState = combat.enemyState();
+    const float playerCenterAtRelease = combat.playerState().position.x
+        + arcane::game::PlayerController::Width * 0.5F;
+    const float bossCenterAtRelease = releaseState.position.x + releaseState.width * 0.5F;
+    const float releaseDirection = playerCenterAtRelease >= bossCenterAtRelease ? 1.0F : -1.0F;
+    if (!expect(releaseState.facingDirection == releaseDirection,
+            "Revolte must retarget and face the player's current side when dash windup ends"))
+        return false;
     combat.update({}, 0.7F);
-    return expect(std::abs(combat.enemyState().position.x - beforeDash) >= 195.9F,
-        "second-phase dash must travel 196 pixels as soon as its cooldown is ready");
+    return expect((combat.enemyState().position.x - beforeDash) * releaseDirection >= 195.9F,
+        "second-phase dash must travel 196 pixels toward the player's release-time position");
 }
 
 bool denkenExposesCremationPoseWhenTornadoEvolves()
@@ -2466,6 +2476,39 @@ bool waterMirrorBossAdvancesThroughBothCopyPhases()
         "the final dialogue must resolve the Water Mirror Demon victory");
 }
 
+bool defeatingFinalEnemyClearsItsPersistentMagicEffects()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {500.0F, 576.0F};
+    request.enemySpawn = {700.0F, 568.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::Richter;
+    request.enemyMaximumHealth = 1;
+    request.enemyContactDamage = 0;
+    request.equippedSpellIds[0] = 1004U;
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 3.01F);
+    arcane::game::PlayerIntent evadePillar;
+    evadePillar.moveAxis = 1.0F;
+    combat.update(evadePillar, 0.50F);
+    const auto pillarEffects = combat.spellEffects();
+    if (!expect(std::any_of(pillarEffects.begin(), pillarEffects.end(),
+            [](const auto& effect) { return effect.spellId == 9001U; }),
+            "Richter must have a persistent pillar before the cleanup check")) return false;
+
+    arcane::game::PlayerIntent kill;
+    kill.spellPressed[0] = true;
+    combat.update(kill, 0.01F);
+    const auto effects = combat.spellEffects();
+    const auto enemy = combat.enemyState();
+    return expect(combat.result() && combat.result()->outcome
+                == arcane::game::CombatOutcome::Victory,
+            "the cleanup scenario must defeat its final enemy")
+        && expect(effects.empty(),
+            "ending combat must remove both enemy and player magic visuals")
+        && expect(!enemy.specialWindingUp && !enemy.specialAttackActive,
+            "defeated enemies must clear frozen casting state");
+}
+
 bool tacticalSpawnsPreserveElevatedLanesAndFlyingAltitude()
 {
     arcane::game::CombatRequest request;
@@ -2572,6 +2615,7 @@ int main()
         && starkCopyLandingExposesStretchedLinieEffect()
         && copyMageSpellsExposeLockedWarningsAndFernCapsHerVolley()
         && waterMirrorBossAdvancesThroughBothCopyPhases()
+        && defeatingFinalEnemyClearsItsPersistentMagicEffects()
         && tacticalSpawnsPreserveElevatedLanesAndFlyingAltitude()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()

@@ -236,6 +236,7 @@ private:
     static constexpr int AuraGuillotineDamage = 22;
     [[nodiscard]] WorldBounds movementBoundsFor(const EnemyRuntime& enemy) const noexcept;
     [[nodiscard]] bool updateEnemySkills(float deltaSeconds, float playerCenter);
+    void clearCombatTransientEffects() noexcept;
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
     void finish(CombatOutcome outcome) noexcept;
     enum class DialogueScript : std::uint8_t {

@@ -35,6 +35,8 @@ struct CombatFeedbackTuning
     float lightHitStopSeconds {0.06F};
     float mediumHitStopSeconds {0.09F};
     float heavyHitStopSeconds {0.13F};
+    float bossHitStopMultiplier {0.45F};
+    float bossHitStopMaximumSeconds {0.055F};
     float playerHitStopSeconds {0.075F};
 };
 

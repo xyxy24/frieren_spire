@@ -539,6 +539,14 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
                 if (enemy.specialWindup <= 0.0F)
                 {
                     const auto caster = enemy.controller.bounds();
+                    if (enemy.revolteSkill == 4)
+                    {
+                        const auto target = playerBounds();
+                        const float currentPlayerCenter = target.left + target.width * 0.5F;
+                        const float casterCenter = caster.left + caster.width * 0.5F;
+                        enemy.specialDirection = currentPlayerCenter >= casterCenter
+                            ? 1.0F : -1.0F;
+                    }
                     const float direction = enemy.specialDirection;
                     const auto frontArea = [&](const float range) {
                         return Aabb {direction > 0.0F ? caster.left + caster.width
@@ -675,7 +683,10 @@ bool CombatSession::updateEnemySkills(const float deltaSeconds, const float play
             {
                 enemy.revolteCounterDashPending = false;
                 enemy.revolteSkill = 4;
-                enemy.specialDirection = enemy.controller.facingDirection();
+                const auto currentBounds = enemy.controller.bounds();
+                enemy.specialDirection = playerCenter
+                        >= currentBounds.left + currentBounds.width * 0.5F
+                    ? 1.0F : -1.0F;
                 enemy.specialWindup = 0.35F;
                 continue;
             }

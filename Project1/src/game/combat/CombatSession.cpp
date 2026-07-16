@@ -1975,6 +1975,7 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
     }
     if (std::none_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) { return enemy.health.isAlive(); }))
     {
+        clearCombatTransientEffects();
         const bool auraEncounter = std::any_of(enemies_.begin(), enemies_.end(), [](const auto& enemy) {
             return enemy.archetype == EnemyArchetype::Aura;
         });
@@ -2084,9 +2085,12 @@ void CombatSession::populateEnemyStates(std::vector<EnemyStateView>& views) cons
             || enemy.breathWindup > 0.0F || enemy.specialWindup > 0.0F;
         const bool active = enemy.controller.action() == ai::EnemyAction::Active
             || enemy.breathRemaining > 0.0F || enemy.specialActive > 0.0F;
+        const float visualFacing = enemy.archetype == EnemyArchetype::Revolte
+                && enemy.revolteSkill >= 0
+            ? enemy.specialDirection : enemy.controller.facingDirection();
         views.push_back({enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
             enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
-            windingUp, active, enemy.slowed, skillBounds, enemy.controller.facingDirection(),
+            windingUp, active, enemy.slowed, skillBounds, visualFacing,
             enemy.markedRemaining > 0.0F, skillEffectProgress,
             enemy.concealmentProgress, enemy.specialWindup > 0.0F,
             enemy.specialActive > 0.0F,
@@ -2291,13 +2295,16 @@ EnemyStateView CombatSession::enemyState() const noexcept
         skillEffectProgress = enemy.specialWindup > 0.0F
             ? std::clamp(enemy.specialElapsed / AuraGuillotineWindupSeconds, 0.0F, 1.0F)
             : std::clamp(enemy.specialElapsed / AuraGuillotineActiveSeconds, 0.0F, 1.0F);
+    const float visualFacing = enemy.archetype == EnemyArchetype::Revolte
+            && enemy.revolteSkill >= 0
+        ? enemy.specialDirection : enemy.controller.facingDirection();
     return {enemy.archetype, enemy.controller.position(), bounds.width, bounds.height,
         enemy.health.current(), enemy.health.maximum(), enemy.health.isAlive(),
         enemy.controller.action() == ai::EnemyAction::Windup || enemy.breathWindup > 0.0F
             || enemy.specialWindup > 0.0F,
         enemy.controller.action() == ai::EnemyAction::Active || enemy.breathRemaining > 0.0F
             || enemy.specialActive > 0.0F,
-        enemy.slowed, skillBounds, enemy.controller.facingDirection(),
+        enemy.slowed, skillBounds, visualFacing,
         enemy.markedRemaining > 0.0F, skillEffectProgress,
         enemy.concealmentProgress, enemy.specialWindup > 0.0F,
         enemy.specialActive > 0.0F,
@@ -2399,6 +2406,28 @@ bool CombatSession::equipUltimateSpell(const std::optional<std::uint32_t> id) no
 WorldBounds CombatSession::movementBoundsFor(const EnemyRuntime& enemy) const noexcept
 {
     return enemy.movementBounds.value_or(request_.worldBounds);
+}
+void CombatSession::clearCombatTransientEffects() noexcept
+{
+    activeSpellEffects_.clear();
+    pendingSpellImpacts_.clear();
+    activePillars_.clear();
+    activeTornadoes_.clear();
+    activeEnemyProjectiles_.clear();
+    activeEnemyBeams_.clear();
+    pendingEnemyLightning_.clear();
+    activeEnemyLightningStorms_.clear();
+    activeEnemyGroundFire_.clear();
+    for (auto& enemy : enemies_)
+    {
+        if (enemy.health.isAlive()) continue;
+        enemy.specialWindup = 0.0F;
+        enemy.specialActive = 0.0F;
+        enemy.manualSkill = -1;
+        enemy.revolteSkill = -1;
+        enemy.breathWindup = 0.0F;
+        enemy.breathRemaining = 0.0F;
+    }
 }
 Aabb CombatSession::playerBounds() const noexcept
 { const auto p = player_.position(); return {p.x, p.y, PlayerController::Width, PlayerController::Height}; }

@@ -7,6 +7,27 @@
 
 namespace arcane::presentation::viewmodel
 {
+namespace
+{
+[[nodiscard]] bool usesBossHitStop(const game::EnemyArchetype archetype) noexcept
+{
+    switch (archetype)
+    {
+    case game::EnemyArchetype::Aura:
+    case game::EnemyArchetype::Revolte:
+    case game::EnemyArchetype::RedMirrorDragon:
+    case game::EnemyArchetype::WaterMirrorDemon:
+    case game::EnemyArchetype::StarkCopy:
+    case game::EnemyArchetype::FernCopy:
+    case game::EnemyArchetype::FrierenCopy:
+    case game::EnemyArchetype::Boss:
+        return true;
+    default:
+        return false;
+    }
+}
+}
+
 CombatFeedbackViewModel::CombatFeedbackViewModel(const CombatFeedbackTuning tuning) noexcept
     : tuning_(tuning)
 {
@@ -114,8 +135,14 @@ void CombatFeedbackViewModel::update(const game::PlayerStateView& player,
             const float playerCenter = player.position.x + game::PlayerController::Width * 0.5F;
             const float enemyCenter = enemy.position.x + enemy.width * 0.5F;
             enemyVisualKickDirection_[index] = enemyCenter >= playerCenter ? 1.0F : -1.0F;
-            beginHitStop(damage <= 18 ? tuning_.lightHitStopSeconds
-                : damage <= 35 ? tuning_.mediumHitStopSeconds : tuning_.heavyHitStopSeconds);
+            float hitStop = damage <= 18 ? tuning_.lightHitStopSeconds
+                : damage <= 35 ? tuning_.mediumHitStopSeconds : tuning_.heavyHitStopSeconds;
+            if (usesBossHitStop(enemy.archetype))
+            {
+                hitStop = std::min(hitStop * tuning_.bossHitStopMultiplier,
+                    tuning_.bossHitStopMaximumSeconds);
+            }
+            beginHitStop(hitStop);
             beginShake(std::clamp(2.0F + static_cast<float>(damage) * 0.08F, 2.5F, 6.0F), 0.12F);
             const game::Vec2 position = enemy.alive ? enemy.position : previousEnemyPositions_[index];
             addDamageNumber({position.x + enemy.width * 0.5F, position.y - 8.0F}, damage, false);
