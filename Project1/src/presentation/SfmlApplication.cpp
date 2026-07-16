@@ -22,7 +22,9 @@
 #include <cstdint>
 #include <optional>
 #include <random>
+#include <span>
 #include <string>
+#include <vector>
 
 namespace ui = arcane::presentation::viewmodel;
 using namespace arcane::presentation::views;
@@ -149,19 +151,29 @@ std::optional<arcane::presentation::PlayerVisualState> updatePresentationState(
     return state;
 }
 
-void updateWindowTitle(sf::RenderWindow& window, const ui::ApplicationViewModel& app)
+std::string desiredWindowTitle(const ui::ApplicationViewModel& app)
 {
     const auto model = app.snapshot();
     if (model.screen == ui::ApplicationScreen::Start)
-        window.setTitle(model.canContinue
+        return model.canContinue
             ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop | F4 Spell"
-            : "Arcane Spire | START - Enter | F2 Event | F3 Shop | F4 Spell");
-    else if (model.screen == ui::ApplicationScreen::Pause)
-        window.setTitle("Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume");
-    else if (model.screen == ui::ApplicationScreen::Result)
-        window.setTitle(model.victory ? "Arcane Spire | WIN - Enter Start"
-            : "Arcane Spire | DEFEAT - Enter Start");
-    else if (app.model()) window.setTitle(makeWindowTitle(app) + " | Esc Pause");
+            : "Arcane Spire | START - Enter | F2 Event | F3 Shop | F4 Spell";
+    if (model.screen == ui::ApplicationScreen::Pause)
+        return "Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume";
+    if (model.screen == ui::ApplicationScreen::Result)
+        return model.victory ? "Arcane Spire | WIN - Enter Start"
+            : "Arcane Spire | DEFEAT - Enter Start";
+    if (app.model()) return makeWindowTitle(app) + " | Esc Pause";
+    return "Arcane Spire";
+}
+
+void updateWindowTitle(sf::RenderWindow& window, const ui::ApplicationViewModel& app,
+    std::string& displayedTitle)
+{
+    std::string title = desiredWindowTitle(app);
+    if (title == displayedTitle) return;
+    window.setTitle(title);
+    displayedTitle = std::move(title);
 }
 
 struct RenderResources
@@ -200,6 +212,7 @@ struct RenderResources
     const std::array<std::optional<sf::Texture>, 2>& tornado;
     const DialoguePortraitTextures& portraits;
     const ArenaTextures& arena;
+    const StaircaseTextures& staircases;
     const arcane::presentation::EnemyAnimator& enemyAnimator;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
@@ -210,7 +223,9 @@ struct RenderResources
 
 void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewModel& app,
     const std::optional<arcane::presentation::PlayerVisualState>& playerVisualState,
-    const RenderResources& resources, const ui::CombatFeedbackSnapshot& feedback)
+    const RenderResources& resources, const ui::CombatFeedbackSnapshot& feedback,
+    const std::span<const arcane::game::EnemyStateView> enemyStates,
+    const std::span<const arcane::game::SpellEffectView> spellEffects)
 {
     sf::Color background {18, 20, 28};
     const auto application = app.snapshot();
@@ -238,7 +253,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             sf::View worldView = interfaceView;
             worldView.move({feedback.cameraOffset.x, feedback.cameraOffset.y});
             window.setView(worldView);
-            drawCombat(window, *tower, resources.headless, resources.mimic, resources.bird,
+            drawCombat(window, *tower, enemyStates, spellEffects,
+                resources.headless, resources.mimic, resources.bird,
                 resources.frostWolf, resources.chaosFlower, resources.qual, resources.qualSkill,
                 resources.heimon, resources.heimonSkill, resources.heimonFog,
                 resources.demonWarrior, resources.largeBirdDemon,
@@ -253,9 +269,9 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.linie, resources.linieSkill,
                 resources.draht, resources.aura, resources.revolte,
                 resources.denken, resources.tornado, resources.arena,
+                resources.staircases,
                 resources.enemyAnimator, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.spellAnimator, feedback);
-            drawStaircase(window, tower->staircaseBounds(), tower->staircaseUnlocked());
             if (const auto loot = tower->lootDropBounds())
                 drawLootDrop(window, *loot, resources.lootBookAnimator);
             window.setView(interfaceView);
@@ -270,7 +286,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 || tower->currentFloorType() == arcane::game::run::FloorType::Event))
         {
             drawSpecialFloor(window, *tower, resources.playerAnimator,
-                resources.shadeChargeAnimator, resources.arena);
+                resources.shadeChargeAnimator, resources.arena, resources.staircases);
             if (tower->specialPanelOpen()
                 && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
             {
@@ -326,6 +342,18 @@ int arcane::presentation::SfmlApplication::run()
     sf::RenderWindow window(sf::VideoMode({WindowWidth, WindowHeight}), "Arcane Spire");
     window.setVerticalSyncEnabled(true);
     window.setKeyRepeatEnabled(false);
+    std::string displayedWindowTitle = "Arcane Spire | Loading assets...";
+    window.setTitle(displayedWindowTitle);
+    window.clear(sf::Color {18, 20, 28});
+    drawPixelText(window, "LOADING ASSETS...",
+        {static_cast<float>(WindowWidth) * 0.5F - 154.0F,
+            static_cast<float>(WindowHeight) * 0.5F - 20.0F},
+        3.0F, sf::Color {220, 206, 255});
+    drawPixelText(window, "PREPARING THE TOWER",
+        {static_cast<float>(WindowWidth) * 0.5F - 120.0F,
+            static_cast<float>(WindowHeight) * 0.5F + 26.0F},
+        1.5F, sf::Color {137, 171, 205});
+    window.display();
 
     arcane::platform::SfmlInputMapper inputMapper;
     arcane::app::TowerSessionConfig config;
@@ -423,6 +451,10 @@ int arcane::presentation::SfmlApplication::run()
     EnemyStateTextures auraTextures = loadEnemyStateTextures(
         "assets/enemies/aura/", false, true, false);
     auraTextures.domination = loadTexture("assets/enemies/aura/domination.png");
+    auraTextures.guillotineFrame = loadTexture(
+        "assets/enemies/aura/soul-guillotine-frame.png");
+    auraTextures.guillotineBlade = loadTexture(
+        "assets/enemies/aura/soul-guillotine-blade.png");
     EnemyStateTextures revolteTextures;
     revolteTextures.idle = loadTexture("assets/enemies/revolte/idle.png");
     revolteTextures.attack = loadTexture("assets/enemies/revolte/attack.png");
@@ -454,6 +486,7 @@ int arcane::presentation::SfmlApplication::run()
             loadTexture("assets/portraits/revolte/avatar3.png")}
     };
     const ArenaTextures arenaTextures = loadArenaTextures("assets/environments/processed");
+    const StaircaseTextures staircaseTextures = loadStaircaseTextures("assets/props");
     arcane::presentation::EnemyAnimator enemyAnimator;
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
@@ -477,12 +510,16 @@ int arcane::presentation::SfmlApplication::run()
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,
         denkenTextures, tornadoTextures, dialoguePortraits,
-        arenaTextures, enemyAnimator, lootBookAnimator, playerAnimator,
+        arenaTextures, staircaseTextures, enemyAnimator, lootBookAnimator, playerAnimator,
         shadeChargeAnimator, spellCards,
         spellEffectAnimator};
     sf::Clock frameClock;
     ui::CombatFeedbackViewModel combatFeedback;
     std::optional<std::uint32_t> feedbackFloor;
+    std::vector<arcane::game::EnemyStateView> frameEnemyStates;
+    std::vector<arcane::game::SpellEffectView> frameSpellEffects;
+    frameEnemyStates.reserve(8U);
+    frameSpellEffects.reserve(16U);
 
     while (window.isOpen())
     {
@@ -501,6 +538,8 @@ int arcane::presentation::SfmlApplication::run()
             simulationDeltaSeconds = combatFeedback.combatDeltaSeconds(deltaSeconds);
         app.update(inputMapper.sample(), simulationDeltaSeconds);
         const auto application = app.snapshot();
+        frameEnemyStates.clear();
+        frameSpellEffects.clear();
         if (const auto* tower = app.model(); application.screen == ui::ApplicationScreen::Playing
             && tower && tower->combat())
         {
@@ -510,14 +549,16 @@ int arcane::presentation::SfmlApplication::run()
                 combatFeedback.reset();
                 feedbackFloor = floor;
             }
-            const auto enemies = tower->combat()->enemyStates();
+            tower->combat()->populateEnemyStates(frameEnemyStates);
+            tower->combat()->populateSpellEffects(frameSpellEffects);
             const float feedbackDelta = !app.loadout().open() ? deltaSeconds : 0.0F;
-            combatFeedback.update(tower->combat()->playerState(), enemies, feedbackDelta);
+            combatFeedback.update(
+                tower->combat()->playerState(), frameEnemyStates, feedbackDelta);
             const bool enemyAnimationAdvances = !app.loadout().open()
                 && !app.spellAcquisition().active()
                 && !tower->combat()->dialogueLine().has_value()
                 && !tower->combat()->bossIntro().has_value();
-            enemyAnimator.update(enemies,
+            enemyAnimator.update(frameEnemyStates,
                 enemyAnimationAdvances ? simulationDeltaSeconds : 0.0F);
         }
         else
@@ -537,9 +578,9 @@ int arcane::presentation::SfmlApplication::run()
         }
         else
             shadeChargeAnimator.reset();
-        updateWindowTitle(window, app);
+        updateWindowTitle(window, app, displayedWindowTitle);
         renderApplicationFrame(window, app, presentationState, renderResources,
-            combatFeedback.snapshot());
+            combatFeedback.snapshot(), frameEnemyStates, frameSpellEffects);
     }
 
     return 0;

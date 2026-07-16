@@ -14,6 +14,13 @@
 
 namespace arcane::game
 {
+inline constexpr std::uint32_t BurningFlowerVisualId = 9006U;
+inline constexpr std::uint32_t PhantomBreakVisualId = 9007U;
+inline constexpr std::uint32_t StoneGolemResolveVisualId = 9008U;
+inline constexpr std::uint32_t LightningStaffDischargeVisualId = 9009U;
+inline constexpr std::uint32_t DefensiveBarrierBreakVisualId = 9010U;
+inline constexpr std::uint32_t MirrorArrayBreakVisualId = 9011U;
+
 enum class CombatOutcome
 {
     Victory,
@@ -30,6 +37,8 @@ struct EnemySpawn
 {
     EnemyArchetype archetype {EnemyArchetype::HeadlessKnight};
     Vec2 position {800.0F, 576.0F};
+    std::optional<WorldBounds> movementBounds;
+    bool flyingPlacement {};
 };
 
 struct CombatRequest

@@ -13,8 +13,8 @@ namespace arcane::presentation
 namespace
 {
 constexpr float Pi = 3.14159265358979323846F;
-constexpr std::size_t ParticleCount = 12U;
-constexpr float ReadyPulseSeconds = 0.30F;
+constexpr std::size_t ParticleCount = 8U;
+constexpr float CompletionCueSeconds = 0.35F;
 
 [[nodiscard]] float clamp01(const float value) noexcept
 {
@@ -47,80 +47,62 @@ void ShadeChargeAnimator::update(
     const PlayerVisualState& player, const float deltaSeconds) noexcept
 {
     const float elapsed = std::max(0.0F, deltaSeconds);
-    elapsedSeconds_ += elapsed;
-    readyPulseRemaining_ = std::max(0.0F, readyPulseRemaining_ - elapsed);
+    completionCueRemaining_ = std::max(0.0F, completionCueRemaining_ - elapsed);
 
     const float remaining = std::clamp(player.shadowDashChargeRemaining, 0.0F,
         game::PlayerController::ShadowDashChargeSeconds);
-    chargeProgress_ = 1.0F - remaining
-        / game::PlayerController::ShadowDashChargeSeconds;
-    const bool newlyReady = remaining <= 0.0F && !player.shadowDashing
-        && player.currentHealth > 0;
-    if (newlyReady && !ready_) readyPulseRemaining_ = ReadyPulseSeconds;
-    ready_ = newlyReady;
-    visible_ = player.currentHealth > 0 && !player.shadowDashing
-        && remaining > 0.0F && chargeProgress_ > 0.02F;
+    const bool charging = remaining > 0.0F;
+    if (!initialized_)
+    {
+        initialized_ = true;
+        wasCharging_ = charging;
+        return;
+    }
+    if (wasCharging_ && !charging && !player.shadowDashing && player.currentHealth > 0)
+        completionCueRemaining_ = CompletionCueSeconds;
+    if (player.currentHealth <= 0) completionCueRemaining_ = 0.0F;
+    wasCharging_ = charging;
 }
 
 void ShadeChargeAnimator::drawBack(
     sf::RenderTarget& target, const sf::Vector2f playerBottomCenter) const
 {
-    if (!visible_) return;
+    if (completionCueRemaining_ <= 0.0F) return;
     const sf::Vector2f focus = playerBottomCenter + sf::Vector2f {0.0F, -38.0F};
-    const float intensity = smoothstep(chargeProgress_);
-
-    if (intensity > 0.55F)
-    {
-        const float auraRadius = 20.0F + intensity * 11.0F
-            + std::sin(elapsedSeconds_ * 5.0F) * 2.0F;
-        sf::CircleShape aura(auraRadius, 32U);
-        aura.setOrigin({auraRadius, auraRadius});
-        aura.setPosition(focus);
-        aura.setFillColor(sf::Color {4, 2, 10, alphaByte((intensity - 0.55F) * 95.0F)});
-        aura.setOutlineColor(sf::Color {72, 45, 108,
-            alphaByte((intensity - 0.55F) * 150.0F)});
-        aura.setOutlineThickness(2.0F);
-        target.draw(aura);
-    }
-
-    const std::size_t activeParticles = std::min(ParticleCount,
-        static_cast<std::size_t>(2.0F + intensity * static_cast<float>(ParticleCount - 2U)));
-    const float cycleSpeed = 0.72F + intensity * 1.45F;
-    for (std::size_t index = 0U; index < activeParticles; ++index)
+    const float progress = 1.0F - completionCueRemaining_ / CompletionCueSeconds;
+    const float inward = smoothstep(progress);
+    const float lifeAlpha = std::sin(progress * Pi);
+    for (std::size_t index = 0U; index < ParticleCount; ++index)
     {
         const auto seed = static_cast<std::uint32_t>(index * 977U + 131U);
-        const float phase = random01(seed);
-        const float cycle = std::fmod(elapsedSeconds_ * cycleSpeed + phase, 1.0F);
-        const float inward = smoothstep(cycle);
         const float baseAngle = random01(seed + 17U) * 2.0F * Pi;
-        const float curve = (random01(seed + 31U) - 0.5F) * 1.8F * (1.0F - inward);
-        const float angle = baseAngle + curve + elapsedSeconds_ * 0.08F;
-        const float startRadius = 48.0F + random01(seed + 47U) * 34.0F;
-        const float radius = startRadius * (1.0F - inward) + 4.0F * inward;
+        const float curve = (random01(seed + 31U) - 0.5F) * 1.4F * (1.0F - inward);
+        const float angle = baseAngle + curve;
+        const float startRadius = 42.0F + random01(seed + 47U) * 30.0F;
+        const float radius = startRadius * (1.0F - inward) + 3.0F * inward;
         const sf::Vector2f direction {std::cos(angle), std::sin(angle)};
         const sf::Vector2f position = focus + direction * radius;
-        const float lifeAlpha = std::sin(cycle * Pi);
-        const float alpha = lifeAlpha * (0.35F + intensity * 0.65F);
+        const float alpha = lifeAlpha * (0.65F + inward * 0.35F);
 
-        const float streakLength = 5.0F + intensity * 9.0F;
-        sf::RectangleShape streak({streakLength, 1.5F + intensity});
-        streak.setOrigin({streakLength, (1.5F + intensity) * 0.5F});
+        const float streakLength = 7.0F + inward * 8.0F;
+        sf::RectangleShape streak({streakLength, 1.5F + inward});
+        streak.setOrigin({streakLength, (1.5F + inward) * 0.5F});
         streak.setPosition(position);
         streak.setRotation(sf::radians(angle));
         streak.setFillColor(sf::Color {42, 23, 65, alphaByte(alpha * 175.0F)});
         target.draw(streak);
 
-        const float moteRadius = 2.0F + random01(seed + 59U) * 2.6F;
+        const float moteRadius = 1.5F + random01(seed + 59U) * 2.0F;
         sf::CircleShape fringe(moteRadius + 1.5F, 5U);
         fringe.setOrigin({moteRadius + 1.5F, moteRadius + 1.5F});
         fringe.setPosition(position);
-        fringe.setRotation(sf::radians(-angle + cycle * Pi));
+        fringe.setRotation(sf::radians(-angle + progress * Pi));
         fringe.setFillColor(sf::Color {72, 45, 108, alphaByte(alpha * 145.0F)});
         target.draw(fringe);
         sf::CircleShape core(moteRadius, 5U);
         core.setOrigin({moteRadius, moteRadius});
         core.setPosition(position);
-        core.setRotation(sf::radians(angle + cycle * Pi));
+        core.setRotation(sf::radians(angle + progress * Pi));
         core.setFillColor(sf::Color {5, 3, 10, alphaByte(alpha * 235.0F)});
         target.draw(core);
     }
@@ -129,29 +111,28 @@ void ShadeChargeAnimator::drawBack(
 void ShadeChargeAnimator::drawFront(
     sf::RenderTarget& target, const sf::Vector2f playerBottomCenter) const
 {
-    if (!visible_ && readyPulseRemaining_ <= 0.0F) return;
+    if (completionCueRemaining_ <= 0.0F) return;
     const sf::Vector2f focus = playerBottomCenter + sf::Vector2f {0.0F, -38.0F};
-    if (readyPulseRemaining_ > 0.0F)
+    const float progress = 1.0F - completionCueRemaining_ / CompletionCueSeconds;
+    if (progress > 0.62F)
     {
-        const float progress = 1.0F - readyPulseRemaining_ / ReadyPulseSeconds;
-        const float radius = 18.0F + progress * 42.0F;
+        const float flashProgress = (progress - 0.62F) / 0.38F;
+        const float radius = 8.0F + flashProgress * 13.0F;
         sf::CircleShape pulse(radius, 40U);
         pulse.setOrigin({radius, radius});
         pulse.setPosition(focus);
         pulse.setFillColor(sf::Color::Transparent);
         pulse.setOutlineColor(sf::Color {24, 12, 38,
-            alphaByte((1.0F - progress) * 230.0F)});
-        pulse.setOutlineThickness(4.0F - progress * 2.5F);
+            alphaByte((1.0F - flashProgress) * 220.0F)});
+        pulse.setOutlineThickness(3.0F - flashProgress * 1.5F);
         target.draw(pulse);
     }
 }
 
 void ShadeChargeAnimator::reset() noexcept
 {
-    elapsedSeconds_ = 0.0F;
-    chargeProgress_ = 0.0F;
-    readyPulseRemaining_ = 0.0F;
-    ready_ = false;
-    visible_ = false;
+    completionCueRemaining_ = 0.0F;
+    initialized_ = false;
+    wasCharging_ = false;
 }
 }

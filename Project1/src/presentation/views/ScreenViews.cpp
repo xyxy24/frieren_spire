@@ -208,9 +208,11 @@ void drawPlayer(sf::RenderTarget& target, const arcane::presentation::PlayerAnim
 void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
-    const ArenaTextures& arenaTextures)
+    const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures)
 {
     drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
+    drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
+        tower.arenaLayout().theme, staircaseTextures);
     if (const auto* player = tower.explorationPlayer())
     {
         const auto visual = makePlayerVisualState(*player, tower.run().player().currentHp);
@@ -231,7 +233,6 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     npcShape.setOutlineColor(sf::Color {235, 225, 190});
     npcShape.setOutlineThickness(3.0F);
     target.draw(npcShape);
-    drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked());
 }
 
 void drawLoadoutOverlay(sf::RenderTarget& target, const ui::LoadoutSnapshot& model,
@@ -363,33 +364,6 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const ui::LoadoutSnapshot& mod
             drawPixelText(target, spellRangeText(*detail.spell),
                 {420.0F, 590.0F}, 0.90F, sf::Color {174, 242, 184});
         }
-    }
-}
-
-void drawStaircase(
-    sf::RenderTarget& target,
-    const arcane::game::Aabb bounds,
-    const bool unlocked)
-{
-    sf::RectangleShape interactionZone({bounds.width, bounds.height});
-    interactionZone.setPosition({bounds.left, bounds.top});
-    interactionZone.setFillColor(sf::Color::Transparent);
-    interactionZone.setOutlineColor(unlocked ? sf::Color {245, 219, 145} : sf::Color {95, 96, 110});
-    interactionZone.setOutlineThickness(3.0F);
-    target.draw(interactionZone);
-
-    constexpr int StepCount = 5;
-    const float stepHeight = bounds.height / static_cast<float>(StepCount);
-    for (int step = 0; step < StepCount; ++step)
-    {
-        const float width = bounds.width * static_cast<float>(StepCount - step) / static_cast<float>(StepCount);
-        sf::RectangleShape shape({width, stepHeight});
-        shape.setPosition({bounds.left + bounds.width - width,
-            bounds.top + bounds.height - stepHeight * static_cast<float>(step + 1)});
-        shape.setFillColor(unlocked ? sf::Color {146, 124, 174} : sf::Color {68, 69, 80});
-        shape.setOutlineColor(unlocked ? sf::Color {226, 207, 244} : sf::Color {105, 106, 118});
-        shape.setOutlineThickness(1.5F);
-        target.draw(shape);
     }
 }
 

@@ -88,6 +88,20 @@ std::size_t eligibleCount(const std::span<const game::economy::CatalogItem> cata
         return std::find(owned.begin(), owned.end(), item.id) == owned.end();
     }));
 }
+
+constexpr bool isFlyingEnemy(const game::EnemyArchetype archetype) noexcept
+{
+    return archetype == game::EnemyArchetype::BirdDemon
+        || archetype == game::EnemyArchetype::LargeBirdDemon;
+}
+
+constexpr bool prefersElevatedSpawn(const game::EnemyArchetype archetype) noexcept
+{
+    // These casters target the player's ground lane with pillars or tornadoes, so they can
+    // create useful vertical pressure without teaching every ground enemy platform navigation.
+    return archetype == game::EnemyArchetype::Richter
+        || archetype == game::EnemyArchetype::Denken;
+}
 }
 
 TowerSession::TowerSession(const game::run::Seed seed, TowerSessionConfig config)
@@ -530,9 +544,40 @@ void TowerSession::startNextFloor()
             const std::size_t second = (first + 1U + rng.index(2U)) % firstGroup.size();
             encounter = {firstGroup[first], firstGroup[second], fourthGroup[rng.index(3U)]};
         }
-        for (std::size_t index = 0U; index < encounter.size(); ++index)
-            request.enemies.push_back({encounter[index],
-                {650.0F + static_cast<float>(index) * 220.0F, 576.0F}});
+        const auto spawnPoints = game::floors::enemySpawnPoints(*arenaLayout_);
+        std::vector<game::floors::ArenaSpawnPoint> groundPoints;
+        std::vector<game::floors::ArenaSpawnPoint> elevatedPoints;
+        std::vector<game::floors::ArenaSpawnPoint> flyingPoints;
+        for (const auto& point : spawnPoints)
+        {
+            switch (point.kind)
+            {
+            case game::floors::ArenaSpawnKind::GroundEnemy: groundPoints.push_back(point); break;
+            case game::floors::ArenaSpawnKind::ElevatedEnemy: elevatedPoints.push_back(point); break;
+            case game::floors::ArenaSpawnKind::FlyingEnemy: flyingPoints.push_back(point); break;
+            }
+        }
+
+        std::size_t groundIndex {};
+        std::size_t elevatedIndex {};
+        std::size_t flyingIndex {};
+        for (const auto archetype : encounter)
+        {
+            const auto* point = &groundPoints[groundIndex++ % groundPoints.size()];
+            bool flyingPlacement = false;
+            if (isFlyingEnemy(archetype) && !flyingPoints.empty())
+            {
+                point = &flyingPoints[flyingIndex++ % flyingPoints.size()];
+                flyingPlacement = true;
+            }
+            else if (prefersElevatedSpawn(archetype) && !elevatedPoints.empty())
+                point = &elevatedPoints[elevatedIndex++ % elevatedPoints.size()];
+
+            const bool elevated = point->kind == game::floors::ArenaSpawnKind::ElevatedEnemy;
+            request.enemies.push_back({archetype, point->position,
+                elevated ? std::optional<game::WorldBounds> {point->movementBounds} : std::nullopt,
+                flyingPlacement});
+        }
     }
     request.enemyContactDamage = currentFloorType_ == game::run::FloorType::Boss ? 20 : 15;
     request.enemyAttackDamage = request.enemyArchetype == game::EnemyArchetype::HeadlessKnight ? 20 : 15;

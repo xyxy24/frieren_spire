@@ -33,6 +33,8 @@ public:
     [[nodiscard]] EnemyStateView enemyState() const noexcept;
     [[nodiscard]] std::vector<EnemyStateView> enemyStates() const;
     [[nodiscard]] std::vector<SpellEffectView> spellEffects() const;
+    void populateEnemyStates(std::vector<EnemyStateView>& views) const;
+    void populateSpellEffects(std::vector<SpellEffectView>& views) const;
     [[nodiscard]] Aabb attackBounds() const noexcept;
     [[nodiscard]] const std::optional<CombatResult>& result() const noexcept;
     [[nodiscard]] std::optional<CombatDialogueLineView> dialogueLine() const noexcept;
@@ -111,6 +113,7 @@ private:
         int manualSkill {-1};
         bool activated {};
         Vec2 specialTarget;
+        std::optional<WorldBounds> movementBounds;
     };
     struct ActiveSpellEffect
     {
@@ -175,6 +178,14 @@ private:
         std::uint64_t sequence {};
     };
     [[nodiscard]] static ai::EnemyConfig enemyConfigFor(EnemyArchetype archetype);
+    static constexpr float AuraGuillotineWindupSeconds = 0.9F;
+    static constexpr float AuraGuillotineActiveSeconds = 0.18F;
+    static constexpr float AuraGuillotineCooldownSeconds = 9.0F;
+    static constexpr float AuraGuillotineWidth = 192.0F;
+    static constexpr float AuraGuillotineHeight = 420.0F;
+    static constexpr int AuraGuillotineDamage = 22;
+    [[nodiscard]] WorldBounds movementBoundsFor(const EnemyRuntime& enemy) const noexcept;
+    [[nodiscard]] bool updateEnemySkills(float deltaSeconds, float playerCenter);
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
     void finish(CombatOutcome outcome) noexcept;
     enum class DialogueScript : std::uint8_t {

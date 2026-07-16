@@ -50,6 +50,8 @@ struct SpellBinding
     bool directional;
     std::uint32_t loopStart {NoLoop};
     std::uint32_t loopEnd {NoLoop};
+    std::uint32_t firstFrame {};
+    std::uint32_t lastFrame {NoLoop};
 };
 
 constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinitions {{
@@ -91,28 +93,47 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
 {
     switch (spellId)
     {
-    case 1001U: return SpellBinding {27U, VisualLayout::FieldRow, 1.0F, false, 2U, 5U};
+    case 1001U:
+        return SpellBinding {27U, VisualLayout::FieldRow, 1.0F, false, 2U, 4U, 0U, 4U};
     case 1002U: return SpellBinding {13U, VisualLayout::CasterBottom, 1.15F, false, 2U, 5U};
     case 1003U: return SpellBinding {28U, VisualLayout::Center, 1.05F, true};
     case 1004U: return SpellBinding {1U, VisualLayout::Beam, 0.72F, true};
     case 1005U: return SpellBinding {2U, VisualLayout::Center, 1.35F, true};
-    case 1006U: return SpellBinding {6U, VisualLayout::Center, 1.05F, true, 2U, 5U};
+    case 1006U: return SpellBinding {6U, VisualLayout::Center, 1.05F, true};
+    case game::BurningFlowerVisualId:
+        return SpellBinding {27U, VisualLayout::FieldRow, 1.0F, false, 5U, 7U, 5U, 8U};
     case 1008U: return SpellBinding {17U, VisualLayout::Tether, 0.72F, true};
     case 1009U: return SpellBinding {3U, VisualLayout::Center, 1.35F, true};
-    case 1011U: return SpellBinding {24U, VisualLayout::CasterBottom, 1.15F, false, 3U, 5U};
+    case 1011U:
+        return SpellBinding {24U, VisualLayout::CasterBottom, 1.15F, false, 3U, 5U, 0U, 5U};
+    case game::PhantomBreakVisualId:
+        return SpellBinding {24U, VisualLayout::CasterBottom, 1.15F, false,
+            NoLoop, NoLoop, 6U, 9U};
     case 1016U: return SpellBinding {9U, VisualLayout::CasterBottom, 1.2F, false, 2U, 5U};
     case 1017U: return SpellBinding {1U, VisualLayout::TripleBeam, 0.58F, true};
     case 1018U: return SpellBinding {10U, VisualLayout::Center, 1.0F, false};
     case 1019U: return SpellBinding {8U, VisualLayout::Center, 0.8F, true};
     case 1020U: return SpellBinding {18U, VisualLayout::Tether, 0.78F, true};
     case 1021U: return SpellBinding {20U, VisualLayout::GroundCenter, 1.15F, false};
-    case 1022U: return SpellBinding {25U, VisualLayout::CasterBottom, 1.25F, false, 3U, 5U};
+    case 1022U:
+        return SpellBinding {25U, VisualLayout::CasterBottom, 1.25F, false, 3U, 5U, 0U, 5U};
+    case game::StoneGolemResolveVisualId:
+        return SpellBinding {25U, VisualLayout::CasterBottom, 1.25F, false,
+            NoLoop, NoLoop, 6U, 9U};
     case 1023U: return SpellBinding {14U, VisualLayout::CasterBottom, 1.15F, false, 2U, 5U};
     case 1024U: return SpellBinding {11U, VisualLayout::Center, 1.15F, false};
     case 1025U: return SpellBinding {19U, VisualLayout::Endpoint, 0.9F, true};
-    case 1026U: return SpellBinding {15U, VisualLayout::Center, 1.0F, false, 2U, 5U};
+    case 1026U:
+        return SpellBinding {15U, VisualLayout::Center, 1.0F, false, 2U, 5U, 0U, 5U};
+    case game::LightningStaffDischargeVisualId:
+        return SpellBinding {15U, VisualLayout::Center, 1.0F, false,
+            NoLoop, NoLoop, 6U, 7U};
     case 1027U: return SpellBinding {4U, VisualLayout::HomingVolley, 0.9F, true};
-    case 1028U: return SpellBinding {16U, VisualLayout::CasterBottom, 1.15F, false, 2U, 5U};
+    case 1028U:
+        return SpellBinding {16U, VisualLayout::CasterBottom, 1.15F, false, 2U, 5U, 0U, 5U};
+    case game::DefensiveBarrierBreakVisualId:
+        return SpellBinding {16U, VisualLayout::CasterBottom, 1.15F, false,
+            NoLoop, NoLoop, 6U, 7U};
     case 1029U: return SpellBinding {7U, VisualLayout::Center, 1.05F, true};
     case 1030U: return SpellBinding {12U, VisualLayout::GroundCenter, 1.25F, false, 2U, 5U};
     case 2001U: return SpellBinding {1U, VisualLayout::Beam, 1.0F, true};
@@ -121,9 +142,12 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     case 2006U: return SpellBinding {31U, VisualLayout::Center, 1.2F, true};
     case 2007U: return SpellBinding {22U, VisualLayout::GroundCenter, 1.35F, false};
     case 2009U: return SpellBinding {30U, VisualLayout::Hellfire, 1.0F, false, 0U, 7U};
-    case 2010U: return SpellBinding {1U, VisualLayout::Beam, 1.0F, true, 2U, 5U};
+    case 2010U: return SpellBinding {1U, VisualLayout::Beam, 1.0F, true, 2U, 4U};
     case 2011U: return SpellBinding {23U, VisualLayout::GroundCenter, 1.35F, false, 4U, 6U};
     case 2012U: return SpellBinding {26U, VisualLayout::CasterBottom, 1.2F, false, 3U, 5U};
+    case game::MirrorArrayBreakVisualId:
+        return SpellBinding {26U, VisualLayout::CasterBottom, 1.2F, false,
+            NoLoop, NoLoop, 6U, 8U};
     default: return std::nullopt;
     }
 }
@@ -132,13 +156,18 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     const SpellBinding& binding, const game::SpellEffectView& effect) noexcept
 {
     const float elapsed = std::max(0.0F, effect.duration - effect.remaining);
-    const auto rawFrame = static_cast<std::uint32_t>(elapsed * definition.framesPerSecond);
+    const std::uint32_t lastFrame = binding.lastFrame == NoLoop
+        ? definition.frameCount - 1U
+        : std::min(binding.lastFrame, definition.frameCount - 1U);
+    const std::uint32_t firstFrame = std::min(binding.firstFrame, lastFrame);
+    const auto rawFrame = firstFrame
+        + static_cast<std::uint32_t>(elapsed * definition.framesPerSecond);
     if (binding.loopStart == NoLoop || binding.loopEnd < binding.loopStart
-        || binding.loopEnd >= definition.frameCount)
-        return std::min(rawFrame, definition.frameCount - 1U);
+        || binding.loopStart < firstFrame || binding.loopEnd > lastFrame)
+        return std::min(rawFrame, lastFrame);
 
     if (rawFrame < binding.loopStart) return rawFrame;
-    const std::uint32_t outroCount = definition.frameCount - binding.loopEnd - 1U;
+    const std::uint32_t outroCount = lastFrame - binding.loopEnd;
     const float outroDuration = static_cast<float>(outroCount) / definition.framesPerSecond;
     if (outroCount > 0U && effect.remaining <= outroDuration)
     {
@@ -188,7 +217,13 @@ bool SpellEffectAnimator::draw(sf::RenderTarget& target, const game::SpellEffect
     const auto drawFrame = [&](const sf::Vector2f position, const float scale,
         const std::uint32_t frameOffset) {
         sf::Sprite sprite(*clip.texture);
-        const std::uint32_t selectedFrame = (frame + frameOffset) % definition.frameCount;
+        const std::uint32_t lastFrame = binding->lastFrame == NoLoop
+            ? definition.frameCount - 1U
+            : std::min(binding->lastFrame, definition.frameCount - 1U);
+        const std::uint32_t firstFrame = std::min(binding->firstFrame, lastFrame);
+        const std::uint32_t allowedFrameCount = lastFrame - firstFrame + 1U;
+        const std::uint32_t selectedFrame = firstFrame
+            + (frame - firstFrame + frameOffset) % allowedFrameCount;
         sprite.setTextureRect(sf::IntRect(
             {static_cast<int>(selectedFrame) * definition.frameWidth, 0},
             {definition.frameWidth, definition.frameHeight}));

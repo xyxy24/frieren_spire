@@ -91,6 +91,47 @@ bool auraBossPlatformsRemainClearlyAboveGround()
     }
     return true;
 }
+
+bool tacticalSpawnPointsFollowPlatformGeometry()
+{
+    const auto& layout = arcane::game::floors::arenaLayout(214U);
+    const auto first = arcane::game::floors::enemySpawnPoints(layout);
+    const auto repeated = arcane::game::floors::enemySpawnPoints(layout);
+    if (!expect(first.size() == 3U + layout.oneWayPlatforms.size() * 2U,
+            "each platform must contribute one elevated and one flying spawn")
+        || !expect(first.size() == repeated.size(),
+            "tactical spawn generation must be deterministic"))
+        return false;
+
+    std::size_t elevatedCount {};
+    std::size_t flyingCount {};
+    for (std::size_t index = 0U; index < first.size(); ++index)
+    {
+        const auto& point = first[index];
+        const auto& repeatedPoint = repeated[index];
+        if (!expect(point.kind == repeatedPoint.kind
+                && point.position.x == repeatedPoint.position.x
+                && point.position.y == repeatedPoint.position.y,
+                "repeated spawn generation must preserve ordering and coordinates"))
+            return false;
+        if (point.kind == arcane::game::floors::ArenaSpawnKind::ElevatedEnemy)
+        {
+            ++elevatedCount;
+            if (!expect(point.movementBounds.groundTop == point.position.y,
+                    "elevated spawn must use its platform top as lane ground"))
+                return false;
+        }
+        else if (point.kind == arcane::game::floors::ArenaSpawnKind::FlyingEnemy)
+            ++flyingCount;
+    }
+    return expect(elevatedCount == layout.oneWayPlatforms.size(),
+            "all platforms must expose elevated lanes")
+        && expect(flyingCount == layout.oneWayPlatforms.size(),
+            "all platforms must expose aerial approach points")
+        && expect(arcane::game::floors::enemySpawnPoints(
+                arcane::game::floors::arenaLayout(210U)).size() == 3U,
+            "safe rooms must expose only base-ground enemy markers");
+}
 }
 
 int main()
@@ -98,7 +139,8 @@ int main()
     const bool passed = everyCatalogLayoutIsValid()
         && specialFloorsAlwaysUseSafeRooms()
         && combatAndBossSelectionsStayInsideTheirAct()
-        && auraBossPlatformsRemainClearlyAboveGround();
+        && auraBossPlatformsRemainClearlyAboveGround()
+        && tacticalSpawnPointsFollowPlatformGeometry();
     if (!passed) return 1;
     std::cout << "All arena layout tests passed.\n";
     return 0;
