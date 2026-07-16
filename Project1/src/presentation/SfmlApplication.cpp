@@ -203,6 +203,7 @@ struct RenderResources
     const std::optional<sf::Texture>& starkSlash;
     const EnemyStateTextures& frierenCopy;
     const EnemyStateTextures& fernCopy;
+    const EnemyStateTextures& waterMirror;
     const std::array<std::optional<sf::Texture>, 2>& frierenBeam;
     const std::array<std::optional<sf::Texture>, 2>& frierenLightning;
     const std::optional<sf::Texture>& frierenFire;
@@ -272,7 +273,8 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.richter, resources.pillar,
                 resources.laufen,
                 resources.starkCopy, resources.starkSlash,
-                resources.frierenCopy, resources.fernCopy, resources.frierenBeam,
+                resources.frierenCopy, resources.fernCopy, resources.waterMirror,
+                resources.frierenBeam,
                 resources.frierenLightning, resources.frierenFire,
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
@@ -464,6 +466,9 @@ int arcane::presentation::SfmlApplication::run()
     fernCopyTextures.idle = loadTexture("assets/enemies/fern_copy/idle.png");
     fernCopyTextures.windup = loadTexture("assets/enemies/fern_copy/windup.png");
     fernCopyTextures.attack = loadTexture("assets/enemies/fern_copy/attack.png");
+    EnemyStateTextures waterMirrorTextures;
+    waterMirrorTextures.idle = loadTexture("assets/enemies/water_mirror_demon/idle.png");
+    waterMirrorTextures.die = loadTexture("assets/enemies/water_mirror_demon/die.png");
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -512,6 +517,9 @@ int arcane::presentation::SfmlApplication::run()
     };
     const DialoguePortraitTextures dialoguePortraits {
         loadTexture("assets/portraits/frieren/idle.png"),
+        loadTexture("assets/portraits/frieren_copy/avatar.png"),
+        loadTexture("assets/portraits/water_mirror_demon/avatar.png"),
+        loadTexture("assets/portraits/water_mirror_demon/die.png"),
         loadTexture("assets/portraits/aura/initial.png"),
         loadTexture("assets/portraits/aura/idle.png"),
         loadTexture("assets/portraits/aura/windup.png"),
@@ -541,7 +549,8 @@ int arcane::presentation::SfmlApplication::run()
         richterTextures, pillarTextures,
         laufenTextures,
         starkCopyTextures, starkSlashTexture,
-        frierenCopyTextures, fernCopyTextures, frierenBeamTextures, frierenLightningTextures,
+        frierenCopyTextures, fernCopyTextures, waterMirrorTextures,
+        frierenBeamTextures, frierenLightningTextures,
         frierenFireTexture,
         slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,

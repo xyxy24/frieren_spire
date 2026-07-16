@@ -116,6 +116,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const std::optional<sf::Texture>& starkSlashTexture,
     const EnemyStateTextures& frierenCopyTextures,
     const EnemyStateTextures& fernCopyTextures,
+    const EnemyStateTextures& waterMirrorTextures,
     const std::array<std::optional<sf::Texture>, 2>& frierenBeamTextures,
     const std::array<std::optional<sf::Texture>, 2>& frierenLightningTextures,
     const std::optional<sf::Texture>& frierenFireTexture,
@@ -429,6 +430,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &frierenCopyTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::FernCopy)
             stateTextures = &fernCopyTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon)
+            stateTextures = &waterMirrorTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -1023,7 +1026,13 @@ void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSessi
     target.draw(portraitFrame);
 
     const sf::Texture* portrait = nullptr;
-    if (dialogue->portrait.starts_with("frieren") && portraits.frieren)
+    if (dialogue->portrait == "frieren-copy" && portraits.frierenCopy)
+        portrait = &*portraits.frierenCopy;
+    else if (dialogue->portrait == "water-mirror" && portraits.waterMirror)
+        portrait = &*portraits.waterMirror;
+    else if (dialogue->portrait == "water-mirror-die" && portraits.waterMirrorDie)
+        portrait = &*portraits.waterMirrorDie;
+    else if (dialogue->portrait.starts_with("frieren") && portraits.frieren)
         portrait = &*portraits.frieren;
     else if (dialogue->portrait == "aura-initial" && portraits.auraInitial)
         portrait = &*portraits.auraInitial;

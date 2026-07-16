@@ -110,11 +110,11 @@ constexpr std::array WaterMirrorPreBattleDialogue {
 };
 constexpr std::array WaterMirrorSecondPhaseDialogue {
     CombatDialogueLineView {"FRIEREN", "IS THAT... A COPY OF ME?", "frieren"},
-    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "water-mirror"},
+    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "frieren-copy"},
     CombatDialogueLineView {"FRIEREN", "THEN LET US SEE WHAT IT CAN DO.", "frieren"}
 };
 constexpr std::array WaterMirrorDefeatDialogue {
-    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "water-mirror"},
+    CombatDialogueLineView {"WATER MIRROR DEMON", "...", "water-mirror-die"},
     CombatDialogueLineView {"FRIEREN", "WHEW. THAT WAS NOT EASY.", "frieren"}
 };
 }
@@ -190,7 +190,7 @@ ai::EnemyConfig CombatSession::enemyConfigFor(const EnemyArchetype archetype)
             128.0F, 84.0F, 7.0F, true, false, EnemySkill::DragonClaw};
     case EnemyArchetype::WaterMirrorDemon:
         return EnemyConfig {0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
-            54.0F, 72.0F, 999.0F, false, false, EnemySkill::BossAttack};
+            84.0F, 84.0F, 999.0F, false, true, EnemySkill::BossAttack};
     case EnemyArchetype::StarkCopy:
         return EnemyConfig {200.0F, 54.0F, 54.0F, 0.4F, 0.6F, 0.0F, 0.0F,
             54.0F, 72.0F, 4.0F, false, false, EnemySkill::BossAttack};
@@ -237,6 +237,12 @@ CombatSession::CombatSession(CombatRequest request)
                 : request_.worldBounds.groundTop
                     - (spawn.archetype == EnemyArchetype::LargeBirdDemon ? 144.0F : 132.0F)
                         - config.height;
+        if (spawn.archetype == EnemyArchetype::WaterMirrorDemon)
+        {
+            position.x = (request_.worldBounds.left + request_.worldBounds.right
+                - config.width) * 0.5F;
+            position.y = request_.worldBounds.groundTop - 144.0F - config.height;
+        }
         const int health = request_.enemies.empty() ? request_.enemyMaximumHealth : [&] {
             switch (spawn.archetype)
             {

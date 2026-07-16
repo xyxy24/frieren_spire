@@ -268,3 +268,11 @@
 - Original source/license: team-provided classroom prototype artwork.
 - Purpose: idle, windup and attack poses for the final Boss encounter's Fern copy; her beam
   reuses the Frieren copy's two-frame effect.
+
+## Water Mirror Demon
+
+- Files: `enemies/water_mirror_demon/*.png`, `portraits/water_mirror_demon/*.png`, and
+  `portraits/frieren_copy/avatar.png`.
+- Added by: project team, 2026-07-16.
+- Original source/license: team-provided classroom prototype artwork.
+- Purpose: idle/death art and dialogue portraits for the final Boss encounter.

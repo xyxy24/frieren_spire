@@ -1947,7 +1947,9 @@ bool waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
     if (!expect(enemies.size() == 3U,
             "Water Mirror Demon must open with the Stark and Fern copies")
         || !expect(enemies[0].archetype == arcane::game::EnemyArchetype::WaterMirrorDemon
-                && enemies[0].currentHealth == 200,
+                && enemies[0].currentHealth == 200 && enemies[0].width == 84.0F
+                && enemies[0].height == 84.0F && enemies[0].position.x == 598.0F
+                && enemies[0].position.y == 412.0F,
             "the final boss must expose its authoritative two hundred HP")
         || !expect(enemies[1].archetype == arcane::game::EnemyArchetype::StarkCopy
                 && enemies[1].currentHealth == 300,

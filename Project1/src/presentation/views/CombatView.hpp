@@ -44,6 +44,9 @@ struct EnemyStateTextures
 struct DialoguePortraitTextures
 {
     std::optional<sf::Texture> frieren;
+    std::optional<sf::Texture> frierenCopy;
+    std::optional<sf::Texture> waterMirror;
+    std::optional<sf::Texture> waterMirrorDie;
     std::optional<sf::Texture> auraInitial;
     std::optional<sf::Texture> auraIdle;
     std::optional<sf::Texture> auraWindup;
@@ -82,6 +85,7 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const std::optional<sf::Texture>& starkSlashTexture,
     const EnemyStateTextures& frierenCopyTextures,
     const EnemyStateTextures& fernCopyTextures,
+    const EnemyStateTextures& waterMirrorTextures,
     const std::array<std::optional<sf::Texture>, 2>& frierenBeamTextures,
     const std::array<std::optional<sf::Texture>, 2>& frierenLightningTextures,
     const std::optional<sf::Texture>& frierenFireTexture,
