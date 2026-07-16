@@ -15,10 +15,8 @@ public:
     void reset() noexcept;
 
 private:
-    float elapsedSeconds_ {};
-    float chargeProgress_ {};
-    float readyPulseRemaining_ {};
-    bool ready_ {};
-    bool visible_ {};
+    float completionCueRemaining_ {};
+    bool initialized_ {};
+    bool wasCharging_ {};
 };
 }

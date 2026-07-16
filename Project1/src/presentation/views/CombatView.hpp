@@ -7,11 +7,13 @@
 #include "presentation/SpellEffectAnimator.hpp"
 #include "presentation/viewmodel/CombatFeedbackViewModel.hpp"
 #include "presentation/views/ArenaView.hpp"
+#include "presentation/views/StaircaseView.hpp"
 
 #include <SFML/Graphics.hpp>
 
 #include <array>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -22,6 +24,8 @@ struct EnemyStateTextures
     std::optional<sf::Texture> animation;
     std::optional<sf::Texture> walk;
     std::optional<sf::Texture> domination;
+    std::optional<sf::Texture> guillotineFrame;
+    std::optional<sf::Texture> guillotineBlade;
     std::optional<sf::Texture> initial;
     std::optional<sf::Texture> idle;
     std::optional<sf::Texture> windup;
@@ -56,6 +60,8 @@ struct DialoguePortraitTextures
     const game::PlayerController& player, int currentHealth);
 
 void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
+    std::span<const game::EnemyStateView> enemyStates,
+    std::span<const game::SpellEffectView> spellEffects,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
     const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
@@ -85,6 +91,7 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyStateTextures& denkenTextures,
     const std::array<std::optional<sf::Texture>, 2>& tornadoTextures,
     const ArenaTextures& arenaTextures,
+    const StaircaseTextures& staircaseTextures,
     const EnemyAnimator& enemyAnimator, const PlayerAnimator& playerAnimator,
     const ShadeChargeAnimator& shadeChargeAnimator,
     const SpellEffectAnimator& spellEffectAnimator,

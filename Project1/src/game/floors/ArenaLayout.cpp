@@ -100,4 +100,24 @@ bool validateArenaLayout(const ArenaLayout& layout) noexcept
     }
     return true;
 }
+
+std::vector<ArenaSpawnPoint> enemySpawnPoints(const ArenaLayout& layout)
+{
+    std::vector<ArenaSpawnPoint> points;
+    points.reserve(3U + layout.oneWayPlatforms.size() * 2U);
+    constexpr std::array GroundX {650.0F, 870.0F, 1090.0F};
+    for (const float x : GroundX)
+        points.push_back({ArenaSpawnKind::GroundEnemy, {x, GroundTop},
+            {WorldLeft, WorldRight, GroundTop}});
+
+    for (const Aabb& platform : layout.oneWayPlatforms)
+    {
+        const float centeredX = platform.left + platform.width * 0.5F - 24.0F;
+        points.push_back({ArenaSpawnKind::ElevatedEnemy, {centeredX, platform.top},
+            {platform.left, platform.left + platform.width, platform.top}});
+        points.push_back({ArenaSpawnKind::FlyingEnemy, {centeredX, platform.top - 72.0F},
+            {WorldLeft, WorldRight, GroundTop}});
+    }
+    return points;
+}
 }

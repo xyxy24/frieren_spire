@@ -215,3 +215,40 @@
 - Purpose: full-screen scene backgrounds and transparent walkable platform artwork. Runtime
   artwork is presentation-only; collision continues to come from deterministic `ArenaLayout`
   rectangles.
+
+## Three-act staircase exits
+
+- Files: runtime textures `props/staircase-act1.png`, `props/staircase-act2.png`, and
+  `props/staircase-act3.png`. Large generation sources and transparent intermediates are retained
+  only in the author workspace and are not runtime dependencies or repository assets.
+- Added by: project team with OpenAI built-in image generation and deterministic local cleanup,
+  2026-07-16.
+- Original source/license: AI-generated classroom prototype material; no external asset pack.
+- Art direction: Act 1 uses occupied gothic masonry, chains, burgundy banners, and Aura's scale
+  crest; Act 2 uses a snowbound northern fortress stair with ice and blue braziers; Act 3 uses
+  pale examination-hall stone, teal-and-gold runes, and floating mana crystals.
+- Processing: flat green/magenta chroma backgrounds were removed with the image-generation
+  skill helper, then each source was cropped and normalized to the same transparent `320x400`
+  bottom-centered runtime canvas.
+- Purpose: replace the geometric staircase placeholder while preserving the authoritative
+  `TowerSessionConfig::staircaseBounds` interaction rectangle.
+
+## Aura soul-guillotine effect
+
+- Files: `enemies/aura/soul-guillotine-frame.png` and
+  `enemies/aura/soul-guillotine-blade.png`.
+- Added by: project team with OpenAI built-in image generation and deterministic local cleanup,
+  2026-07-16.
+- Original source/license: AI-generated classroom prototype material; no external game texture
+  or asset pack was copied.
+- Frame prompt: a tall dark-fantasy pixel-art guillotine perimeter with an ornate top beam, two
+  thin side rails and short corner chains; the entire center is explicitly empty, with no blade,
+  sword, slab, character, text or scenery, on flat `#00ff00` chroma green.
+- Blade prompt: one isolated broad and thin front-facing execution blade, roughly four times
+  wider than tall, with a slanted cutting edge and restrained violet engraving; no handle, sword
+  body, frame, rails, chains, character, text or scenery, on flat `#00ff00` chroma green.
+- Processing: the image-generation skill's chroma-key helper removed the green background. The
+  visible frame was normalized to a transparent `192x420` runtime canvas and the blade to a
+  transparent `128x48` canvas; runtime code keeps the frame fixed and moves only the blade.
+- Purpose: provide the polished surface art for Aura's Soul Guillotine while keeping its
+  authoritative range, warning time, hit timing and full-height drop in gameplay code.

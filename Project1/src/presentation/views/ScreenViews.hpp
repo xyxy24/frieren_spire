@@ -7,6 +7,7 @@
 #include "presentation/SpellCardArt.hpp"
 #include "presentation/viewmodel/UiViewModels.hpp"
 #include "presentation/views/ArenaView.hpp"
+#include "presentation/views/StaircaseView.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -22,10 +23,9 @@ void drawPlayer(sf::RenderTarget& target, const PlayerAnimator& animator,
     sf::Color spriteTint = sf::Color::White);
 void drawSpecialFloor(sf::RenderTarget& target, const app::TowerSession& tower,
     const PlayerAnimator& playerAnimator, const ShadeChargeAnimator& shadeChargeAnimator,
-    const ArenaTextures& arenaTextures);
+    const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures);
 void drawLoadoutOverlay(sf::RenderTarget& target, const viewmodel::LoadoutSnapshot& model,
     const SpellCardArt& spellCards);
-void drawStaircase(sf::RenderTarget& target, game::Aabb bounds, bool unlocked);
 void drawLootDrop(sf::RenderTarget& target, game::Aabb bounds,
     const LootBookAnimator& animator);
 }

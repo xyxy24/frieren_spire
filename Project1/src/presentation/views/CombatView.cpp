@@ -94,6 +94,8 @@ void drawSleepParticles(sf::RenderTarget& target, const arcane::game::PlayerStat
 }
 
 void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
+    const std::span<const arcane::game::EnemyStateView> enemyStates,
+    const std::span<const arcane::game::SpellEffectView> spellEffects,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
     const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
@@ -124,6 +126,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& denkenTextures,
     const std::array<std::optional<sf::Texture>, 2>& tornadoTextures,
     const ArenaTextures& arenaTextures,
+    const StaircaseTextures& staircaseTextures,
     const arcane::presentation::EnemyAnimator& enemyAnimator,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
@@ -134,6 +137,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     if (!combat) return;
 
     drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
+    drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
+        tower.arenaLayout().theme, staircaseTextures);
 
     const arcane::game::PlayerStateView player = combat->playerState();
     const sf::Color playerFallback = player.shadowDashing ? sf::Color {28, 22, 42}
@@ -154,7 +159,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     shadeChargeAnimator.drawFront(target, playerBottomCenter);
     drawSleepParticles(target, player);
 
-    for (const arcane::game::SpellEffectView effect : combat->spellEffects())
+    for (const arcane::game::SpellEffectView effect : spellEffects)
     {
         if (effect.spellId == 9001U)
         {
@@ -313,10 +318,9 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             target.draw(rangeShape);
     }
 
-    const auto enemies = combat->enemyStates();
-    for (std::size_t enemyIndex = 0U; enemyIndex < enemies.size(); ++enemyIndex)
+    for (std::size_t enemyIndex = 0U; enemyIndex < enemyStates.size(); ++enemyIndex)
     {
-        const arcane::game::EnemyStateView enemy = enemies[enemyIndex];
+        const arcane::game::EnemyStateView enemy = enemyStates[enemyIndex];
         const bool hitFlashing = enemyIndex < feedback.enemyFlashRatios.size()
             && feedback.enemyFlashRatios[enemyIndex] > 0.0F;
         const float impactOffset = enemyIndex < feedback.enemyImpactOffsets.size()
@@ -536,8 +540,11 @@ else enemyColor.a = alpha;
                 && enemy.attackActive;
             const bool heimonAttack = enemy.archetype == arcane::game::EnemyArchetype::Heimon
                 && enemy.attackActive && !enemy.specialAttackActive;
+            const bool auraGuillotine = enemy.archetype == arcane::game::EnemyArchetype::Aura
+                && enemy.skillVariant == 0
+                && (enemy.specialWindingUp || enemy.specialAttackActive);
             const bool auraDomination = enemy.archetype == arcane::game::EnemyArchetype::Aura
-                && (enemy.windingUp || enemy.attackActive);
+                && !auraGuillotine && (enemy.windingUp || enemy.attackActive);
             std::optional<sf::IntRect> dominationFrame;
             const sf::Texture* dominationTexture = nullptr;
             if (auraDomination && stateTextures && stateTextures->domination)
@@ -581,7 +588,133 @@ else enemyColor.a = alpha;
                 if (heimonSkillTextures[frame])
                     fogAttackTexture = &*heimonSkillTextures[frame];
             }
-            if (dominationTexture && dominationFrame)
+            if (auraGuillotine)
+            {
+                const float progress = std::clamp(enemy.skillEffectProgress, 0.0F, 1.0F);
+                const bool active = enemy.specialAttackActive;
+                sf::RectangleShape column({area.width, area.height});
+                column.setPosition({area.left, area.top});
+                column.setFillColor(active ? sf::Color {82, 10, 42, 118}
+                    : sf::Color {62, 18, 78,
+                        static_cast<std::uint8_t>(34.0F + progress * 38.0F)});
+                column.setOutlineColor(active ? sf::Color {255, 92, 148}
+                    : sf::Color {190, 96, 218, 175});
+                column.setOutlineThickness(active ? 4.0F : 2.0F);
+                target.draw(column);
+
+                if (auraTextures.guillotineFrame)
+                {
+                    const auto textureSize = auraTextures.guillotineFrame->getSize();
+                    sf::Sprite frame(*auraTextures.guillotineFrame);
+                    frame.setPosition({area.left, area.top});
+                    frame.setScale({area.width / static_cast<float>(textureSize.x),
+                        area.height / static_cast<float>(textureSize.y)});
+                    frame.setColor(active ? sf::Color::White
+                        : sf::Color {255, 255, 255, 205});
+                    target.draw(frame);
+                }
+                else
+                {
+                    for (const float side : {0.18F, 0.82F})
+                        for (std::size_t link = 0U; link < 8U; ++link)
+                        {
+                            sf::CircleShape chainLink(5.0F, 10U);
+                            chainLink.setOrigin({5.0F, 5.0F});
+                            chainLink.setPosition({area.left + area.width * side,
+                                area.top + 18.0F + static_cast<float>(link) * 43.0F});
+                            chainLink.setScale({0.65F, 1.35F});
+                            chainLink.setFillColor(sf::Color::Transparent);
+                            chainLink.setOutlineColor(active ? sf::Color {255, 142, 175, 235}
+                                : sf::Color {169, 100, 205, 120});
+                            chainLink.setOutlineThickness(2.0F);
+                            target.draw(chainLink);
+                        }
+
+                    const float railInset = 28.0F;
+                    for (const float x : {area.left + railInset,
+                            area.left + area.width - railInset - 8.0F})
+                    {
+                        sf::RectangleShape rail({8.0F, area.height - 34.0F});
+                        rail.setPosition({x, area.top + 22.0F});
+                        rail.setFillColor(sf::Color {29, 14, 39,
+                            static_cast<std::uint8_t>(active ? 235U : 155U)});
+                        rail.setOutlineColor(sf::Color {139, 72, 166,
+                            static_cast<std::uint8_t>(active ? 230U : 130U)});
+                        rail.setOutlineThickness(2.0F);
+                        target.draw(rail);
+                    }
+
+                    sf::RectangleShape crossBeam({area.width - 36.0F, 13.0F});
+                    crossBeam.setOrigin({(area.width - 36.0F) * 0.5F, 6.5F});
+                    crossBeam.setPosition(
+                        {area.left + area.width * 0.5F, area.top + 25.0F});
+                    crossBeam.setFillColor(sf::Color {35, 17, 47, 235});
+                    crossBeam.setOutlineColor(sf::Color {173, 82, 187,
+                        static_cast<std::uint8_t>(active ? 245U : 170U)});
+                    crossBeam.setOutlineThickness(3.0F);
+                    target.draw(crossBeam);
+                }
+
+                const float bladeY = active
+                    ? area.top + 48.0F + progress * (area.height - 82.0F)
+                    : area.top + 48.0F + std::sin(progress * 5.0F * 3.14159265F) * 3.0F;
+                if (!active)
+                {
+                    for (const float offset : {-38.0F, 38.0F})
+                    {
+                        sf::RectangleShape suspension({3.0F, bladeY - area.top - 28.0F});
+                        suspension.setPosition({area.left + area.width * 0.5F + offset,
+                            area.top + 28.0F});
+                        suspension.setFillColor(sf::Color {158, 83, 185, 190});
+                        target.draw(suspension);
+                    }
+                }
+
+                if (auraTextures.guillotineBlade)
+                {
+                    const auto textureSize = auraTextures.guillotineBlade->getSize();
+                    sf::Sprite blade(*auraTextures.guillotineBlade);
+                    blade.setOrigin({static_cast<float>(textureSize.x) * 0.5F,
+                        static_cast<float>(textureSize.y) * 0.5F});
+                    blade.setPosition({area.left + area.width * 0.5F, bladeY});
+                    const float scale = area.width * 0.58F
+                        / static_cast<float>(textureSize.x);
+                    blade.setScale({scale, scale});
+                    blade.setColor(active ? sf::Color::White
+                        : sf::Color {255, 255, 255, 225});
+                    target.draw(blade);
+                }
+                else
+                {
+                    const float halfBladeWidth = area.width * 0.29F;
+                    sf::ConvexShape blade(5U);
+                    blade.setPoint(0U, {-halfBladeWidth, -12.0F});
+                    blade.setPoint(1U, {halfBladeWidth, -12.0F});
+                    blade.setPoint(2U, {halfBladeWidth, 8.0F});
+                    blade.setPoint(3U, {0.0F, 25.0F});
+                    blade.setPoint(4U, {-halfBladeWidth, 8.0F});
+                    blade.setPosition({area.left + area.width * 0.5F, bladeY});
+                    blade.setFillColor(active ? sf::Color {255, 225, 235}
+                        : sf::Color {197, 155, 224, 225});
+                    blade.setOutlineColor(active ? sf::Color {255, 82, 136}
+                        : sf::Color {94, 38, 116});
+                    blade.setOutlineThickness(active ? 4.0F : 3.0F);
+                    target.draw(blade);
+                }
+
+                sf::CircleShape groundSeal(area.width * 0.34F, 40U);
+                groundSeal.setOrigin({area.width * 0.34F, area.width * 0.34F});
+                groundSeal.setPosition({area.left + area.width * 0.5F,
+                    area.top + area.height - 5.0F});
+                groundSeal.setScale({1.0F, 0.22F});
+                groundSeal.setFillColor(sf::Color {96, 14, 54,
+                    static_cast<std::uint8_t>(active ? 150U : 45U)});
+                groundSeal.setOutlineColor(active ? sf::Color {255, 105, 158}
+                    : sf::Color {185, 96, 213, 180});
+                groundSeal.setOutlineThickness(3.0F);
+                target.draw(groundSeal);
+            }
+            else if (dominationTexture && dominationFrame)
             {
                 sf::Sprite effect(*dominationTexture, *dominationFrame);
                 const sf::Vector2f size {

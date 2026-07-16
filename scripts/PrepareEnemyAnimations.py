@@ -1,5 +1,6 @@
 from pathlib import Path
-from PIL import Image
+from statistics import median
+from PIL import Image, ImageDraw
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -8,6 +9,13 @@ SOURCE_ROOT = ROOT / "Project1" / "assets" / "enemies" / "generated-animation-sh
 GRID_COLUMNS = 4
 GRID_ROWS = 3
 ALPHA_BOUNDS_THRESHOLD = 32
+
+# These two generated recovery poses were drawn at a visibly different intrinsic
+# scale even though their transparent bounds were close to the other frames.
+FRAME_SCALE_OVERRIDES = {
+    ("headless_knight", 2, 3): 1.18,
+    ("lugner", 2, 3): 1.20,
+}
 
 ENEMIES = (
     "aura",
@@ -71,8 +79,11 @@ def prepare_enemy(enemy: str) -> None:
     destination = ENEMY_ROOT / enemy / "animation.png"
     width, height = frame_size(enemy)
     canvas_width = width * 3
+    canvas_height = height * 2
     horizontal_padding = (canvas_width - width) * 0.5
-    atlas = Image.new("RGBA", (canvas_width * GRID_COLUMNS, height * GRID_ROWS))
+    atlas = Image.new(
+        "RGBA", (canvas_width * GRID_COLUMNS, canvas_height * GRID_ROWS)
+    )
 
     with Image.open(source).convert("RGBA") as sheet:
         cells: list[list[Image.Image]] = []
@@ -96,36 +107,27 @@ def prepare_enemy(enemy: str) -> None:
         with Image.open(reference_path(enemy, 0)).convert("RGBA") as idle_reference:
             idle_reference_bounds = visible_bounds(idle_reference)
             idle_reference_height = idle_reference_bounds[3] - idle_reference_bounds[1]
+        source_idle_height = median(
+            bounds[3] - bounds[1] for bounds in bounds_by_row[0]
+        )
+        shared_scale = idle_reference_height / max(source_idle_height, 1)
 
         for row in range(GRID_ROWS):
             with Image.open(reference_path(enemy, row)).convert("RGBA") as reference:
                 reference_bounds = visible_bounds(reference)
-                reference_height = reference_bounds[3] - reference_bounds[1]
-                target_bottom = reference_bounds[3]
+                target_bottom = canvas_height - (height - reference_bounds[3])
             target_anchor_x = width * 0.5 + horizontal_padding
-            target_visible_height = max(
-                reference_height, round(idle_reference_height * 0.9)
-            )
 
             for column in range(GRID_COLUMNS):
                 cell = cells[row][column]
                 bounds = bounds_by_row[row][column]
                 cropped = cell.crop(bounds)
                 source_anchor = cell.width * 0.5 - bounds[0]
-                frame_scale = target_visible_height / max(cropped.height, 1)
+                frame_scale = shared_scale * FRAME_SCALE_OVERRIDES.get(
+                    (enemy, row, column), 1.0
+                )
                 scaled_width = max(1, round(cropped.width * frame_scale))
                 scaled_height = max(1, round(cropped.height * frame_scale))
-                scaled_anchor = source_anchor * frame_scale
-                scaled_right_extent = (cropped.width - source_anchor) * frame_scale
-                fit_scale = min(
-                    1.0,
-                    target_bottom / scaled_height,
-                    target_anchor_x / max(scaled_anchor, 1.0),
-                    (canvas_width - target_anchor_x)
-                        / max(scaled_right_extent, 1.0),
-                )
-                scaled_width = max(1, round(scaled_width * fit_scale))
-                scaled_height = max(1, round(scaled_height * fit_scale))
                 frame = cropped.resize(
                     (scaled_width, scaled_height), Image.Resampling.NEAREST
                 )
@@ -133,34 +135,92 @@ def prepare_enemy(enemy: str) -> None:
                 anchor_scale = scaled_width / cropped.width
                 left = round(target_anchor_x - source_anchor * anchor_scale)
                 top = target_bottom - scaled_height
-                left = min(max(left, 0), canvas_width - scaled_width)
-                top = min(max(top, 0), height - scaled_height)
+                if (left < 0 or left + scaled_width > canvas_width
+                    or top < 0 or top + scaled_height > canvas_height):
+                    raise ValueError(
+                        f"Frame {column},{row} for {enemy} exceeds its padded cell: "
+                        f"{left},{top} {scaled_width}x{scaled_height} in "
+                        f"{canvas_width}x{canvas_height}"
+                    )
                 atlas.alpha_composite(
-                    frame, (column * canvas_width + left, row * height + top)
+                    frame,
+                    (column * canvas_width + left, row * canvas_height + top),
                 )
 
-    visible_heights: list[list[int]] = []
     for row in range(GRID_ROWS):
-        row_heights: list[int] = []
         for column in range(GRID_COLUMNS):
             frame = atlas.crop((
                 column * canvas_width,
-                row * height,
+                row * canvas_height,
                 (column + 1) * canvas_width,
-                (row + 1) * height,
+                (row + 1) * canvas_height,
             ))
-            bounds = visible_bounds(frame)
-            row_heights.append(bounds[3] - bounds[1])
-        visible_heights.append(row_heights)
-    attack_ratio = min(visible_heights[2]) / max(visible_heights[0])
-    if attack_ratio < 0.88:
-        raise ValueError(
-            f"Attack frames for {enemy} shrink below the idle-size floor: "
-            f"{attack_ratio:.3f}"
-        )
+            visible_bounds(frame)
 
     atlas.save(destination, optimize=True)
     print(f"{destination.relative_to(ROOT)}: {atlas.size} RGBA")
+
+
+def prepare_aura() -> None:
+    """Keep Aura's body pixel-identical while animating only her magic accents."""
+    enemy = "aura"
+    destination = ENEMY_ROOT / enemy / "animation.png"
+    width, height = frame_size(enemy)
+    canvas_width = width * 3
+    atlas = Image.new("RGBA", (canvas_width * GRID_COLUMNS, height * GRID_ROWS))
+
+    with (
+        Image.open(ENEMY_ROOT / enemy / "idle.png").convert("RGBA") as idle,
+        Image.open(ENEMY_ROOT / enemy / "windup.png").convert("RGBA") as windup,
+    ):
+        body_left = (canvas_width - width) // 2
+        particle_positions = (
+            ((-17, -14), (-7, 12)),
+            ((-22, -8), (-11, -19), (1, 15)),
+            ((-26, -2), (-17, -17), (-5, -24), (5, 9)),
+            ((-30, 5), (-23, -13), (-12, -25), (1, -19), (8, 2)),
+        )
+        for row in range(GRID_ROWS):
+            for column in range(GRID_COLUMNS):
+                # Domination has its own large effect atlas. Reusing the original
+                # 72-pixel body prevents AI-redrawn poses from changing head/body scale.
+                body = idle if row == 0 or (row == 2 and column >= 2) else windup
+                frame = Image.new("RGBA", (canvas_width, height))
+                frame.alpha_composite(body, (body_left, 0))
+                draw = ImageDraw.Draw(frame)
+                hand_x = body_left + 17
+                hand_y = 29
+                particle_count = column + (1 if row > 0 else 0)
+                for offset_x, offset_y in particle_positions[column][:particle_count]:
+                    x = hand_x + offset_x
+                    y = hand_y + offset_y
+                    color = (212, 118, 255, 230) if (x + y) % 2 else (255, 211, 92, 235)
+                    draw.rectangle((x, y, x + 1, y + 1), fill=color)
+                if row == 1:
+                    radius = 2 + column * 2
+                    draw.rectangle(
+                        (hand_x - radius, hand_y - radius,
+                            hand_x + radius, hand_y + radius),
+                        outline=(183, 78, 244, 105 + column * 35),
+                    )
+                elif row == 2 and column < 2:
+                    radius = 10 + column * 5
+                    draw.rectangle(
+                        (hand_x - radius, hand_y - radius,
+                            hand_x + radius, hand_y + radius),
+                        outline=(255, 223, 126, 210 - column * 55),
+                    )
+                atlas.alpha_composite(frame, (column * canvas_width, row * height))
+
+    # Every row deliberately reuses a legacy body at native scale and ground line.
+    for row in range(GRID_ROWS):
+        for column in range(GRID_COLUMNS):
+            frame = atlas.crop((column * canvas_width, row * height,
+                (column + 1) * canvas_width, (row + 1) * height))
+            visible_bounds(frame)
+
+    atlas.save(destination, optimize=True)
+    print(f"{destination.relative_to(ROOT)}: {atlas.size} RGBA (locked Aura body)")
 
 
 def prepare_headless_walk() -> None:
@@ -274,7 +334,10 @@ def main() -> None:
             "Missing cleaned enemy animation sheets: " + ", ".join(missing)
         )
     for enemy in ENEMIES:
-        prepare_enemy(enemy)
+        if enemy == "aura":
+            prepare_aura()
+        else:
+            prepare_enemy(enemy)
     walk_source = SOURCE_ROOT / "headless_knight-walk-alpha.png"
     if not walk_source.is_file():
         raise FileNotFoundError(f"Missing cleaned walk sheet: {walk_source}")

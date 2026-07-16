@@ -1,6 +1,8 @@
 #pragma once
 
 #include "game/combat/Aabb.hpp"
+#include "game/math/Vec2.hpp"
+#include "game/player/PlayerController.hpp"
 #include "game/run/RunTypes.hpp"
 
 #include <cstdint>
@@ -16,6 +18,20 @@ enum class ArenaTheme : std::uint8_t
     MageExam
 };
 
+enum class ArenaSpawnKind : std::uint8_t
+{
+    GroundEnemy,
+    ElevatedEnemy,
+    FlyingEnemy
+};
+
+struct ArenaSpawnPoint
+{
+    ArenaSpawnKind kind {ArenaSpawnKind::GroundEnemy};
+    Vec2 position;
+    WorldBounds movementBounds;
+};
+
 struct ArenaLayout
 {
     run::ContentId id {};
@@ -29,4 +45,5 @@ struct ArenaLayout
 [[nodiscard]] const ArenaLayout& arenaLayout(run::ContentId id);
 [[nodiscard]] std::span<const ArenaLayout> allArenaLayouts() noexcept;
 [[nodiscard]] bool validateArenaLayout(const ArenaLayout& layout) noexcept;
+[[nodiscard]] std::vector<ArenaSpawnPoint> enemySpawnPoints(const ArenaLayout& layout);
 }

@@ -67,7 +67,7 @@ flowchart TB
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
 
-当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）、`views/CombatView`（战斗场景、敌人贴图、Boss 对话）与 `views/SpellAcquisitionView`（场景内光球、工程诊断窗、注册几何网络、星爆和信息落版）；`PlayerAnimator` 和 `EnemyAnimator` 仅根据只读战斗快照推进表现帧，`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。
+当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）、`views/CombatView`（战斗场景、敌人贴图、Boss 对话）与 `views/SpellAcquisitionView`（场景内光球、工程诊断窗、注册几何网络、星爆和信息落版）；`PlayerAnimator` 和 `EnemyAnimator` 仅根据只读战斗快照推进表现帧，`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。窗口创建后先提交一帧资源准备画面，再同步建立当前课程版本的纹理缓存；运行期间窗口标题只有内容变化时才写入操作系统，不能在每帧重复调用平台 API。
 
 `ApplicationViewModel`、`LoadoutViewModel` 与 `SpellAcquisitionViewModel` 是有状态 ViewModel；`ApplicationSnapshot`、`LoadoutSnapshot`、`RewardViewModel`、`MerchantViewModel`、`SpellAcquisitionSnapshot` 和装备槽投影是 View 的只读绑定对象。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。获取演出 ViewModel 只在检测到已学列表增长后启动，保存内容 ID 和表现时间；奖励已经由 Model 原子结算，演出不能重复发放或自动装备。演出期间 Model 不推进，`PlayerAnimator` 由表现层覆盖为一次性的 `Pickup` 姿态并停在末帧，避免复用冻结前残留速度而显示跑步。`CombatFeedbackViewModel` 是仅持有表现寿命的 ViewModel：它读取相邻两帧 `PlayerStateView/EnemyStateView` 的权威 HP 差值，产出目标闪白、飘字、命中扩散环、纯视觉击退、确定性镜头偏移和短命中停顿请求，并在楼层切换时重置。事件、战斗 HUD 和特殊楼层面板目前仍读取 Model 的只读快照，后续按同一边界迁移。
 
@@ -152,7 +152,7 @@ stateDiagram-v2
 
 剑之乡专属遗物仍以稳定内容 ID 存入本局遗物集合，但不加入 `RelicMerchantCatalog`。勇者之剑通过 `DamageRequest::flatReduction` 修正 `EnemyContact`；真-勇者之剑只在 `DamageResult::appliedDamage > 0` 后产生一次范围反击，避免黑冲无敌、护盾或减伤令实际伤害归零时仍触发，也不得递归响应自身伤害。
 
-阿乌拉的“不死大军”是 `CombatSession` 拥有的 Boss 召唤计时器，而不是表现层生成对象：开场和每次 12 秒触发均创建两个拥有独立 AI、HP、伤害序列与血条的无头骑士 `EnemyRuntime`。支配使用锁定朝向后的身前 `420×180 px` AABB、0.8 秒前摇和单次攻击序列结算，基础伤害为 0，命中后提交 1 秒控制；首次施放只绕过女神加护与普通控制抗性，空间相交、黑冲和法术无敌始终在应用控制前判断。表现层仅按 `skillEffectBounds` 缩放八帧预警特效，不复制判定公式。
+阿乌拉的“不死大军”是 `CombatSession` 拥有的 Boss 召唤计时器，而不是表现层生成对象：开场和每次 12 秒触发均创建两个拥有独立 AI、HP、伤害序列与血条的无头骑士 `EnemyRuntime`。支配使用锁定朝向后的身前 `420×180 px` AABB、0.8 秒前摇和单次攻击序列结算，基础伤害为 0，命中后提交 1 秒控制；首次施放只绕过女神加护与普通控制抗性，空间相交、黑冲和法术无敌始终在应用控制前判断。首次支配后启用的灵魂断头台由 `EnemyRuntime::secondaryCooldown`、`specialWindup` 和 `specialActive` 驱动：开始前锁定玩家位置为 `192×420 px` AABB，0.9 秒后只结算一次 22 点伤害，区域不再追踪；其 9 秒独立冷却只允许在 `Chase` 且未受控制时启动。`EnemyStateView` 只投影权威范围、阶段和归一化进度；表现层把固定框架和运动刀刃作为两张独立纹理加载，按投影范围缩放框架并按投影进度驱动薄刃完成全高下落，素材缺失时使用程序化结构回退，不复制任何命中公式。
 
 红镜龙原型当前处于延期状态，不得由楼层调度器生成。其爪击与吐焰实验代码暂时保留以便后续恢复，但不属于当前可玩内容或交付验收范围。Boss UI 仍根据 `EnemyArchetype` 判断主 Boss，不能仅凭楼层类型把召唤物也画成固定 Boss 血条。
 
@@ -187,9 +187,9 @@ stateDiagram-v2
 - `SpellCardArt` 独立加载 `assets/spell_cards/<spell-id>.png` 中的 33 张方形卡面，并以同一内容 ID 在奖励、商店、Tab 配装页和 HUD 槽位中绘制；它不读取或复用 `SpellEffectAnimator` 的战斗图集。卡面插画和 Boss 金色边框只属于表现层；魔法类别、可装备性、伤害、范围与冷却仍只读取领域定义和运行时快照。
 - `CombatRequest` 输入遭遇 ID、种子、玩家出生点、敌人实例列表、场地边界、玩家初始 HP 和金币基础奖励。敌人列表为空时仍支持旧单敌人字段，供小型领域测试使用；正式普通楼层传入三个敌人实例，Boss 楼层传入一个。
 - `CombatResult` 只报告胜负、原遭遇 ID、击杀数、应发金币和战斗结束后的玩家 HP；它不直接修改 B 拥有的本局资源或楼层进度。
-- `PlayerStateView` 和 `EnemyStateView` 是表现/UI 可读取的快照。`CombatSession::enemyStates()` 返回每个敌人的类型、位置、碰撞尺寸、HP 和技能阶段，UI 据此在普通敌人头顶绘制独立血条；Boss 继续使用右上角血条。
+- `PlayerStateView` 和 `EnemyStateView` 是表现/UI 可读取的快照。`CombatSession::enemyStates()` 返回每个敌人的类型、位置、碰撞尺寸、HP 和技能阶段，UI 据此在普通敌人头顶绘制独立血条；Boss 继续使用右上角血条。实时主循环使用 `populateEnemyStates/populateSpellEffects` 填充跨帧复用的容器，同一帧的反馈、动画和 View 共享同一份投影，避免重复构造快照和持续堆分配；返回 vector 的旧接口保留给测试和非热路径调用。
 - `PlayerStateView` 额外公开权威速度、基础攻击序列号、成功施法序列号、受击序列号与受击无敌剩余时间。SFML `PlayerAnimator` 只用这些只读字段选择或触发动画；一次性动画不得反向延长攻击有效帧、施法冷却、冲刺时间、无敌时间或受击控制。玩家精灵统一为 `128×96` 帧并以 `(64, 92)` 脚底锚点对齐 `42×64` 权威碰撞体，向左朝向通过表现层水平镜像实现。
-- `ShadeChargeAnimator` 只读取投影到 `PlayerVisualState` 的 `shadowDashChargeRemaining` 与 `shadowDashing`：以最多 12 个确定性粒子模板绘制向胸口收束的黑紫轨迹，并在就绪时播放一次 0.3 秒暗环后停止绘制。它是黑冲充能进度的唯一画面提示，HUD 不再重复绘制独立充能条；它不拥有或修改 1.5 秒充能、无敌和标记规则，暂停、构筑与魔法获取覆盖层只冻结其表现时钟。
+- `ShadeChargeAnimator` 只读取投影到 `PlayerVisualState` 的 `shadowDashChargeRemaining` 与 `shadowDashing`：它记录上一帧是否仍在充能，只在剩余时间由正数跨到零时，以最多 8 个确定性粒子模板播放一次约 0.35 秒的向胸口收束提示；充能期间、就绪等待期间和开局默认就绪状态均不持续绘制。HUD 不再重复绘制独立充能条；它不拥有或修改 1.5 秒充能、无敌和标记规则，暂停、构筑与魔法获取覆盖层只冻结其表现时钟。
 - `SpellEffectAnimator` 在表现层持有 32 套法术图集纹理和 33 个当前法术 ID 的布局映射。图集帧尺寸、锚点与播放速度来自经审核的 `assets/spells/processed/manifest.json`，运行时代码不读取或修改领域数值；CMake 将标准化图集复制到可执行文件旁的 `assets/spells/`。每个映射显式选择固定中心、施法者脚底、目标地面、前方端点、地面铺设、牵引线、单光束、三重光束、追踪弹组或多火柱布局，并只允许等比缩放图集。瞬发效果的生命周期不得短于 `frameCount / framesPerSecond`，持续效果必须完整播放入场帧、循环中段和退场帧；二次触发的魔像碎裂与镜阵响应也遵守同一规则。当前朝向型法术读取玩家的只读朝向进行水平镜像，正式拆分弹体与命中阶段时再由 `SpellVisualEvent` 携带施法瞬间朝向。
 - `EnemyStateView` 还公开锁定后的朝向。SFML `EnemyAnimator` 按敌人类型和 `windingUp/attackActive` 选择四帧 idle/windup/attack 图集行并水平翻转；状态切换会从该行首帧开始，待机以 4 FPS 按 `0-1-2-3-2-1` 往返播放，前摇以 9 FPS 推进，短攻击以 30 FPS 播放。动画器比较相邻只读快照的水平位置，只在实际位移时为拥有 `walk.png` 的敌人播放 10 FPS 行走循环；当前无头骑士使用八帧重甲步态，停下即回到待机，表现检测不能写回 AI 速度或位置。离线处理按每帧可见高度独立缩放，攻击与前摇不得低于对应敌人待机高度的 90%，再以源格中心和旧姿势地面线对齐，并用三倍宽透明画布容纳武器和拖尾，避免横向攻击把角色本体缩小、原地漂移或在循环边界突跳；这些表现参数不得反向改变领域碰撞箱、攻击有效时间或伤害。特殊跳跃、召唤、登场和死亡姿势优先于通用图集。资源由 CMake 复制到可执行文件旁的 `assets/`。
 - 每次基础攻击都有递增序列号，命中目标后记录序列号，保证活动帧跨越多个更新时不会重复结算。
@@ -261,7 +261,7 @@ runSeed
 
 当前 `FloorScheduler` 的正式默认节奏为每五层一个 Boss，Boss 固定出现在第 5、10、15 层，完整流程共 15 层；Boss 层优先且不消耗普通候选层的保底计数。`floorsPerBoss` 仍可在测试和快速预览配置中显式缩短。其他楼层由 `encounter` 随机流确定，并通过可配置间隔保证商店和事件出现。商店库存使用独立 `merchant` 随机流，新增楼层布局随机数不会改变商品。
 
-`ArenaLayout` 目录现以稳定 ID `110～115`、`210～215`、`310～315` 描述三幕纯平地安全房、普通竞技场与 Boss 房。`FloorController` 只使用 `RandomStream::Layout` 在当前幕普通竞技场池中选择 ID；事件和商店直接选择当幕 `SafeRoom`，Boss 直接选择专用房。`TowerSession` 将当前布局的静态单向平台复制进 `CombatRequest`，`PlayerController` 负责从下方穿台、下落落台、离开边缘，以及仅在站立于单向平台时响应“下方向 + 跳跃”的主动穿台；基础地面始终不可穿透。当前地面敌人仍只使用主地面，待 B 的敌人模块消费 lane/出生标记后再允许高台出生。SFML `ArenaTextures` 在应用启动时一次性持有当前课程版本三幕共六张背景/平台纹理，`ArenaView` 只读取布局主题和平台矩形完成缩放绘制，不重新计算碰撞；纹理缺失时使用程序化场景后备。平台图可向碰撞顶面下方延伸，但权威碰撞仍只来自 `ArenaLayout`。
+`ArenaLayout` 目录现以稳定 ID `110～115`、`210～215`、`310～315` 描述三幕纯平地安全房、普通竞技场与 Boss 房。`FloorController` 只使用 `RandomStream::Layout` 在当前幕普通竞技场池中选择 ID；事件和商店直接选择当幕 `SafeRoom`，Boss 直接选择专用房。`TowerSession` 将当前布局的静态单向平台复制进 `CombatRequest`，`PlayerController` 负责从下方穿台、下落落台、离开边缘，以及仅在站立于单向平台时响应“下方向 + 跳跃”的主动穿台；基础地面始终不可穿透。`ArenaLayout::enemySpawnPoints` 以审核过的平台几何稳定派生三类出生标记：三个主地面点、每个平台一个高台点和一个空中点。`TowerSession` 让鸟形飞行敌人优先使用空中点，让 Richter、Denken 这类能从高处向地面投放技能的远程施法者优先使用高台点，其余近战仍使用主地面点；高台点同时携带该平台的水平 lane 与顶面高度，`CombatSession` 在追击、击退和牵引时统一使用该 lane，避免敌人走出平台后悬空。首版不让所有地面敌人跨层导航。SFML `ArenaTextures` 在应用启动时一次性持有当前课程版本三幕共六张背景/平台纹理，`ArenaView` 只读取布局主题和平台矩形完成缩放绘制，不重新计算碰撞；纹理缺失时使用程序化场景后备。平台图可向碰撞顶面下方延伸，但权威碰撞仍只来自 `ArenaLayout`。
 
 商店/事件层由 `TowerSession` 持有独立的探索玩家和 NPC 交互覆盖层。商店库存按魔法与遗物分行生成，`TowerSession` 保存当前选中商品 ID/索引并消费菜单方向与确认意图；表现层只负责按类别分行、显示价格和选中状态。成功交易后从活动库存移除商品。事件使用 `Untriggered → Choosing → Result` 状态机，`Result` 保存选择 ID 到本层卸载为止，以便重复查看相同效果。覆盖层关闭不完成楼层，只有玩家到达后方楼梯才提交非战斗楼层完成与过层事务。
 

@@ -5,8 +5,11 @@
 Each supported enemy owns an `animation.png` atlas with four columns and three rows. The rows are
 idle, windup, and attack. Every row contains four chronological frames. Frames preserve the legacy
 enemy texture's visible size and bottom-center anchor, but use a triple-width transparent canvas so
-weapons and attack trails do not force the character itself to shrink. Presentation changes cannot
-alter the authoritative collision box.
+weapons and attack trails do not force the character itself to shrink. Non-Aura atlases also use a
+double-height cell, leaving transparent space above airborne poses and vertical effects. The whole
+sheet for one enemy uses one scale derived from its median generated idle frame; individual crouches,
+dives, jumps, and lunges are never independently stretched back to standing height. Presentation
+changes cannot alter the authoritative collision box.
 
 Idle playback uses the sequence `0, 1, 2, 3, 2, 1` at 4 FPS. Reversing through the middle frames
 avoids a hard frame-three-to-frame-zero snap while retaining all four generated poses.
@@ -20,6 +23,11 @@ Aura additionally owns an eight-column `domination.png` effect atlas: six escala
 build violet chains, balance scales and command rings; frame seven is the judgment flash and frame
 eight dissipates. The View scales each selected frame to `EnemyStateView::skillEffectBounds`, so the
 effect cannot disagree with or enlarge the `420 x 180` authoritative area.
+
+Aura is processed as a deliberate exception to the generated-pose pipeline. Her runtime atlas
+reuses the legacy idle and casting bodies at their native 72-pixel scale and bottom anchor, while
+only scale sparks, casting rings, and magic accents advance between frames. This prevents changes
+in AI-redrawn head, torso, and skirt proportions from making the boss appear to grow or shrink.
 
 ## Shared Generation Prompt
 
@@ -59,9 +67,10 @@ Green characters use `#ff00ff`; other characters use `#00ff00`.
 Built-in image generation sources and chroma-cleaned intermediates are stored under
 `Project1/assets/enemies/generated-animation-sheets/`. The installed image-generation chroma-key
 helper removes the flat background. `scripts/PrepareEnemyAnimations.py` then crops the centered
-four-by-three grid, applies nearest-neighbor normalization to the matching legacy pose, and writes
-the runtime atlas into each `assets/enemies/<enemy>/animation.png` directory. Each generated frame
-is scaled independently by visible character height: an attack or windup frame may never render
-shorter than 90 percent of the matching enemy's idle height. The source cell center and the legacy
-ground line provide a stable anchor, while the triple-width canvas absorbs horizontal weapons and
-trails. This prevents broad attack poses from shrinking the character or moving a stationary enemy.
+four-by-three grid, applies nearest-neighbor normalization, and writes the runtime atlas into each
+`assets/enemies/<enemy>/animation.png` directory. A single per-enemy scale is calculated from the
+median generated idle height and its legacy idle reference. The source cell center and legacy ground
+line provide a stable anchor, while triple-width and double-height cells absorb weapons, wings,
+vertical poses, and trails. Only explicitly audited AI scale outliers receive a named per-frame
+correction. This prevents broad attacks from shrinking the actor while retaining intentional pose
+changes such as crouching, diving, opening a lid, or spreading wings.

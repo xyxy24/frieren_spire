@@ -69,6 +69,10 @@ $cmake = Join-Path $visualStudioPath "Common7\IDE\CommonExtensions\Microsoft\CMa
 if (-not (Test-Path -LiteralPath $cmake)) {
     throw "Visual Studio's bundled CMake was not found at: $cmake"
 }
+# FetchContent launches nested CMake processes by command name. Keep those
+# subprocesses on the same bundled version instead of an older PATH install.
+$cmakeDirectory = Split-Path -Parent $cmake
+$env:PATH = "$cmakeDirectory;$env:PATH"
 
 if ($Action -eq "doctor") {
     $git = Get-Command git -ErrorAction SilentlyContinue
@@ -89,8 +93,8 @@ $arguments = switch ($Action) {
     "configure" { @("--preset", $configurePreset) }
     "build-debug" { @("--build", "--preset", $debugBuildPreset) }
     "build-release" { @("--build", "--preset", $releaseBuildPreset) }
-    "test-debug" { @("--build", "--preset", $debugBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests") }
-    "test-release" { @("--build", "--preset", $releaseBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests") }
+    "test-debug" { @("--build", "--preset", $debugBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests") }
+    "test-release" { @("--build", "--preset", $releaseBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests") }
 }
 
 & $cmake @arguments

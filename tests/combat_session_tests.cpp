@@ -469,7 +469,7 @@ bool everySpellEffectKeepsItsCompleteVisualTimeline()
     constexpr std::array expectations {
         Expectation {1001U, 4.0F, false}, Expectation {1002U, 5.0F, false},
         Expectation {1003U, 8.0F / 16.0F, false}, Expectation {1004U, 8.0F / 16.0F, false},
-        Expectation {1005U, 6.0F / 18.0F, false}, Expectation {1006U, 3.0F, false},
+        Expectation {1005U, 6.0F / 18.0F, false}, Expectation {1006U, 8.0F / 16.0F, false},
         Expectation {1008U, 8.0F / 16.0F, false}, Expectation {1009U, 6.0F / 16.0F, false},
         Expectation {1011U, 4.0F, false}, Expectation {1016U, 4.0F, false},
         Expectation {1017U, 8.0F / 16.0F, false}, Expectation {1018U, 8.0F / 16.0F, false},
@@ -523,17 +523,18 @@ bool secondarySpellEffectsKeepTheirCompleteVisualTimelines()
     arcane::game::PlayerIntent summon;
     summon.spellPressed[0] = true;
     golem.update(summon, 0.01F);
-    bool foundGolemOutro = false;
-    for (int frame = 0; frame < 600 && !foundGolemOutro; ++frame)
+    bool foundGolemResolution = false;
+    for (int frame = 0; frame < 600 && !foundGolemResolution; ++frame)
     {
         golem.update({}, 0.01F);
         const auto effects = golem.spellEffects();
-        foundGolemOutro = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
-            return effect.spellId == 1022U && std::abs(effect.duration - 1.0F) < 0.001F;
+        foundGolemResolution = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::StoneGolemResolveVisualId
+                && std::abs(effect.duration - 0.4F) < 0.001F;
         });
     }
-    if (!expect(foundGolemOutro,
-            "Stone Golem shatter must keep enough time for its outro frames")) return false;
+    if (!expect(foundGolemResolution,
+            "Stone Golem resolution must skip its construction and idle frames")) return false;
 
     auto mirrorRequest = adjacentEnemyRequest();
     mirrorRequest.enemyMaximumHealth = 100000;
@@ -550,8 +551,99 @@ bool secondarySpellEffectsKeepTheirCompleteVisualTimelines()
     mirror.update(triggerMirrors, 0.01F);
     const auto mirrorEffects = mirror.spellEffects();
     return expect(std::any_of(mirrorEffects.begin(), mirrorEffects.end(), [](const auto& effect) {
-            return effect.spellId == 2012U && std::abs(effect.duration - 0.75F) < 0.001F;
-        }), "Mirror Array response must play its intro, active and outro frames");
+            return effect.spellId == arcane::game::MirrorArrayBreakVisualId
+                && std::abs(effect.duration - 0.25F) < 0.001F;
+        }), "Mirror Array response must start directly from its shatter frames");
+}
+
+bool statefulSpellVisualsUseTheirMatchingTransitionPhases()
+{
+    auto phantomRequest = adjacentEnemyRequest();
+    phantomRequest.enemyContactDamage = 0;
+    phantomRequest.equippedSpellIds[0] = 1011U;
+    arcane::game::CombatSession phantom(phantomRequest);
+    arcane::game::PlayerIntent summonPhantom;
+    summonPhantom.spellPressed[0] = true;
+    phantom.update(summonPhantom, 0.01F);
+    bool phantomBroke = false;
+    for (int step = 0; step < 600 && !phantomBroke; ++step)
+    {
+        phantom.update({}, 0.01F);
+        const auto effects = phantom.spellEffects();
+        phantomBroke = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::PhantomBreakVisualId;
+        });
+    }
+    if (!expect(phantomBroke,
+            "a struck Phantom must switch from idle frames to its break-only timeline"))
+        return false;
+
+    auto barrierRequest = adjacentEnemyRequest();
+    barrierRequest.enemyContactDamage = 0;
+    barrierRequest.enemyAttackDamage = 40;
+    barrierRequest.equippedSpellIds[0] = 1028U;
+    arcane::game::CombatSession barrier(barrierRequest);
+    arcane::game::PlayerIntent raiseBarrier;
+    raiseBarrier.spellPressed[0] = true;
+    barrier.update(raiseBarrier, 0.01F);
+    bool barrierBroke = false;
+    for (int step = 0; step < 600 && !barrierBroke; ++step)
+    {
+        barrier.update({}, 0.01F);
+        const auto effects = barrier.spellEffects();
+        barrierBroke = std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::DefensiveBarrierBreakVisualId;
+        });
+        if (barrierBroke && !expect(std::none_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == 1028U;
+            }), "a broken barrier must stop rendering its intact loop")) return false;
+    }
+    return expect(barrierBroke,
+        "a depleted Defensive Barrier must start directly from its shatter frames");
+}
+
+bool flameBurstUsesOneShotVisualAndSeparateBurningField()
+{
+    auto request = adjacentEnemyRequest();
+    request.enemyMaximumHealth = 100000;
+    request.enemyContactDamage = 0;
+    request.enemyAttackDamage = 0;
+    request.equippedSpellIds[0] = 1001U;
+    request.equippedSpellIds[1] = 1006U;
+    arcane::game::CombatSession combat(request);
+
+    arcane::game::PlayerIntent field;
+    field.spellPressed[0] = true;
+    combat.update(field, 0.01F);
+    arcane::game::PlayerIntent ignite;
+    ignite.spellPressed[1] = true;
+    combat.update(ignite, 0.01F);
+
+    auto effects = combat.spellEffects();
+    const auto burst = std::find_if(effects.begin(), effects.end(), [](const auto& effect) {
+        return effect.spellId == 1006U;
+    });
+    const auto burningField = std::find_if(effects.begin(), effects.end(), [](const auto& effect) {
+        return effect.spellId == arcane::game::BurningFlowerVisualId;
+    });
+    if (!expect(burst != effects.end() && std::abs(burst->duration - 0.5F) < 0.001F,
+            "Flame Burst must play its eight-frame clip once instead of looping for the burn DOT")
+        || !expect(burningField != effects.end()
+                && std::abs(burningField->duration - 2.0F) < 0.001F,
+            "ignited Flower Field must use a distinct persistent fire visual")
+        || !expect(std::none_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == 1001U;
+            }), "igniting Flower Field must remove the replaced flower visual"))
+        return false;
+
+    combat.update({}, 0.55F);
+    effects = combat.spellEffects();
+    return expect(std::none_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == 1006U;
+        }), "one-shot Flame Burst visual must disappear after its final frame")
+        && expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::BurningFlowerVisualId;
+        }), "the separate burning field must remain visible for its gameplay duration");
 }
 
 bool newCombatSpellsApplyTheirCoreInteractions()
@@ -623,8 +715,15 @@ bool lightningStaffEnhancesExactlyThreeBasicAttacks()
         combat.update(attack, 0.01F);
         if (attackIndex < 2) combat.update({}, 0.35F);
     }
+    const auto effects = combat.spellEffects();
     return expect(combat.enemyState().currentHealth == 22,
-        "Lightning Staff must add three seven-damage hits and one twelve-damage burst");
+            "Lightning Staff must add three seven-damage hits and one twelve-damage burst")
+        && expect(std::none_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == 1026U;
+            }), "spent Lightning Staff must stop its persistent charge animation")
+        && expect(std::any_of(effects.begin(), effects.end(), [](const auto& effect) {
+                return effect.spellId == arcane::game::LightningStaffDischargeVisualId;
+            }), "the third Lightning Staff hit must start directly from its discharge frames");
 }
 
 bool frostLanceCanFreezeAfterItsOwnBaseCooldown()
@@ -1187,6 +1286,62 @@ bool auraDominationUsesTelegraphedFrontRange()
     shadowDash.update({}, 0.20F);
     return expect(shadowDash.playerState().stunRemaining <= 0.0F,
         "a charged Shade Dash must avoid even the first domination impact");
+}
+
+bool auraSoulGuillotineLocksPositionAndCanBeSidestepped()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {160.0F, 576.0F};
+    request.enemyArchetype = arcane::game::EnemyArchetype::Aura;
+    request.enemySpawn = {900.0F, 576.0F};
+    request.enemyMaximumHealth = 225;
+    request.enemyAttackDamage = 0;
+    request.enemyContactDamage = 0;
+
+    const auto reachGuillotine = [](arcane::game::CombatSession& combat) {
+        combat.update({}, 2.40F);
+        advanceDialogue(combat);
+        combat.update({}, 3.51F);
+        combat.update({}, 0.01F);
+        if (!combat.dialogueLine()) return false;
+        advanceDialogue(combat);
+        arcane::game::PlayerIntent escapeDomination;
+        escapeDomination.moveAxis = -1.0F;
+        combat.update(escapeDomination, 0.65F);
+        combat.update({}, 0.16F);
+        for (int step = 0; step < 500; ++step)
+        {
+            const auto aura = combat.enemyState();
+            if (aura.specialWindingUp && aura.skillVariant == 0
+                && aura.skillEffectBounds) return true;
+            combat.update({}, 0.01F);
+        }
+        return false;
+    };
+
+    arcane::game::CombatSession hit(request);
+    if (!expect(reachGuillotine(hit),
+            "Aura must unlock Soul Guillotine after her first Domination")) return false;
+    const auto telegraph = hit.enemyState();
+    const auto area = *telegraph.skillEffectBounds;
+    if (!expect(area.width == 192.0F && area.height == 420.0F,
+            "Soul Guillotine must expose its narrow authoritative execution column")
+        || !expect(arcane::game::intersects(area, arcane::game::Aabb {hit.playerState().position.x,
+                hit.playerState().position.y, 42.0F, 64.0F}),
+            "Soul Guillotine must lock the player's position when windup begins")) return false;
+    hit.update({}, 0.91F);
+    if (!expect(hit.playerState().currentHealth == 78,
+            "remaining inside Soul Guillotine must deal twenty-two damage")) return false;
+
+    arcane::game::CombatSession dodge(request);
+    if (!expect(reachGuillotine(dodge),
+            "the dodge scenario must reach Soul Guillotine windup")) return false;
+    arcane::game::PlayerIntent sidestep;
+    sidestep.moveAxis = 1.0F;
+    dodge.update(sidestep, 0.80F);
+    dodge.update({}, 0.11F);
+    return expect(dodge.playerState().currentHealth == 100,
+        "moving outside the locked column during windup must avoid Soul Guillotine");
 }
 
 bool defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
@@ -1905,6 +2060,36 @@ bool waterMirrorBossAdvancesThroughBothCopyPhases()
     return expect(combat.result() && combat.result()->outcome == arcane::game::CombatOutcome::Victory,
         "the final dialogue must resolve the Water Mirror Demon victory");
 }
+
+bool tacticalSpawnsPreserveElevatedLanesAndFlyingAltitude()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {120.0F, 576.0F};
+    request.enemyContactDamage = 0;
+    request.enemies = {
+        {arcane::game::EnemyArchetype::Richter, {620.0F, 480.0F},
+            arcane::game::WorldBounds {500.0F, 800.0F, 480.0F}, false},
+        {arcane::game::EnemyArchetype::Laufen, {860.0F, 640.0F}},
+        {arcane::game::EnemyArchetype::BirdDemon, {700.0F, 360.0F}, std::nullopt, true}
+    };
+    arcane::game::CombatSession combat(request);
+    auto enemies = combat.enemyStates();
+    if (!expect(enemies[0].position.y == 408.0F,
+            "elevated caster feet must align to the platform surface")
+        || !expect(enemies[1].position.y == 576.0F,
+            "ground melee enemies must remain on the base floor")
+        || !expect(enemies[2].position.y == 344.0F,
+            "flying placement must use the map-provided aerial anchor"))
+        return false;
+
+    for (int step = 0; step < 240; ++step) combat.update({}, 1.0F / 60.0F);
+    enemies = combat.enemyStates();
+    return expect(enemies[0].position.x >= 500.0F
+            && enemies[0].position.x + enemies[0].width <= 800.0F,
+            "elevated caster movement and knockback must stay inside its platform lane")
+        && expect(enemies[0].position.y == 408.0F,
+            "elevated caster must not drift vertically while pursuing the player");
+}
 }
 
 int main()
@@ -1928,6 +2113,8 @@ int main()
         && collectibleSpellsEmitEffectPlaceholders()
         && everySpellEffectKeepsItsCompleteVisualTimeline()
         && secondarySpellEffectsKeepTheirCompleteVisualTimelines()
+        && statefulSpellVisualsUseTheirMatchingTransitionPhases()
+        && flameBurstUsesOneShotVisualAndSeparateBurningField()
         && newCombatSpellsApplyTheirCoreInteractions()
         && lightningStaffEnhancesExactlyThreeBasicAttacks()
         && frostLanceCanFreezeAfterItsOwnBaseCooldown()
@@ -1950,6 +2137,7 @@ int main()
         && displacementSkillTriggersWhenPlayerEdgeEntersExtendedRange()
         && auraOpensWithTwoHeadlessKnights()
         && auraDominationUsesTelegraphedFrontRange()
+        && auraSoulGuillotineLocksPositionAndCanBeSidestepped()
         && defeatingAuraClearsHerArmyAndStartsDefeatDialogue()
         && revolteLocksAtFiveAndHealsForSecondPhase()
         && revolteParryActivatesWithoutWindup()
@@ -1977,6 +2165,7 @@ int main()
         && starkCopyWhirlwindSlashHitsBehindOnce()
         && starkCopyLandingExposesStretchedLinieEffect()
         && waterMirrorBossAdvancesThroughBothCopyPhases()
+        && tacticalSpawnsPreserveElevatedLanesAndFlyingAltitude()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()
         && bloodMagicUsesCurrentHealth()
