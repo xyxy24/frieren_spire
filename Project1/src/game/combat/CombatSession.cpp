@@ -1086,8 +1086,10 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                             request_.worldBounds.groundTop - 96.0F, 32.0F, 96.0F},
                             enemy.specialDirection, 300.0F, 300.0F,
                             ++environmentalSequence_, 20, 220.0F});
+                        enemy.manualSkill = 2;
+                        enemy.specialActive = 0.6F;
                     }
-                    enemy.manualSkill = -1;
+                    else enemy.manualSkill = -1;
                 }
                 continue;
             }
@@ -1105,9 +1107,8 @@ void CombatSession::update(const PlayerIntent& intent, const float deltaSeconds)
                     else
                     {
                         const auto caster = enemy.controller.bounds();
-                        const Aabb slash {enemy.specialDirection > 0.0F
-                                ? caster.left + caster.width : caster.left - 54.0F,
-                            caster.top, 54.0F, caster.height};
+                        const Aabb slash {caster.left - 54.0F, caster.top,
+                            caster.width + 108.0F, caster.height};
                         if (intersects(slash, playerBounds()))
                             static_cast<void>(resolvePlayerDamage({DamageSource::EnemyAttack,
                                 ++environmentalSequence_, 20, 1.0F,
@@ -2614,9 +2615,8 @@ std::vector<EnemyStateView> CombatSession::enemyStates() const
         }
         if (enemy.archetype == EnemyArchetype::StarkCopy && enemy.manualSkill == 1
             && (enemy.specialWindup > 0.0F || enemy.specialActive > 0.0F))
-            skillBounds = Aabb {enemy.specialDirection > 0.0F
-                    ? bounds.left + bounds.width : bounds.left - 54.0F,
-                bounds.top, 54.0F, bounds.height};
+            skillBounds = Aabb {bounds.left - 54.0F, bounds.top,
+                bounds.width + 108.0F, bounds.height};
         if ((enemy.markedRemaining > 0.0F || tacticalNotesRemaining_ > 0.0F)
             && skill != ai::EnemySkill::WolfClaw && skill != ai::EnemySkill::LeafBlade)
         {
@@ -2653,7 +2653,8 @@ std::vector<SpellEffectView> CombatSession::spellEffects() const
         views.push_back({tornado.evolutionRemaining > 0.0F ? 9002U : 9003U,
             tornado.bounds, tornado.remaining, 7.0F});
     for (const auto& projectile : activeEnemyProjectiles_)
-        views.push_back({projectile.bounds.width >= 54.0F ? 9102U : 9101U,
+        views.push_back({projectile.bounds.height >= 96.0F ? 9302U
+                : (projectile.bounds.width >= 54.0F ? 9102U : 9101U),
             projectile.bounds, projectile.remainingDistance / projectile.speed,
             projectile.totalDistance / projectile.speed, projectile.direction});
     for (const auto& beam : activeEnemyBeams_)

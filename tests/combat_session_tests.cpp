@@ -1786,6 +1786,27 @@ bool waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
         "the Water Mirror Demon must reject direct player damage");
 }
 
+bool starkCopyWhirlwindSlashHitsBehindOnce()
+{
+    arcane::game::CombatRequest request;
+    request.playerSpawn = {240.0F, 576.0F};
+    request.enemies = {{arcane::game::EnemyArchetype::StarkCopy, {300.0F, 0.0F}}};
+    arcane::game::CombatSession combat(request);
+    combat.update({}, 2.01F);
+    arcane::game::PlayerIntent crossBehind;
+    crossBehind.moveAxis = 1.0F;
+    combat.update(crossBehind, 0.50F);
+    if (!expect(combat.playerState().position.x > combat.enemyState().position.x
+            + combat.enemyState().width,
+            "the whirlwind regression setup must move the player behind Stark")
+        || !expect(combat.playerState().currentHealth == 80,
+            "Stark's whirlwind slash must hit within the rear fifty-four-pixel range"))
+        return false;
+    combat.update({}, 0.30F);
+    return expect(combat.playerState().currentHealth == 80,
+        "the whirlwind attack pose must not repeat its instant damage check");
+}
+
 bool waterMirrorBossAdvancesThroughBothCopyPhases()
 {
     arcane::game::CombatRequest request;
@@ -1911,6 +1932,7 @@ int main()
         && swordDemonMagicHitImmediatelyTriggersFlashStep()
         && swordDemonSlashUsesOneInstantDamageWindow()
         && waterMirrorBossOpensWithCopiesAndRejectsDirectDamage()
+        && starkCopyWhirlwindSlashHitsBehindOnce()
         && waterMirrorBossAdvancesThroughBothCopyPhases()
         && combatSessionAppliesEquippedSpellDamage()
         && spellDamageTargetsEveryEnemyInsideTheAuthoritativeArea()

@@ -190,6 +190,14 @@
 - Source: team-provided classroom prototype artwork.
 - Purpose: Laufen's idle, speed-magic windup, side-kick windup and side-kick attack poses.
 
+## Stark copy character and slash artwork
+
+- Files: `enemies/stark_copy/*.png`.
+- Added by: project team, 2026-07-16.
+- Source: team-provided classroom prototype artwork.
+- Purpose: the Stark copy's idle, Sky-Splitting Strike windup/jump/landing,
+  whirlwind-slash windup/attack, and vertical sword-wave effect.
+
 ## Three-act environment backgrounds and battle platforms
 
 - Files: runtime textures under `environments/processed/`; generation sources, chroma-key

@@ -185,6 +185,8 @@ struct RenderResources
     const EnemyStateTextures& richter;
     const std::array<std::optional<sf::Texture>, 3>& pillar;
     const EnemyStateTextures& laufen;
+    const EnemyStateTextures& starkCopy;
+    const std::optional<sf::Texture>& starkSlash;
     const std::optional<sf::Texture>& slash;
     const std::optional<sf::Texture>& largeSlash;
     const EnemyStateTextures& lugner;
@@ -245,6 +247,7 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.threeHeadedDemon,
                 resources.richter, resources.pillar,
                 resources.laufen,
+                resources.starkCopy, resources.starkSlash,
                 resources.slash, resources.largeSlash,
                 resources.lugner, resources.lugnerSkill,
                 resources.linie, resources.linieSkill,
@@ -389,6 +392,15 @@ int arcane::presentation::SfmlApplication::run()
     EnemyStateTextures laufenTextures = loadEnemyStateTextures(
         "assets/enemies/laufen/");
     laufenTextures.preJump = loadTexture("assets/enemies/laufen/windup_attack.png");
+    EnemyStateTextures starkCopyTextures;
+    starkCopyTextures.idle = loadTexture("assets/enemies/stark_copy/idle.png");
+    starkCopyTextures.skillWindups[0] = loadTexture("assets/enemies/stark_copy/windup1.png");
+    starkCopyTextures.jump = loadTexture("assets/enemies/stark_copy/jump.png");
+    starkCopyTextures.skillAttacks[0] = loadTexture("assets/enemies/stark_copy/attack1.png");
+    starkCopyTextures.skillWindups[1] = loadTexture("assets/enemies/stark_copy/windup2.png");
+    starkCopyTextures.skillAttacks[1] = loadTexture("assets/enemies/stark_copy/attack2.png");
+    const std::optional<sf::Texture> starkSlashTexture =
+        loadTexture("assets/enemies/stark_copy/slash.png");
     const std::optional<sf::Texture> slashTexture =
         loadTexture("assets/enemies/shared/slash.png");
     const std::optional<sf::Texture> largeSlashTexture =
@@ -460,6 +472,7 @@ int arcane::presentation::SfmlApplication::run()
         threeHeadedDemonTextures,
         richterTextures, pillarTextures,
         laufenTextures,
+        starkCopyTextures, starkSlashTexture,
         slashTexture, largeSlashTexture,
         lugnerTextures, lugnerSkillTextures, linieTextures,
         linieSkillTextures, drahtTextures, auraTextures, revolteTextures,

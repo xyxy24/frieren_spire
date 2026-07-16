@@ -110,6 +110,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const EnemyStateTextures& richterTextures,
     const std::array<std::optional<sf::Texture>, 3>& pillarTextures,
     const EnemyStateTextures& laufenTextures,
+    const EnemyStateTextures& starkCopyTextures,
+    const std::optional<sf::Texture>& starkSlashTexture,
     const std::optional<sf::Texture>& slashTexture,
     const std::optional<sf::Texture>& largeSlashTexture,
     const EnemyStateTextures& lugnerTextures,
@@ -222,6 +224,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         const std::optional<sf::Texture>* projectileTexture = nullptr;
         if (effect.spellId == 9101U) projectileTexture = &slashTexture;
         else if (effect.spellId == 9102U) projectileTexture = &largeSlashTexture;
+        else if (effect.spellId == 9302U) projectileTexture = &starkSlashTexture;
         if (projectileTexture && *projectileTexture)
         {
             sf::Sprite slash(**projectileTexture);
@@ -338,6 +341,8 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             stateTextures = &richterTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen)
             stateTextures = &laufenTextures;
+        else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy)
+            stateTextures = &starkCopyTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
         else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
@@ -402,6 +407,21 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen
                 && enemy.windingUp && stateTextures->preJump)
                 texture = &*stateTextures->preJump;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+                && enemy.windingUp && enemy.skillVariant >= 0 && enemy.skillVariant <= 1
+                && stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)])
+                texture = &*stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)];
+            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+                && enemy.attackActive && enemy.skillVariant == 0 && stateTextures->jump)
+                texture = &*stateTextures->jump;
+            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+                && enemy.attackActive && enemy.skillVariant == 2
+                && stateTextures->skillAttacks[0])
+                texture = &*stateTextures->skillAttacks[0];
+            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+                && enemy.attackActive && enemy.skillVariant == 1
+                && stateTextures->skillAttacks[1])
+                texture = &*stateTextures->skillAttacks[1];
             else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;
@@ -459,6 +479,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 sprite.move({0.0F, 10.0F});
             float horizontalScale = enemy.facingDirection > 0.0F ? -1.0F : 1.0F;
             if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
+                || enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
                 || (enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight
                     && usingWalkAnimation))
                 horizontalScale = -horizontalScale;
