@@ -1,4 +1,4 @@
-#include "presentation/viewmodel/ApplicationViewModel.hpp"
+﻿#include "presentation/viewmodel/ApplicationViewModel.hpp"
 #include "game/relics/RelicSystem.hpp"
 #include "game/spells/SpellSystem.hpp"
 #include "presentation/viewmodel/UiViewModels.hpp"
@@ -20,6 +20,11 @@ bool expect(const bool condition, const std::string_view message)
     if (!condition) std::cerr << "FAILED: " << message << '\n';
     return condition;
 }
+
+const arcane::common::ui::ApplicationState& applicationState(
+    const ui::ApplicationViewModel& application) noexcept;
+void updateApplication(ui::ApplicationViewModel& application,
+    const arcane::common::InputState& input, float deltaSeconds);
 
 arcane::app::TowerSessionConfig fastFlowConfig()
 {
@@ -349,44 +354,52 @@ bool pauseCanContinueOrRestartFloorSnapshot()
     ui::ApplicationViewModel app(123U, config);
     arcane::game::PlayerIntent confirm;
     confirm.menuConfirmPressed = true;
-    app.update(confirm, 0.01F);
-    if (!expect(app.snapshot().screen == ui::ApplicationScreen::Playing && app.model(),
+    updateApplication(app, confirm, 0.01F);
+    if (!expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+            && applicationState(app).run.has_value(),
         "start confirmation must create a playable run")) return false;
 
     arcane::game::PlayerIntent attack;
     attack.attackPressed = true;
-    app.update(attack, 0.01F);
-    if (!expect(app.model()->run().phase() == arcane::game::run::RunPhase::LootPending,
+    updateApplication(app, attack, 0.01F);
+    if (!expect(applicationState(app).run->phase == arcane::common::ui::GameplayPhase::LootPending,
         "test must mutate the current floor before restart")) return false;
     arcane::game::PlayerIntent pause;
     pause.pausePressed = true;
-    app.update(pause, 0.01F);
-    if (!expect(app.snapshot().pauseMenuItem == ui::PauseMenuItem::ReplayCurrentFloor,
+    updateApplication(app, pause, 0.01F);
+    if (!expect(applicationState(app).pauseMenuItem == ui::PauseMenuItem::ReplayCurrentFloor,
             "pause menu must initially select replay current floor")) return false;
 
     arcane::game::PlayerIntent down;
     down.menuDownPressed = true;
-    app.update(down, 0.01F);
-    if (!expect(app.snapshot().pauseMenuItem == ui::PauseMenuItem::SaveAndExit,
+    updateApplication(app, down, 0.01F);
+    if (!expect(applicationState(app).pauseMenuItem == ui::PauseMenuItem::SaveAndExit,
             "down input must select save and exit")) return false;
-    app.update(confirm, 0.01F);
-    if (!expect(app.snapshot().screen == ui::ApplicationScreen::Start && app.snapshot().canContinue
-            && app.model()->run().phase() == arcane::game::run::RunPhase::LootPending,
+    updateApplication(app, confirm, 0.01F);
+    if (!expect(applicationState(app).screen == ui::ApplicationScreen::Start
+            && applicationState(app).canContinue
+            && applicationState(app).run->phase == arcane::common::ui::GameplayPhase::LootPending,
         "save and exit must retain the current run on a continue-capable start screen")) return false;
-    app.update(confirm, 0.01F);
-    if (!expect(app.snapshot().screen == ui::ApplicationScreen::Playing
-            && app.model()->run().phase() == arcane::game::run::RunPhase::LootPending,
+    updateApplication(app, confirm, 0.01F);
+    if (!expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+            && applicationState(app).run->phase == arcane::common::ui::GameplayPhase::LootPending,
         "continue must resume the retained run instead of creating another one")) return false;
 
-    app.update(pause, 0.01F);
-    if (!expect(app.snapshot().pauseMenuItem == ui::PauseMenuItem::ReplayCurrentFloor,
+    updateApplication(app, pause, 0.01F);
+    if (!expect(applicationState(app).pauseMenuItem == ui::PauseMenuItem::ReplayCurrentFloor,
             "reopening pause must reset selection to replay")) return false;
-    app.update(confirm, 0.01F);
-    return expect(app.snapshot().screen == ui::ApplicationScreen::Playing
-            && app.model()->run().phase() == arcane::game::run::RunPhase::InEncounter,
+    updateApplication(app, confirm, 0.01F);
+    if (!expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+            && applicationState(app).run->phase == arcane::common::ui::GameplayPhase::InEncounter,
             "confirming replay must restore the floor-start phase")
-        && expect(app.model()->run().player().gold == 0 && app.model()->run().player().learnedSpells.empty(),
-            "replay must roll back rewards earned on the current floor");
+        || !expect(applicationState(app).run->gold == 0,
+            "replay must roll back gold earned on the current floor")) return false;
+    arcane::common::InputState toggle;
+    toggle.toggleLoadoutPressed = true;
+    updateApplication(app, toggle, 0.01F);
+    return expect(applicationState(app).loadout
+            && applicationState(app).loadout->regularSpells.empty(),
+        "replay must roll back spells earned on the current floor");
 }
 
 bool startMenuEventPreviewOpensAnInteractiveEventFloor()
@@ -398,16 +411,19 @@ bool startMenuEventPreviewOpensAnInteractiveEventFloor()
 
     arcane::game::PlayerIntent preview;
     preview.debugEventPreviewPressed = true;
-    app.update(preview, 0.01F);
-    if (!expect(app.snapshot().screen == ui::ApplicationScreen::Playing && app.model()
-            && app.model()->currentFloorType() == arcane::game::run::FloorType::Event,
+    updateApplication(app, preview, 0.01F);
+    if (!expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+            && applicationState(app).run
+            && applicationState(app).run->floorKind == arcane::common::ui::FloorKind::Event,
         "F2 preview must start directly on a deterministic event floor")) return false;
 
     arcane::game::PlayerIntent interactWithNpc;
     interactWithNpc.interactPressed = true;
-    app.update(interactWithNpc, 0.01F);
-    return expect(app.model()->specialPanelOpen()
-            && app.model()->eventFloorState() == arcane::app::EventFloorState::Choosing,
+    updateApplication(app, interactWithNpc, 0.01F);
+    return expect(applicationState(app).specialFloor
+            && applicationState(app).specialFloor->event.open
+            && applicationState(app).specialFloor->event.state
+                == arcane::common::ui::EventFloorState::Choosing,
         "event preview must expose the real spatial NPC interaction page");
 }
 
@@ -420,20 +436,22 @@ bool startMenuMerchantPreviewOpensAnInteractiveShop()
 
     arcane::game::PlayerIntent preview;
     preview.debugMerchantPreviewPressed = true;
-    app.update(preview, 0.01F);
-    if (!expect(app.snapshot().screen == ui::ApplicationScreen::Playing && app.model()
-            && app.model()->currentFloorType() == arcane::game::run::FloorType::Merchant,
+    updateApplication(app, preview, 0.01F);
+    if (!expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+            && applicationState(app).run
+            && applicationState(app).run->floorKind == arcane::common::ui::FloorKind::Merchant,
         "F3 preview must start directly on a deterministic merchant floor")
-        || !expect(app.model()->run().player().gold >= 100,
-            "merchant preview must provide enough gold to test purchases")
-        || !expect(app.model()->merchantStock().size() == 5U,
-            "merchant preview must generate the real spell and relic rows")) return false;
+        || !expect(applicationState(app).run->gold >= 100,
+            "merchant preview must provide enough gold to test purchases")) return false;
 
     arcane::game::PlayerIntent interactWithNpc;
     interactWithNpc.interactPressed = true;
-    app.update(interactWithNpc, 0.01F);
-    return expect(app.model()->specialPanelOpen(),
-        "merchant preview must expose the real spatial shop interaction page");
+    updateApplication(app, interactWithNpc, 0.01F);
+    return expect(applicationState(app).run->specialPanelOpen,
+            "merchant preview must expose the real spatial shop interaction page")
+        && expect(applicationState(app).merchant
+                && applicationState(app).merchant->items.size() == 5U,
+            "opened merchant binding must expose the real spell and relic rows");
 }
 
 bool startMenuSpellPreviewOpensTheRegistrationPresentation()
@@ -441,10 +459,10 @@ bool startMenuSpellPreviewOpensTheRegistrationPresentation()
     ui::ApplicationViewModel app(911U);
     arcane::game::PlayerIntent preview;
     preview.debugSpellAcquisitionPreviewPressed = true;
-    app.update(preview, 0.01F);
-    const auto acquisition = app.spellAcquisition().snapshot();
-    return expect(app.snapshot().screen == ui::ApplicationScreen::Playing
-            && app.model() && acquisition
+    updateApplication(app, preview, 0.01F);
+    const auto acquisition = applicationState(app).spellAcquisition;
+    return expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+            && applicationState(app).run && acquisition
             && acquisition->content.summary.id == 1001U,
         "F4 preview must start a real run under the spell-registration presentation");
 }
@@ -460,30 +478,31 @@ bool startMenuBossPreviewsOpenTheRealActBosses()
         ui::ApplicationViewModel app(1200U + index);
         arcane::game::PlayerIntent preview;
         preview.debugBossPreviewPressed[index] = true;
-        app.update(preview, 0.01F);
-        const auto* tower = app.model();
-        if (!expect(app.snapshot().screen == ui::ApplicationScreen::Playing && tower,
+        updateApplication(app, preview, 0.01F);
+        const auto& state = applicationState(app);
+        if (!expect(state.screen == ui::ApplicationScreen::Playing && state.run && state.combat,
                 "F5-F7 preview must create a playable tower model")
-            || !expect(tower->currentFloorType() == arcane::game::run::FloorType::Boss
-                    && tower->combat(),
+            || !expect(state.run->floorKind == arcane::common::ui::FloorKind::Boss,
                 "boss preview must enter the real boss combat floor")
-            || !expect(tower->combat()->enemyState().archetype == archetypes[index],
+            || !expect(!state.combat->enemies.empty()
+                    && state.combat->enemies[0].archetype
+                        == static_cast<arcane::common::ui::EnemyArchetype>(archetypes[index]),
                 "each boss preview key must select its matching boss")
-            || !expect(tower->run().context().floorIndex == index * 5U + 4U
-                    && tower->run().context().act == index + 1U
-                    && tower->run().context().bossesDefeated == index,
+            || !expect(state.run->floorIndex == index * 5U + 4U
+                    && state.run->act == index + 1U
+                    && state.run->bossesDefeated == index,
                 "boss preview must use the matching run progression")
-            || !expect(tower->arenaLayout().id == (index + 1U) * 100U + 15U,
+            || !expect(state.combat->arena.id == (index + 1U) * 100U + 15U,
                 "boss preview must use the matching act boss arena")
-            || !expect(tower->run().player().equippedSpells
-                    == std::array<std::optional<arcane::game::run::ContentId>, 3> {
-                        1004U, 1005U, 1006U},
+            || !expect(state.equippedSlots
+                    && state.equippedSlots->regular[0]->id == 1004U
+                    && state.equippedSlots->regular[1]->id == 1005U
+                    && state.equippedSlots->regular[2]->id == 1006U,
                 "boss preview must provide the deterministic regular test loadout")) return false;
 
         const bool shouldHaveUltimate = index > 0U;
-        if (!expect(tower->run().player().ultimateSpellUnlocked == shouldHaveUltimate
-                && tower->run().player().equippedUltimateSpell.has_value()
-                    == shouldHaveUltimate,
+        if (!expect(state.equippedSlots->ultimateUnlocked == shouldHaveUltimate
+                && state.equippedSlots->ultimate.has_value() == shouldHaveUltimate,
             "later boss previews must expose an equipped ultimate without unlocking it early"))
             return false;
     }
@@ -498,14 +517,14 @@ bool defeatResultCanStartANewRun()
     ui::ApplicationViewModel app(321U, config);
     arcane::game::PlayerIntent confirm;
     confirm.menuConfirmPressed = true;
-    app.update(confirm, 0.01F);
-    for (int step = 0; step < 1000 && app.snapshot().screen == ui::ApplicationScreen::Playing; ++step)
-        app.update(arcane::game::PlayerIntent {}, 0.10F);
-    if (!expect(app.snapshot().screen == ui::ApplicationScreen::Result && !app.snapshot().victory,
+    updateApplication(app, confirm, 0.01F);
+    for (int step = 0; step < 1000 && applicationState(app).screen == ui::ApplicationScreen::Playing; ++step)
+        updateApplication(app, arcane::game::PlayerIntent {}, 0.10F);
+    if (!expect(applicationState(app).screen == ui::ApplicationScreen::Result && !applicationState(app).victory,
         "player death must enter the defeat result screen")) return false;
-    app.update(confirm, 0.01F);
-    return expect(app.snapshot().screen == ui::ApplicationScreen::Playing
-            && app.model()->run().player().currentHp == app.model()->run().player().maxHp,
+    updateApplication(app, confirm, 0.01F);
+    return expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+            && applicationState(app).run->currentHp == applicationState(app).run->maximumHp,
         "result confirmation must create a fresh run");
 }
 
@@ -607,6 +626,18 @@ bool combatFeedbackTracksAuthoritativeHealthDeltas()
             "combat delta time must resume after hit stop expires");
 }
 
+const arcane::common::ui::ApplicationState& applicationState(
+    const ui::ApplicationViewModel& application) noexcept
+{
+    return application.stateBinding().value();
+}
+
+void updateApplication(ui::ApplicationViewModel& application,
+    const arcane::common::InputState& input, const float deltaSeconds)
+{
+    application.execute({input, deltaSeconds});
+}
+
 bool bossHitStopKeepsImpactWithoutLookingLikeAFrameHitch()
 {
     ui::CombatFeedbackViewModel feedback;
@@ -638,73 +669,73 @@ bool applicationViewModelSelectsNewRewardWithoutAutoEquipping()
     ui::ApplicationViewModel app(809U, config);
     arcane::game::PlayerIntent confirm;
     confirm.menuConfirmPressed = true;
-    app.update(confirm, 0.01F);
+    updateApplication(app, confirm, 0.01F);
 
     arcane::game::PlayerIntent attack;
     attack.attackPressed = true;
-    app.update(attack, 0.01F);
+    updateApplication(app, attack, 0.01F);
     arcane::game::PlayerIntent moveRight;
     moveRight.moveAxis = 1.0F;
-    app.update(moveRight, 0.10F);
+    updateApplication(app, moveRight, 0.10F);
     arcane::game::PlayerIntent interactIntent;
     interactIntent.interactPressed = true;
-    app.update(interactIntent, 0.01F);
-    if (!expect(app.reward().has_value(),
+    updateApplication(app, interactIntent, 0.01F);
+    if (!expect(applicationState(app).reward.has_value(),
             "application view model must expose a reward binding in the reward phase")) return false;
 
-    const auto chosen = app.reward()->cards[0].summary.id;
+    const auto chosen = applicationState(app).reward->cards[0].summary.id;
     arcane::game::PlayerIntent choose;
     choose.spellPressed[0] = true;
-    app.update(choose, 0.01F);
-    if (!expect(app.model()->run().player().learnedSpells.back() == chosen,
-            "reward command must update the model's learned spell collection")
-        || !expect(app.loadout().selectedSpell(app.model()->run().player()) == chosen,
-            "loadout view model must select the newly learned spell")
-        || !expect(!app.model()->run().player().equippedSpells[0],
+    updateApplication(app, choose, 0.01F);
+    if (!expect(applicationState(app).spellAcquisition
+            && applicationState(app).spellAcquisition->content.summary.id == chosen,
+            "reward command must publish the learned spell through the acquisition state")
+        || !expect(applicationState(app).equippedSlots
+                && !applicationState(app).equippedSlots->regular[0],
             "selecting a reward must not bypass the explicit equip command")
-        || !expect(app.spellAcquisition().active()
-                && app.spellAcquisition().snapshot()->content.summary.id == chosen,
+        || !expect(applicationState(app).spellAcquisition.has_value(),
             "selecting a reward must start the acquisition presentation for that spell"))
         return false;
 
-    const auto completedPhase = app.model()->run().phase();
+    const auto completedPhase = applicationState(app).run->phase;
     arcane::game::PlayerIntent blockedInput;
     blockedInput.toggleLoadoutPressed = true;
     blockedInput.pausePressed = true;
     blockedInput.interactPressed = true;
     blockedInput.spellPressed[0] = true;
-    app.update(blockedInput, 0.25F);
-    if (!expect(app.spellAcquisition().active() && !app.loadout().open(),
+    updateApplication(app, blockedInput, 0.25F);
+    if (!expect(applicationState(app).spellAcquisition
+            && !applicationState(app).loadout,
             "the acquisition presentation must consume pause, loadout, and world input")
-        || !expect(app.snapshot().screen == ui::ApplicationScreen::Playing
-                && app.model()->run().phase() == completedPhase,
+        || !expect(applicationState(app).screen == ui::ApplicationScreen::Playing
+                && applicationState(app).run->phase == completedPhase,
             "the acquisition presentation must freeze the underlying application flow"))
         return false;
 
-    app.update(confirm, 0.01F);
-    if (!expect(app.spellAcquisition().active(),
+    updateApplication(app, confirm, 0.01F);
+    if (!expect(applicationState(app).spellAcquisition.has_value(),
             "confirmation must not dismiss the acquisition before its minimum display time"))
         return false;
 
     arcane::game::PlayerIntent idle;
-    app.update(idle, ui::SpellAcquisitionViewModel::MinimumDisplaySeconds);
-    const auto revealed = app.spellAcquisition().snapshot();
+    updateApplication(app, idle, ui::SpellAcquisitionViewModel::MinimumDisplaySeconds);
+    const auto revealed = applicationState(app).spellAcquisition;
     if (!expect(revealed && revealed->registrationProgress == 1.0F
                 && revealed->circulationProgress == 1.0F
                 && revealed->burstProgress == 1.0F
                 && revealed->revealProgress == 1.0F && revealed->canDismiss,
             "the spell-registration timeline must deterministically finish its reveal"))
         return false;
-    app.update(confirm, 0.01F);
-    if (!expect(!app.spellAcquisition().active(),
+    updateApplication(app, confirm, 0.01F);
+    if (!expect(!applicationState(app).spellAcquisition,
             "confirmation after the reveal must close the acquisition presentation")) return false;
 
     arcane::game::PlayerIntent toggle;
     toggle.toggleLoadoutPressed = true;
-    app.update(toggle, 0.01F);
-    const auto loadout = app.loadout().snapshot(app.model()->run().player());
-    return expect(app.loadout().open() && loadout.selectedDetail
-            && loadout.selectedDetail->summary.id == chosen,
+    updateApplication(app, toggle, 0.01F);
+    const auto loadout = applicationState(app).loadout;
+    return expect(loadout && loadout->selectedDetail
+            && loadout->selectedDetail->summary.id == chosen,
         "view must receive the selected reward through the loadout snapshot");
 }
 

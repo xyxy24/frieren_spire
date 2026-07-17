@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <string>
 #include <stdexcept>
 #include <utility>
 
@@ -33,15 +34,159 @@ void configureBossPreviewPlayer(game::run::PlayerProgress& player, const std::si
         player.equippedUltimateSpell = 2007U;
     }
 }
+
+common::ui::GameplayPhase toGameplayPhase(const game::run::RunPhase phase) noexcept
+{
+    using Source = game::run::RunPhase;
+    using Target = common::ui::GameplayPhase;
+    switch (phase)
+    {
+    case Source::FloorLoading: return Target::FloorLoading;
+    case Source::InEncounter: return Target::InEncounter;
+    case Source::LootPending: return Target::LootPending;
+    case Source::Reward: return Target::Reward;
+    case Source::Breakthrough: return Target::Breakthrough;
+    case Source::FloorComplete: return Target::FloorComplete;
+    case Source::Defeat: return Target::Defeat;
+    case Source::Victory: return Target::Victory;
+    }
+    return Target::FloorLoading;
+}
+
+common::ui::FloorKind toFloorKind(const game::run::FloorType type) noexcept
+{
+    using Source = game::run::FloorType;
+    using Target = common::ui::FloorKind;
+    switch (type)
+    {
+    case Source::Combat: return Target::Combat;
+    case Source::Event: return Target::Event;
+    case Source::Merchant: return Target::Merchant;
+    case Source::Boss: return Target::Boss;
+    }
+    return Target::Combat;
+}
+
+common::ui::EventKind toEventKind(const app::EventKind kind) noexcept
+{
+    using Source = app::EventKind;
+    using Target = common::ui::EventKind;
+    switch (kind)
+    {
+    case Source::AldenBall: return Target::AldenBall;
+    case Source::HalfCenturyMeteorShower: return Target::HalfCenturyMeteorShower;
+    case Source::SwordVillage: return Target::SwordVillage;
+    case Source::SouthernHero: return Target::SouthernHero;
+    }
+    return Target::AldenBall;
+}
+
+common::ui::EventFloorState toEventFloorState(const app::EventFloorState state) noexcept
+{
+    using Source = app::EventFloorState;
+    using Target = common::ui::EventFloorState;
+    switch (state)
+    {
+    case Source::Untriggered: return Target::Untriggered;
+    case Source::Choosing: return Target::Choosing;
+    case Source::Result: return Target::Result;
+    }
+    return Target::Untriggered;
+}
+
+common::ui::PlayerVisualState makeExplorationVisual(
+    const game::PlayerController& player, const int health) noexcept
+{
+    return {player.position(), player.velocity(), health, player.isGrounded(),
+        player.facingDirection(), 0U, 0U, 0U, player.dashRemaining(),
+        player.shadowDashChargeRemaining(), player.isShadowDashing(), player.isStunned()};
+}
+
+std::string makeBoundWindowTitle(const common::ui::ApplicationState& state)
+{
+    using common::ui::ApplicationScreen;
+    if (state.screen == ApplicationScreen::Start)
+        return state.canContinue
+            ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop | F4 Spell | F5-F7 Boss"
+            : "Arcane Spire | START - Enter | F2 Event | F3 Shop | F4 Spell | F5-F7 Boss";
+    if (state.screen == ApplicationScreen::Pause)
+        return "Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume";
+    if (state.screen == ApplicationScreen::Result)
+        return state.victory ? "Arcane Spire | WIN - Enter Start"
+            : "Arcane Spire | DEFEAT - Enter Start";
+    if (!state.run) return "Arcane Spire";
+
+    const auto& run = *state.run;
+    std::string title = "Arcane Spire | Floor " + std::to_string(run.floorIndex + 1U)
+        + " | Seed " + std::to_string(run.runSeed)
+        + " | HP " + std::to_string(run.currentHp) + "/" + std::to_string(run.maximumHp)
+        + " | Gold " + std::to_string(run.gold)
+        + " | Boss " + std::to_string(run.bossesDefeated) + "/3 | ";
+    if (state.spellAcquisition)
+    {
+        const auto& acquisition = *state.spellAcquisition;
+        return title + (acquisition.bossSpell ? "ULTIMATE SPELL ACQUIRED - " : "SPELL ACQUIRED - ")
+            + std::string {acquisition.content.summary.name}
+            + (acquisition.canDismiss ? " | Enter Continue"
+                : acquisition.canSkip ? " | Space Skip" : " | Unlocking...");
+    }
+    if (state.loadout)
+    {
+        const auto& loadout = *state.loadout;
+        const std::string selected = loadout.selectedDetail
+            ? std::string {loadout.selectedDetail->summary.name} : std::string {"None"};
+        if (loadout.page == common::ui::LoadoutPage::Relics)
+            return title + "RELIC COLLECTION - Selected " + selected
+                + " | A/D Select, Q/E Spell Page, Tab Close";
+        const bool boss = loadout.spellSection == common::ui::SpellSection::Boss;
+        return title + (boss ? "BOSS SPELL LOADOUT - Selected " : "REGULAR SPELL LOADOUT - Selected ")
+            + selected + (boss ? " | A/D Select, R Equip Ultimate"
+                : " | A/D Select, U/I/O Equip Slot")
+            + ", W/S Switch Spell Group, Q/E Relic Page, Tab Close";
+    }
+    using common::ui::GameplayPhase;
+    switch (run.phase)
+    {
+    case GameplayPhase::InEncounter:
+        if (run.floorKind == common::ui::FloorKind::Merchant)
+            return title + (run.specialPanelOpen
+                ? "MERCHANT - WASD Select | Enter Buy | E Close"
+                : "MERCHANT ROOM - Meet NPC, E Trade | Rear Staircase Exits");
+        if (run.floorKind == common::ui::FloorKind::Event)
+            return title + (run.specialPanelOpen ? "EVENT CHOICE OR RESULT - U I O Select | E Close"
+                : "EVENT ROOM - Meet NPC, E Interact");
+        return title + "A/D Move, Space Jump, S+Space Drop, J Attack, K Dash, U/I/O Spells, R Ultimate, Tab Loadout";
+    case GameplayPhase::LootPending:
+        return title + "ENEMY DROP - Move To Drop, E Inspect Reward | Tab Loadout";
+    case GameplayPhase::Reward:
+        return title + "CHOOSE ONE SPELL - U I O | Tab Loadout";
+    case GameplayPhase::Breakthrough:
+        return title + "Choose Mana Breakthrough: U Power, I Haste, O Defense";
+    case GameplayPhase::FloorComplete:
+        return title + "Move Into Staircase, E Climb (+50% Missing HP), Tab Loadout";
+    case GameplayPhase::Victory: return title + "VICTORY - Third Boss Defeated";
+    case GameplayPhase::Defeat: return title + "DEFEAT";
+    case GameplayPhase::FloorLoading: return title + "Loading";
+    }
+    return title;
+}
 }
 
 ApplicationViewModel::ApplicationViewModel(
     const game::run::Seed seed, app::TowerSessionConfig config)
-    : seed_(seed), config_(std::move(config)) {}
+    : seed_(seed), config_(std::move(config))
+{
+    refreshState();
+}
 
 void ApplicationViewModel::update(
-    const game::PlayerIntent& intent, const float deltaSeconds)
+    const common::InputState& intent, const float deltaSeconds)
 {
+    const ApplicationScreen previousScreen = screen_;
+    const auto previousFloor = model_
+        ? std::optional {model_->run().context().floorIndex} : std::nullopt;
+    const auto previousPhase = model_
+        ? std::optional {model_->run().phase()} : std::nullopt;
     switch (screen_)
     {
     case ApplicationScreen::Start: handleStart(intent); break;
@@ -49,27 +194,39 @@ void ApplicationViewModel::update(
     case ApplicationScreen::Pause: handlePause(intent); break;
     case ApplicationScreen::Result: handleResult(intent); break;
     }
+    if (screen_ != previousScreen)
+        events_.publish({common::UiEventKind::ScreenChanged,
+            static_cast<std::uint32_t>(screen_)});
+    if (model_ && (!previousFloor || *previousFloor != model_->run().context().floorIndex))
+        events_.publish({common::UiEventKind::FloorChanged,
+            model_->run().context().floorIndex});
+    if (model_ && (!previousPhase || *previousPhase != model_->run().phase())
+        && (model_->run().phase() == game::run::RunPhase::Victory
+            || model_->run().phase() == game::run::RunPhase::Defeat))
+        events_.publish({common::UiEventKind::RunEnded,
+            model_->run().phase() == game::run::RunPhase::Victory ? 1U : 0U});
+    refreshState();
 }
 
-ApplicationSnapshot ApplicationViewModel::snapshot() const noexcept
+bool ApplicationViewModel::canExecute(const common::FrameCommand&) const noexcept
 {
-    return {screen_, pauseMenuItem_, screen_ == ApplicationScreen::Start && model_.has_value(),
-        victory_};
+    return true;
 }
 
-const app::TowerSession* ApplicationViewModel::model() const noexcept
+void ApplicationViewModel::execute(const common::FrameCommand& command)
 {
-    return model_ ? &*model_ : nullptr;
+    update(command.input, command.deltaSeconds);
 }
 
-const LoadoutViewModel& ApplicationViewModel::loadout() const noexcept
+const common::binding::IReadOnlyProperty<ApplicationSnapshot>&
+ApplicationViewModel::stateBinding() const noexcept
 {
-    return loadout_;
+    return state_;
 }
 
-const SpellAcquisitionViewModel& ApplicationViewModel::spellAcquisition() const noexcept
+common::binding::IEventBinding<common::UiEvent>& ApplicationViewModel::eventBinding() noexcept
 {
-    return spellAcquisition_;
+    return events_;
 }
 
 std::optional<RewardViewModel> ApplicationViewModel::reward() const
@@ -158,11 +315,13 @@ void ApplicationViewModel::handlePlaying(
     {
         loadout_.selectNewestBoss(player);
         spellAcquisition_.start(player.learnedBossSpells.back());
+        events_.publish({common::UiEventKind::SpellAcquired, player.learnedBossSpells.back()});
     }
     else if (player.learnedSpells.size() > regularCount)
     {
         loadout_.selectNewestRegular(player);
         spellAcquisition_.start(player.learnedSpells.back());
+        events_.publish({common::UiEventKind::SpellAcquired, player.learnedSpells.back()});
     }
     else
     {
@@ -176,7 +335,10 @@ void ApplicationViewModel::handlePlaying(
                 return mastery.rank > previousRank(mastery.spellId);
             });
         if (upgraded != player.spellMasteries.end())
+        {
             spellAcquisition_.start(upgraded->spellId, upgraded->rank);
+            events_.publish({common::UiEventKind::SpellAcquired, upgraded->spellId});
+        }
     }
 
     if (model_->run().phase() == game::run::RunPhase::Victory
@@ -278,5 +440,74 @@ void ApplicationViewModel::startBossPreview(const std::size_t bossIndex)
     loadout_.reset();
     spellAcquisition_.reset();
     victory_ = false;
+}
+
+void ApplicationViewModel::refreshState()
+{
+    ApplicationSnapshot next;
+    next.screen = screen_;
+    next.pauseMenuItem = pauseMenuItem_;
+    next.canContinue = screen_ == ApplicationScreen::Start && model_.has_value();
+    next.victory = victory_;
+    if (!model_)
+    {
+        next.windowTitle = makeBoundWindowTitle(next);
+        state_.publish(std::move(next));
+        return;
+    }
+
+    const auto& tower = *model_;
+    const auto& run = tower.run();
+    const auto& player = run.player();
+    next.run = common::ui::RunHeaderState {run.context().runSeed,
+        run.context().floorIndex, run.context().act, run.context().bossesDefeated,
+        toGameplayPhase(run.phase()), toFloorKind(tower.currentFloorType()),
+        player.currentHp, player.maxHp, player.gold, tower.specialPanelOpen()};
+    next.equippedSlots = makeEquippedSlotsViewModel(player);
+    if (loadout_.open()) next.loadout = loadout_.snapshot(player);
+    if (const auto acquisition = spellAcquisition_.snapshot())
+        next.spellAcquisition = *acquisition;
+    if (const auto rewardState = reward()) next.reward = *rewardState;
+    if (const auto breakthroughState = breakthrough()) next.breakthrough = *breakthroughState;
+    if (const auto merchantState = merchant()) next.merchant = *merchantState;
+
+    if (const auto* combat = tower.combat())
+    {
+        common::ui::CombatSceneState scene;
+        scene.arena = tower.arenaLayout();
+        scene.staircase = {tower.staircaseBounds(), tower.staircaseUnlocked(),
+            tower.arenaLayout().theme};
+        scene.player = combat->playerState();
+        combat->populateEnemyStates(scene.enemies);
+        combat->populateSpellEffects(scene.spellEffects);
+        scene.attackBounds = combat->attackBounds();
+        scene.dialogue = combat->dialogueLine();
+        scene.bossIntro = combat->bossIntro();
+        scene.lootDrop = tower.lootDropBounds();
+        next.run->currentHp = scene.player.currentHealth;
+        next.combat = std::move(scene);
+    }
+    else if (tower.currentFloorType() == game::run::FloorType::Merchant
+        || tower.currentFloorType() == game::run::FloorType::Event)
+    {
+        common::ui::SpecialFloorState special;
+        special.arena = tower.arenaLayout();
+        special.staircase = {tower.staircaseBounds(), tower.staircaseUnlocked(),
+            tower.arenaLayout().theme};
+        if (const auto* exploration = tower.explorationPlayer())
+            special.player = makeExplorationVisual(*exploration, player.currentHp);
+        special.npcBounds = tower.npcBounds();
+        special.floorKind = toFloorKind(tower.currentFloorType());
+        special.event.open = tower.specialPanelOpen();
+        special.event.kind = toEventKind(tower.eventKind());
+        special.event.state = toEventFloorState(tower.eventFloorState());
+        special.event.resultChoice = tower.eventResultChoice();
+        const auto choices = tower.eventChoices();
+        for (std::size_t index = 0U; index < special.event.choices.size(); ++index)
+            special.event.choices[index] = {choices[index].id, choices[index].goldDelta};
+        next.specialFloor = std::move(special);
+    }
+    next.windowTitle = makeBoundWindowTitle(next);
+    state_.publish(std::move(next));
 }
 }

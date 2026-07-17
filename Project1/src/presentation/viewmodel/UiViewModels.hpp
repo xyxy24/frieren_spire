@@ -2,104 +2,26 @@
 
 #include "game/economy/MerchantSystem.hpp"
 #include "game/run/RunTypes.hpp"
+#include "common/ui/UiStates.hpp"
 
-#include <array>
-#include <cstdint>
-#include <optional>
 #include <span>
-#include <string>
-#include <string_view>
-#include <vector>
 
 namespace arcane::presentation::viewmodel
 {
-enum class ContentKind : std::uint8_t { Unknown, Spell, Relic };
-enum class SpellRangeKind : std::uint8_t { Self, ForwardBox, SelfArea, TargetArea, Summon };
-enum class LoadoutPage : std::uint8_t { Spells, Relics };
-enum class SpellSection : std::uint8_t { Regular, Boss };
-
-struct SpellDetailViewModel
-{
-    float cooldownSeconds {};
-    SpellRangeKind rangeKind {SpellRangeKind::Self};
-    float range {};
-    float height {};
-};
-
-struct ContentSummaryViewModel
-{
-    game::run::ContentId id {};
-    ContentKind kind {ContentKind::Unknown};
-    std::string_view name {"UNKNOWN CONTENT"};
-    bool bossSpell {};
-    bool selected {};
-    std::uint8_t rank {};
-};
-
-struct ContentDetailViewModel
-{
-    struct SynergyHint
-    {
-        game::run::ContentId ownedSpellId {};
-        std::string_view ownedSpellName;
-        std::string_view description;
-    };
-
-    ContentSummaryViewModel summary;
-    std::string_view description {"NO DESCRIPTION AVAILABLE"};
-    std::optional<SpellDetailViewModel> spell;
-    std::string masteryDescription;
-    std::vector<SynergyHint> synergies;
-    bool upgradeReward {};
-};
-
-struct EquippedSlotsViewModel
-{
-    std::array<std::optional<ContentSummaryViewModel>, 3> regular;
-    std::optional<ContentSummaryViewModel> ultimate;
-    bool ultimateUnlocked {};
-};
-
-struct RewardViewModel
-{
-    std::array<ContentDetailViewModel, 3> cards;
-    bool showRerollHint {};
-};
-
-struct BreakthroughCardViewModel
-{
-    std::string_view name;
-    std::string_view description;
-    std::uint8_t currentRank {};
-};
-
-struct BreakthroughViewModel
-{
-    std::array<BreakthroughCardViewModel, 3> cards;
-};
-
-struct MerchantItemViewModel
-{
-    ContentSummaryViewModel content;
-    int price {};
-};
-
-struct MerchantViewModel
-{
-    std::vector<MerchantItemViewModel> items;
-    std::optional<ContentDetailViewModel> selectedDetail;
-};
-
-struct LoadoutSnapshot
-{
-    LoadoutPage page {LoadoutPage::Spells};
-    SpellSection spellSection {SpellSection::Regular};
-    std::vector<ContentSummaryViewModel> regularSpells;
-    std::vector<ContentSummaryViewModel> bossSpells;
-    std::vector<ContentSummaryViewModel> relics;
-    std::optional<ContentDetailViewModel> selectedDetail;
-    EquippedSlotsViewModel equipped;
-};
+using ContentKind = common::ui::ContentKind;
+using SpellRangeKind = common::ui::SpellRangeKind;
+using LoadoutPage = common::ui::LoadoutPage;
+using SpellSection = common::ui::SpellSection;
+using SpellDetailViewModel = common::ui::SpellDetailState;
+using ContentSummaryViewModel = common::ui::ContentSummaryState;
+using ContentDetailViewModel = common::ui::ContentDetailState;
+using EquippedSlotsViewModel = common::ui::EquippedSlotsState;
+using RewardViewModel = common::ui::RewardState;
+using BreakthroughCardViewModel = common::ui::BreakthroughCardState;
+using BreakthroughViewModel = common::ui::BreakthroughState;
+using MerchantItemViewModel = common::ui::MerchantItemState;
+using MerchantViewModel = common::ui::MerchantState;
+using LoadoutSnapshot = common::ui::LoadoutState;
 
 [[nodiscard]] ContentSummaryViewModel makeContentSummaryViewModel(
     game::run::ContentId id, bool selected = false, std::uint8_t rank = 0U) noexcept;

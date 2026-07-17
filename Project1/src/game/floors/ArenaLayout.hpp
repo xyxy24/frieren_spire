@@ -4,6 +4,7 @@
 #include "game/math/Vec2.hpp"
 #include "game/player/PlayerController.hpp"
 #include "game/run/RunTypes.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <cstdint>
 #include <span>
@@ -11,12 +12,7 @@
 
 namespace arcane::game::floors
 {
-enum class ArenaTheme : std::uint8_t
-{
-    AuraOccupation,
-    NorthernFrontier,
-    MageExam
-};
+using ArenaTheme = common::ui::ArenaTheme;
 
 enum class ArenaSpawnKind : std::uint8_t
 {
@@ -32,13 +28,7 @@ struct ArenaSpawnPoint
     WorldBounds movementBounds;
 };
 
-struct ArenaLayout
-{
-    run::ContentId id {};
-    ArenaTheme theme {ArenaTheme::AuraOccupation};
-    bool safeRoom {};
-    std::vector<Aabb> oneWayPlatforms;
-};
+using ArenaLayout = common::ui::ArenaState;
 
 [[nodiscard]] run::ContentId selectArenaId(
     const run::RunContext& context, run::FloorType type) noexcept;

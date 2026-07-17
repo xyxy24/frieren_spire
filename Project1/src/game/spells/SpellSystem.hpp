@@ -2,6 +2,7 @@
 
 #include "game/combat/Aabb.hpp"
 #include "game/math/Vec2.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <array>
 #include <cstddef>
@@ -37,12 +38,7 @@ struct SpellDefinition
     SpellTier tier {SpellTier::Regular};
 };
 
-struct SpellSlotView
-{
-    std::optional<std::uint32_t> id;
-    float cooldownRemaining {};
-    float cooldownDuration {};
-};
+using SpellSlotView = common::ui::SpellSlotState;
 
 struct SpellCastResult
 {

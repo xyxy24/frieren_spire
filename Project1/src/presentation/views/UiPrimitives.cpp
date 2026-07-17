@@ -1,7 +1,5 @@
 #include "presentation/views/UiPrimitives.hpp"
 
-#include "game/player/PlayerController.hpp"
-
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -11,7 +9,7 @@
 
 namespace arcane::presentation::views
 {
-namespace ui = viewmodel;
+namespace ui = common::ui;
 
 void drawHealthBar(
     sf::RenderTarget& target,
@@ -37,7 +35,7 @@ void drawHealthBar(
     target.draw(fill);
 }
 
-sf::Color colorForContent(const arcane::game::run::ContentId id)
+sf::Color colorForContent(const ui::ContentId id)
 {
     const auto red = static_cast<std::uint8_t>(90U + (id * 47U) % 130U);
     const auto green = static_cast<std::uint8_t>(80U + (id * 71U) % 140U);
@@ -138,7 +136,7 @@ std::string formatTenths(const float value)
     return std::to_string(tenths / 10) + "." + std::to_string(std::abs(tenths % 10));
 }
 
-std::string spellRangeText(const ui::SpellDetailViewModel& spell)
+std::string spellRangeText(const ui::SpellDetailState& spell)
 {
     using ui::SpellRangeKind;
     switch (spell.rangeKind)
@@ -159,7 +157,7 @@ std::string spellRangeText(const ui::SpellDetailViewModel& spell)
 
 void drawCard(
     sf::RenderTarget& target,
-    const ui::ContentSummaryViewModel& content,
+    const ui::ContentSummaryState& content,
     const sf::Vector2f position,
     const sf::Vector2f size,
     const bool selected,
@@ -218,19 +216,20 @@ void drawCard(
 
 void drawCard(
     sf::RenderTarget& target,
-    const arcane::game::run::ContentId id,
+    const ui::ContentId id,
     const sf::Vector2f position,
     const sf::Vector2f size,
     const bool selected,
     const arcane::presentation::SpellCardArt* spellCards)
 {
-    drawCard(target, ui::makeContentSummaryViewModel(id, selected), position, size,
-        selected, spellCards);
+    const ui::ContentSummaryState content {
+        id, ui::ContentKind::Unknown, "EVENT CHOICE", false, selected, 0U};
+    drawCard(target, content, position, size, selected, spellCards);
 }
 
-void drawEquippedSlots(sf::RenderTarget& target, const ui::EquippedSlotsViewModel& model,
+void drawEquippedSlots(sf::RenderTarget& target, const ui::EquippedSlotsState& model,
     const arcane::presentation::SpellCardArt& spellCards,
-    const arcane::game::PlayerStateView* combatView)
+    const ui::PlayerCombatState* combatView)
 {
     constexpr float SlotSize = 66.0F;
     constexpr float Gap = 18.0F;

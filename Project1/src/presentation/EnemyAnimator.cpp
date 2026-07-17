@@ -22,14 +22,14 @@ constexpr std::array<std::uint32_t, 6> IdleFrameSequence {0U, 1U, 2U, 3U, 2U, 1U
 }
 
 void EnemyAnimator::update(
-    const std::span<const game::EnemyStateView> enemies, const float deltaSeconds)
+    const std::span<const common::ui::EnemyState> enemies, const float deltaSeconds)
 {
     tracks_.resize(enemies.size());
     const float elapsed = std::max(0.0F, deltaSeconds);
     for (std::size_t index = 0U; index < enemies.size(); ++index)
     {
         Track& track = tracks_[index];
-        const game::EnemyStateView& enemy = enemies[index];
+        const common::ui::EnemyState& enemy = enemies[index];
         const Phase desired = phaseFor(enemy);
         const bool sameEnemy = track.initialized && track.archetype == enemy.archetype;
         const bool moving = sameEnemy && desired == Phase::Idle && elapsed > 0.0F
@@ -106,7 +106,7 @@ std::optional<sf::IntRect> EnemyAnimator::frameRect(
         {frameWidth, frameHeight}};
 }
 
-EnemyAnimator::Phase EnemyAnimator::phaseFor(const game::EnemyStateView& enemy) noexcept
+EnemyAnimator::Phase EnemyAnimator::phaseFor(const common::ui::EnemyState& enemy) noexcept
 {
     if (enemy.attackActive) return Phase::Attack;
     if (enemy.windingUp) return Phase::Windup;

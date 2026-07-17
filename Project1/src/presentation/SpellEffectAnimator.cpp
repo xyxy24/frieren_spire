@@ -100,13 +100,13 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     case 1004U: return SpellBinding {1U, VisualLayout::Beam, 0.72F, true};
     case 1005U: return SpellBinding {2U, VisualLayout::Center, 1.35F, true};
     case 1006U: return SpellBinding {6U, VisualLayout::Center, 1.05F, true};
-    case game::BurningFlowerVisualId:
+    case common::ui::BurningFlowerVisualId:
         return SpellBinding {27U, VisualLayout::FieldRow, 1.0F, false, 5U, 7U, 5U, 8U};
     case 1008U: return SpellBinding {17U, VisualLayout::Tether, 0.72F, true};
     case 1009U: return SpellBinding {3U, VisualLayout::Center, 1.35F, true};
     case 1011U:
         return SpellBinding {24U, VisualLayout::CasterBottom, 1.15F, false, 3U, 5U, 0U, 5U};
-    case game::PhantomBreakVisualId:
+    case common::ui::PhantomBreakVisualId:
         return SpellBinding {24U, VisualLayout::CasterBottom, 1.15F, false,
             NoLoop, NoLoop, 6U, 9U};
     case 1016U: return SpellBinding {9U, VisualLayout::CasterBottom, 1.2F, false, 2U, 5U};
@@ -117,7 +117,7 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     case 1021U: return SpellBinding {20U, VisualLayout::GroundCenter, 1.15F, false};
     case 1022U:
         return SpellBinding {25U, VisualLayout::CasterBottom, 1.25F, false, 3U, 5U, 0U, 5U};
-    case game::StoneGolemResolveVisualId:
+    case common::ui::StoneGolemResolveVisualId:
         return SpellBinding {25U, VisualLayout::CasterBottom, 1.25F, false,
             NoLoop, NoLoop, 6U, 9U};
     case 1023U: return SpellBinding {14U, VisualLayout::CasterBottom, 1.15F, false, 2U, 5U};
@@ -125,13 +125,13 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     case 1025U: return SpellBinding {19U, VisualLayout::Endpoint, 0.9F, true};
     case 1026U:
         return SpellBinding {15U, VisualLayout::Center, 1.0F, false, 2U, 5U, 0U, 5U};
-    case game::LightningStaffDischargeVisualId:
+    case common::ui::LightningStaffDischargeVisualId:
         return SpellBinding {15U, VisualLayout::Center, 1.0F, false,
             NoLoop, NoLoop, 6U, 7U};
     case 1027U: return SpellBinding {4U, VisualLayout::HomingVolley, 0.9F, true};
     case 1028U:
         return SpellBinding {16U, VisualLayout::CasterBottom, 1.15F, false, 2U, 5U, 0U, 5U};
-    case game::DefensiveBarrierBreakVisualId:
+    case common::ui::DefensiveBarrierBreakVisualId:
         return SpellBinding {16U, VisualLayout::CasterBottom, 1.15F, false,
             NoLoop, NoLoop, 6U, 7U};
     case 1029U: return SpellBinding {7U, VisualLayout::Center, 1.05F, true};
@@ -145,17 +145,17 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     case 2010U: return SpellBinding {1U, VisualLayout::Beam, 1.0F, true, 2U, 4U};
     case 2011U: return SpellBinding {23U, VisualLayout::GroundCenter, 1.35F, false, 4U, 6U};
     case 2012U: return SpellBinding {26U, VisualLayout::CasterBottom, 1.2F, false, 3U, 5U};
-    case game::MirrorArrayBreakVisualId:
+    case common::ui::MirrorArrayBreakVisualId:
         return SpellBinding {26U, VisualLayout::CasterBottom, 1.2F, false,
             NoLoop, NoLoop, 6U, 8U};
-    case game::ZoltraakMuzzleVisualId:
+    case common::ui::ZoltraakMuzzleVisualId:
         return SpellBinding {5U, VisualLayout::Endpoint, 1.0F, true};
     default: return std::nullopt;
     }
 }
 
 [[nodiscard]] std::uint32_t frameFor(const ClipDefinition& definition,
-    const SpellBinding& binding, const game::SpellEffectView& effect) noexcept
+    const SpellBinding& binding, const common::ui::SpellEffectState& effect) noexcept
 {
     const float elapsed = std::max(0.0F, effect.duration - effect.remaining);
     const std::uint32_t lastFrame = binding.lastFrame == NoLoop
@@ -202,7 +202,8 @@ bool SpellEffectAnimator::loadFromDirectory(const std::filesystem::path& directo
     return loadedAll;
 }
 
-bool SpellEffectAnimator::draw(sf::RenderTarget& target, const game::SpellEffectView& effect,
+bool SpellEffectAnimator::draw(sf::RenderTarget& target,
+    const common::ui::SpellEffectState& effect,
     const float groundTop) const
 {
     const std::optional<SpellBinding> binding = bindingFor(effect.spellId);

@@ -1,14 +1,10 @@
 #pragma once
 
+#include "common/geometry/Geometry.hpp"
+
 namespace arcane::game
 {
-struct Aabb
-{
-    float left {0.0F};
-    float top {0.0F};
-    float width {0.0F};
-    float height {0.0F};
-};
+using Aabb = common::RectF;
 
 [[nodiscard]] constexpr bool intersects(const Aabb& left, const Aabb& right) noexcept
 {

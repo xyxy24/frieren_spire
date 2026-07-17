@@ -1,6 +1,6 @@
 #pragma once
 
-#include "game/combat/CombatContracts.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/Texture.hpp>
@@ -18,7 +18,7 @@ public:
     static constexpr std::size_t ClipCount = 32U;
 
     [[nodiscard]] bool loadFromDirectory(const std::filesystem::path& directory);
-    [[nodiscard]] bool draw(sf::RenderTarget& target, const game::SpellEffectView& effect,
+    [[nodiscard]] bool draw(sf::RenderTarget& target, const common::ui::SpellEffectState& effect,
         float groundTop) const;
 
 private:

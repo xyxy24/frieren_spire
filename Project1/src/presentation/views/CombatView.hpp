@@ -1,11 +1,10 @@
 #pragma once
 
-#include "app/run/TowerSession.hpp"
+#include "common/ui/UiStates.hpp"
 #include "presentation/EnemyAnimator.hpp"
 #include "presentation/PlayerAnimator.hpp"
 #include "presentation/ShadeChargeAnimator.hpp"
 #include "presentation/SpellEffectAnimator.hpp"
-#include "presentation/viewmodel/CombatFeedbackViewModel.hpp"
 #include "presentation/views/ArenaView.hpp"
 #include "presentation/views/StaircaseView.hpp"
 
@@ -61,13 +60,7 @@ struct DialoguePortraitTextures
 [[nodiscard]] EnemyStateTextures loadEnemyStateTextures(std::string_view base,
     bool loadJump = false, bool loadIntroAndDeath = false, bool loadAttack = true,
     bool loadPreJump = false, bool loadWalk = false);
-[[nodiscard]] PlayerVisualState makePlayerVisualState(const game::PlayerStateView& player);
-[[nodiscard]] PlayerVisualState makePlayerVisualState(
-    const game::PlayerController& player, int currentHealth);
-
-void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
-    std::span<const game::EnemyStateView> enemyStates,
-    std::span<const game::SpellEffectView> spellEffects,
+void drawCombat(sf::RenderTarget& target, const common::ui::CombatSceneState& state,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
     const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
@@ -107,7 +100,7 @@ void drawCombat(sf::RenderTarget& target, const app::TowerSession& tower,
     const EnemyAnimator& enemyAnimator, const PlayerAnimator& playerAnimator,
     const ShadeChargeAnimator& shadeChargeAnimator,
     const SpellEffectAnimator& spellEffectAnimator,
-    const viewmodel::CombatFeedbackSnapshot& feedback);
-void drawCombatOverlay(sf::RenderTarget& target, const game::CombatSession& combat,
+    const common::ui::CombatFeedbackState& feedback);
+void drawCombatOverlay(sf::RenderTarget& target, const common::ui::CombatSceneState& state,
     const DialoguePortraitTextures& portraits);
 }

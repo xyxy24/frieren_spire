@@ -1,6 +1,6 @@
 #pragma once
 
-#include "game/contracts/PlayerIntent.hpp"
+#include "common/input/InputState.hpp"
 
 #include <SFML/Window/Event.hpp>
 
@@ -10,9 +10,9 @@ class SfmlInputMapper
 {
 public:
     void handleEvent(const sf::Event& event);
-    [[nodiscard]] game::PlayerIntent sample();
+    [[nodiscard]] common::InputState sample();
 
 private:
-    game::PlayerIntent pendingIntent_;
+    common::InputState pendingIntent_;
 };
 }

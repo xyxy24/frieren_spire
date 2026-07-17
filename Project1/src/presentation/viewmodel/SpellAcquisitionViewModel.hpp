@@ -7,19 +7,7 @@
 
 namespace arcane::presentation::viewmodel
 {
-struct SpellAcquisitionSnapshot
-{
-    ContentDetailViewModel content;
-    float elapsedSeconds {};
-    float referenceElapsedSeconds {};
-    float registrationProgress {};
-    float circulationProgress {};
-    float burstProgress {};
-    float revealProgress {};
-    bool canSkip {};
-    bool canDismiss {};
-    bool bossSpell {};
-};
+using SpellAcquisitionSnapshot = common::ui::SpellAcquisitionState;
 
 class SpellAcquisitionViewModel
 {

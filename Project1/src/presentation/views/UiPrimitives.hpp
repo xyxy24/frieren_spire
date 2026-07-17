@@ -1,9 +1,7 @@
 #pragma once
 
-#include "game/combat/CombatContracts.hpp"
+#include "common/ui/UiStates.hpp"
 #include "presentation/SpellCardArt.hpp"
-#include "presentation/viewmodel/ApplicationViewModel.hpp"
-#include "presentation/viewmodel/UiViewModels.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -24,20 +22,20 @@ void drawPixelText(sf::RenderTarget& target, std::string_view text, sf::Vector2f
 [[nodiscard]] std::string wrapPixelText(std::string_view text, std::size_t maximumCharacters);
 [[nodiscard]] std::string formatTenths(float value);
 [[nodiscard]] std::string spellRangeText(
-    const viewmodel::SpellDetailViewModel& spell);
+    const common::ui::SpellDetailState& spell);
 
-void drawCard(sf::RenderTarget& target, const viewmodel::ContentSummaryViewModel& content,
+void drawCard(sf::RenderTarget& target, const common::ui::ContentSummaryState& content,
     sf::Vector2f position, sf::Vector2f size, bool selected,
     const SpellCardArt* spellCards = nullptr);
-void drawCard(sf::RenderTarget& target, game::run::ContentId id,
+void drawCard(sf::RenderTarget& target, common::ui::ContentId id,
     sf::Vector2f position, sf::Vector2f size, bool selected,
     const SpellCardArt* spellCards = nullptr);
 void drawEquippedSlots(sf::RenderTarget& target,
-    const viewmodel::EquippedSlotsViewModel& model, const SpellCardArt& spellCards,
-    const game::PlayerStateView* combatView = nullptr);
+    const common::ui::EquippedSlotsState& model, const SpellCardArt& spellCards,
+    const common::ui::PlayerCombatState* combatView = nullptr);
 
 void drawStartMenu(sf::RenderTarget& target, bool canContinue);
-void drawPauseMenu(sf::RenderTarget& target, viewmodel::PauseMenuItem selection);
+void drawPauseMenu(sf::RenderTarget& target, common::ui::PauseMenuItem selection);
 void drawResultMenu(sf::RenderTarget& target, bool victory);
 void drawGold(sf::RenderTarget& target, int gold);
 }

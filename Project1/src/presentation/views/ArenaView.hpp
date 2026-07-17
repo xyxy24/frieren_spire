@@ -1,6 +1,6 @@
 #pragma once
 
-#include "game/floors/ArenaLayout.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -17,6 +17,6 @@ struct ArenaTextures
 };
 
 [[nodiscard]] ArenaTextures loadArenaTextures(std::string_view directory);
-void drawArena(sf::RenderTarget& target, const game::floors::ArenaLayout& layout,
+void drawArena(sf::RenderTarget& target, const common::ui::ArenaState& layout,
     float groundTop, const ArenaTextures& textures);
 }

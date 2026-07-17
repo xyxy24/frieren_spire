@@ -49,7 +49,7 @@ void SfmlInputMapper::handleEvent(const sf::Event& event)
     }
 }
 
-game::PlayerIntent SfmlInputMapper::sample()
+common::InputState SfmlInputMapper::sample()
 {
     const bool moveLeft = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)
         || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left);
@@ -61,7 +61,7 @@ game::PlayerIntent SfmlInputMapper::sample()
     const bool menuDown = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)
         || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down);
 
-    game::PlayerIntent intent = pendingIntent_;
+    common::InputState intent = pendingIntent_;
     pendingIntent_ = {};
     intent.moveAxis = static_cast<float>(moveRight) - static_cast<float>(moveLeft);
     intent.verticalMoveAxis = static_cast<float>(menuDown) - static_cast<float>(menuUp);

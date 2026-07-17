@@ -1,6 +1,6 @@
 #pragma once
 
-#include "game/math/Vec2.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/Color.hpp>
@@ -29,21 +29,7 @@ enum class PlayerAnimation : std::uint8_t
     Count
 };
 
-struct PlayerVisualState
-{
-    game::Vec2 position;
-    game::Vec2 velocity;
-    int currentHealth {1};
-    bool grounded {false};
-    float facingDirection {1.0F};
-    std::uint64_t attackSequence {};
-    std::uint64_t castSequence {};
-    std::uint64_t hurtSequence {};
-    float dashRemaining {};
-    float shadowDashChargeRemaining {};
-    bool shadowDashing {false};
-    bool stunned {false};
-};
+using PlayerVisualState = common::ui::PlayerVisualState;
 
 class PlayerAnimator
 {

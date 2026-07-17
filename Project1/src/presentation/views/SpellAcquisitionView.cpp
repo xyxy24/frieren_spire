@@ -13,6 +13,7 @@
 
 namespace arcane::presentation::views
 {
+namespace ui = common::ui;
 namespace
 {
 constexpr float Pi = 3.14159265358979323846F;
@@ -106,7 +107,7 @@ constexpr std::array<std::string_view, 12U> PanelHeaders {{
 }
 
 [[nodiscard]] sf::Color accentFor(
-    const game::run::ContentId id, const bool bossSpell) noexcept
+    const common::ui::ContentId id, const bool bossSpell) noexcept
 {
     if (bossSpell) return {255, 213, 126};
     constexpr std::array<sf::Color, 6U> Palette {{
@@ -178,7 +179,7 @@ void drawFourPointStar(sf::RenderTarget& target, const sf::Vector2f center,
 }
 
 void drawFocusOrb(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const SpellCardArt& spellCards,
+    const ui::SpellAcquisitionState& model, const SpellCardArt& spellCards,
     const sf::Vector2f focus, const float opacity)
 {
     if (opacity <= 0.0F) return;
@@ -213,7 +214,7 @@ void drawFocusOrb(sf::RenderTarget& target,
 }
 
 void drawRotatingSquares(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const sf::Vector2f focus,
+    const ui::SpellAcquisitionState& model, const sf::Vector2f focus,
     const float opacity)
 {
     for (std::size_t squareIndex = 0U; squareIndex < 4U; ++squareIndex)
@@ -306,7 +307,7 @@ void drawPanelDecoration(sf::RenderTarget& target, const sf::Vector2f topLeft,
 }
 
 void drawDiagnosticPanels(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const sf::Vector2f focus,
+    const ui::SpellAcquisitionState& model, const sf::Vector2f focus,
     const float opacity)
 {
     for (std::size_t index = 0U; index < PanelSpecs.size(); ++index)
@@ -356,7 +357,7 @@ void drawDiagnosticPanels(sf::RenderTarget& target,
 }
 
 void drawRaisingCharacters(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const float opacity)
+    const ui::SpellAcquisitionState& model, const float opacity)
 {
     const std::size_t columnCount = model.circulationProgress > 0.0F ? 34U : 14U;
     for (std::size_t column = 0U; column < columnCount; ++column)
@@ -383,7 +384,7 @@ void drawRaisingCharacters(sf::RenderTarget& target,
 }
 
 void drawCirculation(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const sf::Vector2f focus,
+    const ui::SpellAcquisitionState& model, const sf::Vector2f focus,
     const float opacity)
 {
     const float progress = model.circulationProgress;
@@ -438,7 +439,7 @@ void drawCirculation(sf::RenderTarget& target,
 }
 
 void drawBurst(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const sf::Vector2f focus)
+    const ui::SpellAcquisitionState& model, const sf::Vector2f focus)
 {
     const float progress = model.burstProgress;
     if (progress <= 0.0F) return;
@@ -499,7 +500,7 @@ void drawBurst(sf::RenderTarget& target,
 }
 
 void drawReveal(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const SpellCardArt& spellCards,
+    const ui::SpellAcquisitionState& model, const SpellCardArt& spellCards,
     const sf::Color accent)
 {
     const float progress = model.revealProgress;
@@ -581,7 +582,7 @@ void drawReveal(sf::RenderTarget& target,
 }
 
 void drawSpellAcquisition(sf::RenderTarget& target,
-    const viewmodel::SpellAcquisitionSnapshot& model, const SpellCardArt& spellCards,
+    const ui::SpellAcquisitionState& model, const SpellCardArt& spellCards,
     sf::Vector2f focusPosition)
 {
     focusPosition.x = std::clamp(focusPosition.x, 220.0F, 1060.0F);

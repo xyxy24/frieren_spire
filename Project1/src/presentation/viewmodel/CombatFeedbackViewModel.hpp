@@ -1,29 +1,15 @@
 #pragma once
 
 #include "game/combat/CombatContracts.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <span>
 #include <vector>
 
 namespace arcane::presentation::viewmodel
 {
-struct DamageNumberViewModel
-{
-    game::Vec2 position;
-    int amount {};
-    float remaining {};
-    float lifetime {};
-    bool playerTarget {};
-};
-
-struct ImpactBurstViewModel
-{
-    game::Vec2 position;
-    float remaining {};
-    float lifetime {};
-    bool playerTarget {};
-    bool lethal {};
-};
+using DamageNumberViewModel = common::ui::DamageNumberState;
+using ImpactBurstViewModel = common::ui::ImpactBurstState;
 
 struct CombatFeedbackTuning
 {
@@ -40,16 +26,7 @@ struct CombatFeedbackTuning
     float playerHitStopSeconds {0.075F};
 };
 
-struct CombatFeedbackSnapshot
-{
-    game::Vec2 cameraOffset;
-    float playerFlashRatio {};
-    std::vector<float> enemyFlashRatios;
-    std::vector<float> enemyImpactOffsets;
-    std::vector<DamageNumberViewModel> damageNumbers;
-    std::vector<ImpactBurstViewModel> impactBursts;
-    float hitStopRemaining {};
-};
+using CombatFeedbackSnapshot = common::ui::CombatFeedbackState;
 
 class CombatFeedbackViewModel
 {

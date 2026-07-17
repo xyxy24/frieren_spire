@@ -1,6 +1,6 @@
 #pragma once
 
-#include "game/combat/CombatContracts.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/Graphics/Texture.hpp>
@@ -16,7 +16,7 @@ namespace arcane::presentation
 class EnemyAnimator
 {
 public:
-    void update(std::span<const game::EnemyStateView> enemies, float deltaSeconds);
+    void update(std::span<const common::ui::EnemyState> enemies, float deltaSeconds);
     void reset() noexcept;
     [[nodiscard]] std::optional<sf::IntRect> frameRect(
         const sf::Texture& atlas, std::size_t enemyIndex) const noexcept;
@@ -31,7 +31,7 @@ private:
 
     struct Track
     {
-        game::EnemyArchetype archetype {game::EnemyArchetype::HeadlessKnight};
+        common::ui::EnemyArchetype archetype {common::ui::EnemyArchetype::HeadlessKnight};
         Phase phase {Phase::Idle};
         float seconds {};
         float lastPositionX {};
@@ -39,7 +39,7 @@ private:
         bool initialized {false};
     };
 
-    [[nodiscard]] static Phase phaseFor(const game::EnemyStateView& enemy) noexcept;
+    [[nodiscard]] static Phase phaseFor(const common::ui::EnemyState& enemy) noexcept;
     [[nodiscard]] static std::uint32_t frameFor(const Track& track) noexcept;
 
     std::vector<Track> tracks_;

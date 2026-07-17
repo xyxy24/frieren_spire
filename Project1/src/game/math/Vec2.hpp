@@ -1,11 +1,8 @@
 #pragma once
 
+#include "common/geometry/Geometry.hpp"
+
 namespace arcane::game
 {
-struct Vec2
-{
-    float x {0.0F};
-    float y {0.0F};
-};
+using Vec2 = common::Vec2;
 }
-

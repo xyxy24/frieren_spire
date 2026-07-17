@@ -1,7 +1,5 @@
 #include "presentation/ShadeChargeAnimator.hpp"
 
-#include "game/player/PlayerController.hpp"
-
 #include <SFML/Graphics.hpp>
 
 #include <algorithm>
@@ -49,8 +47,7 @@ void ShadeChargeAnimator::update(
     const float elapsed = std::max(0.0F, deltaSeconds);
     completionCueRemaining_ = std::max(0.0F, completionCueRemaining_ - elapsed);
 
-    const float remaining = std::clamp(player.shadowDashChargeRemaining, 0.0F,
-        game::PlayerController::ShadowDashChargeSeconds);
+    const float remaining = std::max(0.0F, player.shadowDashChargeRemaining);
     const bool charging = remaining > 0.0F;
     if (!initialized_)
     {

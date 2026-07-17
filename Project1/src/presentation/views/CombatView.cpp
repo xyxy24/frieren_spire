@@ -14,6 +14,7 @@
 
 namespace arcane::presentation::views
 {
+namespace ui = arcane::common::ui;
 std::optional<sf::Texture> loadTexture(const std::string& path)
 {
     sf::Texture texture;
@@ -43,26 +44,18 @@ EnemyStateTextures loadEnemyStateTextures(const std::string_view base, const boo
     return textures;
 }
 
-arcane::presentation::PlayerVisualState makePlayerVisualState(
-    const arcane::game::PlayerStateView& player)
+namespace
+{
+[[nodiscard]] arcane::presentation::PlayerVisualState toPlayerVisualState(
+    const ui::PlayerCombatState& player) noexcept
 {
     return {player.position, player.velocity, player.currentHealth, player.grounded,
-        player.facingDirection, player.attackSequence, player.castSequence, player.hurtSequence,
-        player.dashRemaining, player.shadowDashChargeRemaining,
+        player.facingDirection, player.attackSequence, player.castSequence,
+        player.hurtSequence, player.dashRemaining, player.shadowDashChargeRemaining,
         player.shadowDashing, player.stunned};
 }
 
-arcane::presentation::PlayerVisualState makePlayerVisualState(
-    const arcane::game::PlayerController& player, const int currentHealth)
-{
-    return {player.position(), player.velocity(), currentHealth, player.isGrounded(),
-        player.facingDirection(), 0U, 0U, 0U, player.dashRemaining(),
-        player.shadowDashChargeRemaining(), player.isShadowDashing(), player.isStunned()};
-}
-
-namespace
-{
-void drawSleepParticles(sf::RenderTarget& target, const arcane::game::PlayerStateView& player)
+void drawSleepParticles(sf::RenderTarget& target, const ui::PlayerCombatState& player)
 {
     if (player.sleepRemaining <= 0.0F) return;
 
@@ -80,7 +73,7 @@ void drawSleepParticles(sf::RenderTarget& target, const arcane::game::PlayerStat
         const float size = index % 3U == 0U ? 6.0F : 4.0F;
         sf::RectangleShape particle({size, size});
         particle.setPosition({player.position.x + HorizontalOffsets[index] + drift,
-            player.position.y + arcane::game::PlayerController::Height
+            player.position.y + ui::PlayerHeight
                 - 8.0F - progress * 78.0F});
         const float fade = std::sin(progress * 3.1415927F);
         particle.setFillColor(sf::Color {111, 48, 148,
@@ -93,9 +86,7 @@ void drawSleepParticles(sf::RenderTarget& target, const arcane::game::PlayerStat
 }
 }
 
-void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
-    const std::span<const arcane::game::EnemyStateView> enemyStates,
-    const std::span<const arcane::game::SpellEffectView> spellEffects,
+void drawCombat(sf::RenderTarget& target, const ui::CombatSceneState& state,
     const EnemyStateTextures& headlessTextures, const EnemyStateTextures& mimicTextures,
     const EnemyStateTextures& birdTextures, const EnemyStateTextures& frostWolfTextures,
     const EnemyStateTextures& chaosFlowerTextures, const EnemyStateTextures& qualTextures,
@@ -137,16 +128,15 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const arcane::presentation::SpellEffectAnimator& spellEffectAnimator,
-    const arcane::presentation::viewmodel::CombatFeedbackSnapshot& feedback)
+    const ui::CombatFeedbackState& feedback)
 {
-    const arcane::game::CombatSession* combat = tower.combat();
-    if (!combat) return;
+    const auto& enemyStates = state.enemies;
+    const auto& spellEffects = state.spellEffects;
+    drawArena(target, state.arena, GroundTop, arenaTextures);
+    drawStaircase(target, state.staircase.bounds, state.staircase.unlocked,
+        state.staircase.theme, staircaseTextures);
 
-    drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
-    drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
-        tower.arenaLayout().theme, staircaseTextures);
-
-    const arcane::game::PlayerStateView player = combat->playerState();
+    const ui::PlayerCombatState player = state.player;
     const sf::Color playerFallback = player.shadowDashing ? sf::Color {28, 22, 42}
         : player.dashRemaining > 0.0F ? sf::Color {100, 220, 245}
         : player.stunned ? sf::Color {112, 180, 235}
@@ -157,17 +147,17 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         && static_cast<int>(player.hitInvulnerabilityRemaining * 24.0F) % 2 == 0)
         playerTint.a = 105;
     const sf::Vector2f playerBottomCenter {
-        player.position.x + arcane::game::PlayerController::Width * 0.5F,
-        player.position.y + arcane::game::PlayerController::Height
+        player.position.x + ui::PlayerWidth * 0.5F,
+        player.position.y + ui::PlayerHeight
     };
     shadeChargeAnimator.drawBack(target, playerBottomCenter);
-    drawPlayer(target, playerAnimator, makePlayerVisualState(player), playerFallback, playerTint);
+    drawPlayer(target, playerAnimator, toPlayerVisualState(player), playerFallback, playerTint);
     shadeChargeAnimator.drawFront(target, playerBottomCenter);
     drawSleepParticles(target, player);
 
-    for (const arcane::game::SpellEffectView effect : spellEffects)
+    for (const ui::SpellEffectState effect : spellEffects)
     {
-        if (effect.spellId == arcane::game::CopyBeamTelegraphVisualId)
+        if (effect.spellId == ui::CopyBeamTelegraphVisualId)
         {
             const float progress = effect.duration > 0.0F
                 ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
@@ -192,7 +182,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             target.draw(core, sf::RenderStates {sf::BlendAdd});
             continue;
         }
-        if (effect.spellId == arcane::game::FrierenCopyGroundFireTelegraphVisualId)
+        if (effect.spellId == ui::FrierenCopyGroundFireTelegraphVisualId)
         {
             const float progress = effect.duration > 0.0F
                 ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
@@ -209,7 +199,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             target.draw(warning, sf::RenderStates {sf::BlendAdd});
             continue;
         }
-        if (effect.spellId == arcane::game::FrierenCopyBeamVisualId)
+        if (effect.spellId == ui::FrierenCopyBeamVisualId)
         {
             const std::size_t frame = effect.remaining > effect.duration * 0.5F ? 0U : 1U;
             if (frierenBeamTextures[frame])
@@ -253,7 +243,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 continue;
             }
         }
-        if (effect.spellId == arcane::game::FrierenCopyLightningVisualId)
+        if (effect.spellId == ui::FrierenCopyLightningVisualId)
         {
             const std::size_t frame = effect.remaining > effect.duration * 0.5F ? 0U : 1U;
             if (frierenLightningTextures[frame])
@@ -271,7 +261,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 continue;
             }
         }
-        if (effect.spellId == arcane::game::FrierenCopyGroundFireVisualId
+        if (effect.spellId == ui::FrierenCopyGroundFireVisualId
             && frierenFireTexture)
         {
             const sf::Texture& texture = *frierenFireTexture;
@@ -374,13 +364,13 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 continue;
             }
         }
-        if (effect.spellId == arcane::game::RevolteCrossSlashFirstTelegraphVisualId
-            || effect.spellId == arcane::game::RevolteCrossSlashSecondTelegraphVisualId
-            || effect.spellId == arcane::game::RevolteCrossSlashVisualId)
+        if (effect.spellId == ui::RevolteCrossSlashFirstTelegraphVisualId
+            || effect.spellId == ui::RevolteCrossSlashSecondTelegraphVisualId
+            || effect.spellId == ui::RevolteCrossSlashVisualId)
         {
-            const bool impact = effect.spellId == arcane::game::RevolteCrossSlashVisualId;
+            const bool impact = effect.spellId == ui::RevolteCrossSlashVisualId;
             const bool secondRound = effect.spellId
-                == arcane::game::RevolteCrossSlashSecondTelegraphVisualId;
+                == ui::RevolteCrossSlashSecondTelegraphVisualId;
             const float progress = effect.duration > 0.0F
                 ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
                 : 1.0F;
@@ -441,7 +431,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             }
             continue;
         }
-        if (effect.spellId == arcane::game::RevolteCrossSlashImpactVisualId)
+        if (effect.spellId == ui::RevolteCrossSlashImpactVisualId)
         {
             const float progress = effect.duration > 0.0F
                 ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
@@ -476,11 +466,11 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             }
             continue;
         }
-        if (effect.spellId == arcane::game::RevolteFlyingBladeTelegraphVisualId
-            || effect.spellId == arcane::game::RevolteFlyingBladeVisualId)
+        if (effect.spellId == ui::RevolteFlyingBladeTelegraphVisualId
+            || effect.spellId == ui::RevolteFlyingBladeVisualId)
         {
             const bool telegraph = effect.spellId
-                == arcane::game::RevolteFlyingBladeTelegraphVisualId;
+                == ui::RevolteFlyingBladeTelegraphVisualId;
             const float progress = effect.duration > 0.0F
                 ? 1.0F - std::clamp(effect.remaining / effect.duration, 0.0F, 1.0F)
                 : 1.0F;
@@ -631,104 +621,104 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
 
     for (std::size_t enemyIndex = 0U; enemyIndex < enemyStates.size(); ++enemyIndex)
     {
-        const arcane::game::EnemyStateView enemy = enemyStates[enemyIndex];
+        const ui::EnemyState enemy = enemyStates[enemyIndex];
         const bool hitFlashing = enemyIndex < feedback.enemyFlashRatios.size()
             && feedback.enemyFlashRatios[enemyIndex] > 0.0F;
         const float impactOffset = enemyIndex < feedback.enemyImpactOffsets.size()
             ? feedback.enemyImpactOffsets[enemyIndex] : 0.0F;
         const bool showDefeatedBoss = !enemy.alive
-            && (enemy.archetype == arcane::game::EnemyArchetype::Aura
-                || enemy.archetype == arcane::game::EnemyArchetype::Revolte
-                || enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon)
-            && combat->dialogueLine().has_value();
+            && (enemy.archetype == ui::EnemyArchetype::Aura
+                || enemy.archetype == ui::EnemyArchetype::Revolte
+                || enemy.archetype == ui::EnemyArchetype::WaterMirrorDemon)
+            && state.dialogue.has_value();
         if (!enemy.alive && !showDefeatedBoss) continue;
-        const bool primaryBoss = enemy.archetype == arcane::game::EnemyArchetype::Aura
-            || enemy.archetype == arcane::game::EnemyArchetype::Revolte
-            || enemy.archetype == arcane::game::EnemyArchetype::RedMirrorDragon
-            || enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon
-            || enemy.archetype == arcane::game::EnemyArchetype::Boss;
+        const bool primaryBoss = enemy.archetype == ui::EnemyArchetype::Aura
+            || enemy.archetype == ui::EnemyArchetype::Revolte
+            || enemy.archetype == ui::EnemyArchetype::RedMirrorDragon
+            || enemy.archetype == ui::EnemyArchetype::WaterMirrorDemon
+            || enemy.archetype == ui::EnemyArchetype::Boss;
         const EnemyStateTextures* stateTextures = nullptr;
-        if (enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight)
+        if (enemy.archetype == ui::EnemyArchetype::HeadlessKnight)
             stateTextures = &headlessTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::ChestMimic)
+        else if (enemy.archetype == ui::EnemyArchetype::ChestMimic)
             stateTextures = &mimicTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::BirdDemon)
+        else if (enemy.archetype == ui::EnemyArchetype::BirdDemon)
             stateTextures = &birdTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf)
+        else if (enemy.archetype == ui::EnemyArchetype::FrostWolf)
             stateTextures = &frostWolfTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::ChaosFlower)
+        else if (enemy.archetype == ui::EnemyArchetype::ChaosFlower)
             stateTextures = &chaosFlowerTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Heimon)
+        else if (enemy.archetype == ui::EnemyArchetype::Heimon)
             stateTextures = &heimonTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::DemonWarrior)
+        else if (enemy.archetype == ui::EnemyArchetype::DemonWarrior)
             stateTextures = &demonWarriorTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::LargeBirdDemon)
+        else if (enemy.archetype == ui::EnemyArchetype::LargeBirdDemon)
             stateTextures = &largeBirdDemonTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Gargoyle)
+        else if (enemy.archetype == ui::EnemyArchetype::Gargoyle)
             stateTextures = &gargoyleTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::SwordDemon)
+        else if (enemy.archetype == ui::EnemyArchetype::SwordDemon)
             stateTextures = &swordDemonTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::ThreeHeadedDemon)
+        else if (enemy.archetype == ui::EnemyArchetype::ThreeHeadedDemon)
             stateTextures = &threeHeadedDemonTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Richter)
+        else if (enemy.archetype == ui::EnemyArchetype::Richter)
             stateTextures = &richterTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen)
+        else if (enemy.archetype == ui::EnemyArchetype::Laufen)
             stateTextures = &laufenTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy)
+        else if (enemy.archetype == ui::EnemyArchetype::StarkCopy)
             stateTextures = &starkCopyTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::FrierenCopy)
+        else if (enemy.archetype == ui::EnemyArchetype::FrierenCopy)
             stateTextures = &frierenCopyTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::FernCopy)
+        else if (enemy.archetype == ui::EnemyArchetype::FernCopy)
             stateTextures = &fernCopyTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::WaterMirrorDemon)
+        else if (enemy.archetype == ui::EnemyArchetype::WaterMirrorDemon)
             stateTextures = &waterMirrorTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Qual)
+        else if (enemy.archetype == ui::EnemyArchetype::Qual)
             stateTextures = &qualTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Lugner)
+        else if (enemy.archetype == ui::EnemyArchetype::Lugner)
             stateTextures = &lugnerTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Linie)
+        else if (enemy.archetype == ui::EnemyArchetype::Linie)
             stateTextures = &linieTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Draht)
+        else if (enemy.archetype == ui::EnemyArchetype::Draht)
             stateTextures = &drahtTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Aura)
+        else if (enemy.archetype == ui::EnemyArchetype::Aura)
             stateTextures = &auraTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte)
+        else if (enemy.archetype == ui::EnemyArchetype::Revolte)
             stateTextures = &revolteTextures;
-        else if (enemy.archetype == arcane::game::EnemyArchetype::Denken)
+        else if (enemy.archetype == ui::EnemyArchetype::Denken)
             stateTextures = &denkenTextures;
         const sf::Texture* texture = nullptr;
         std::optional<sf::IntRect> animationFrame;
         bool usingWalkAnimation = false;
         if (stateTextures)
         {
-            const auto dialogue = combat->dialogueLine();
-            const bool auraInitial = enemy.archetype == arcane::game::EnemyArchetype::Aura
-                && (combat->bossIntro().has_value()
+            const auto dialogue = state.dialogue;
+            const bool auraInitial = enemy.archetype == ui::EnemyArchetype::Aura
+                && (state.bossIntro.has_value()
                     || (dialogue && (dialogue->portrait == "aura-initial"
                         || dialogue->portrait == "frieren-pre")));
             if (showDefeatedBoss && stateTextures->die) texture = &*stateTextures->die;
             else if (auraInitial && stateTextures->initial) texture = &*stateTextures->initial;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Heimon
+            else if (enemy.archetype == ui::EnemyArchetype::Heimon
                 && enemy.specialAttackActive && stateTextures->summon)
                 texture = &*stateTextures->summon;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
+            else if (enemy.archetype == ui::EnemyArchetype::FrostWolf
                 && enemy.specialAttackActive && stateTextures->jump)
                 texture = &*stateTextures->jump;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
+            else if (enemy.archetype == ui::EnemyArchetype::FrostWolf
                 && enemy.specialWindingUp && stateTextures->preJump)
                 texture = &*stateTextures->preJump;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Linie
+            else if (enemy.archetype == ui::EnemyArchetype::Linie
                 && enemy.attackActive && !enemy.skillEffectBounds
                 && stateTextures->jump) texture = &*stateTextures->jump;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::LargeBirdDemon
+            else if (enemy.archetype == ui::EnemyArchetype::LargeBirdDemon
                 && enemy.returningToAir && stateTextures->idle) texture = &*stateTextures->idle;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Gargoyle
+            else if (enemy.archetype == ui::EnemyArchetype::Gargoyle
                 && enemy.activated && !enemy.windingUp && !enemy.attackActive
                 && stateTextures->jump) texture = &*stateTextures->jump;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::SwordDemon
+            else if (enemy.archetype == ui::EnemyArchetype::SwordDemon
                 && enemy.skillVariant == 0 && enemy.attackActive && stateTextures->dash)
                 texture = &*stateTextures->dash;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::ThreeHeadedDemon)
+            else if (enemy.archetype == ui::EnemyArchetype::ThreeHeadedDemon)
             {
                 const std::size_t form = enemy.currentHealth >= 120 ? 2U
                     : (enemy.currentHealth >= 60 ? 1U : 0U);
@@ -740,57 +730,57 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
                 else if (stateTextures->idleVariants[form])
                     texture = &*stateTextures->idleVariants[form];
             }
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen
+            else if (enemy.archetype == ui::EnemyArchetype::Laufen
                 && enemy.specialWindingUp && stateTextures->windup)
                 texture = &*stateTextures->windup;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Laufen
+            else if (enemy.archetype == ui::EnemyArchetype::Laufen
                 && enemy.windingUp && stateTextures->preJump)
                 texture = &*stateTextures->preJump;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+            else if (enemy.archetype == ui::EnemyArchetype::StarkCopy
                 && enemy.windingUp && enemy.skillVariant >= 0 && enemy.skillVariant <= 1
                 && stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)])
                 texture = &*stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+            else if (enemy.archetype == ui::EnemyArchetype::StarkCopy
                 && enemy.attackActive && enemy.skillVariant == 0 && stateTextures->jump)
                 texture = &*stateTextures->jump;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+            else if (enemy.archetype == ui::EnemyArchetype::StarkCopy
                 && enemy.attackActive && enemy.skillVariant == 2
                 && stateTextures->skillAttacks[0])
                 texture = &*stateTextures->skillAttacks[0];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::StarkCopy
+            else if (enemy.archetype == ui::EnemyArchetype::StarkCopy
                 && enemy.attackActive && enemy.skillVariant == 1
                 && stateTextures->skillAttacks[1])
                 texture = &*stateTextures->skillAttacks[1];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::FrierenCopy
+            else if (enemy.archetype == ui::EnemyArchetype::FrierenCopy
                 && enemy.windingUp && enemy.skillVariant >= 0 && enemy.skillVariant <= 1
                 && stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)])
                 texture = &*stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            else if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.skillVariant == 5 && (enemy.windingUp || enemy.attackActive)
                 && stateTextures->parry)
                 texture = &*stateTextures->parry;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            else if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.skillVariant == 6 && enemy.windingUp
                 && stateTextures->skillWindups[2])
                 texture = &*stateTextures->skillWindups[2];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            else if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.skillVariant == 6 && enemy.attackActive
                 && stateTextures->skillAttacks[2])
                 texture = &*stateTextures->skillAttacks[2];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            else if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.skillVariant == 3 && enemy.attackActive && stateTextures->parry)
                 texture = &*stateTextures->parry;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Denken
+            else if (enemy.archetype == ui::EnemyArchetype::Denken
                 && enemy.specialAttackActive && stateTextures->skillWindups[1])
                 texture = &*stateTextures->skillWindups[1];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            else if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.skillVariant == 4 && enemy.attackActive && stateTextures->dash)
                 texture = &*stateTextures->dash;
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            else if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.windingUp && enemy.skillVariant >= 0 && enemy.skillVariant <= 3
                 && stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)])
                 texture = &*stateTextures->skillWindups[static_cast<std::size_t>(enemy.skillVariant)];
-            else if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            else if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.attackActive && enemy.skillVariant >= 0 && enemy.skillVariant <= 2
                 && stateTextures->skillAttacks[static_cast<std::size_t>(enemy.skillVariant)])
                 texture = &*stateTextures->skillAttacks[static_cast<std::size_t>(enemy.skillVariant)];
@@ -829,12 +819,12 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
             sprite.setOrigin({frameSize.x * 0.5F, frameSize.y});
             sprite.setPosition({enemy.position.x + enemy.width * 0.5F + impactOffset,
                 enemy.position.y + enemy.height});
-            if (enemy.archetype == arcane::game::EnemyArchetype::Revolte
+            if (enemy.archetype == ui::EnemyArchetype::Revolte
                 && enemy.skillVariant == 4 && (enemy.windingUp || enemy.attackActive))
                 sprite.move({0.0F, 10.0F});
             float horizontalScale = enemy.facingDirection > 0.0F ? -1.0F : 1.0F;
-            if (enemy.archetype == arcane::game::EnemyArchetype::FrostWolf
-                || (enemy.archetype == arcane::game::EnemyArchetype::HeadlessKnight
+            if (enemy.archetype == ui::EnemyArchetype::FrostWolf
+                || (enemy.archetype == ui::EnemyArchetype::HeadlessKnight
                     && usingWalkAnimation))
                 horizontalScale = -horizontalScale;
             sprite.setScale({horizontalScale, 1.0F});
@@ -865,18 +855,18 @@ else enemyColor.a = alpha;
         if (enemy.skillEffectBounds)
         {
             const auto area = *enemy.skillEffectBounds;
-            const bool lugnerBlood = enemy.archetype == arcane::game::EnemyArchetype::Lugner
+            const bool lugnerBlood = enemy.archetype == ui::EnemyArchetype::Lugner
                 && enemy.attackActive;
-            const bool linieCleave = enemy.archetype == arcane::game::EnemyArchetype::Linie
+            const bool linieCleave = enemy.archetype == ui::EnemyArchetype::Linie
                 && enemy.attackActive;
-            const bool qualKillingMagic = enemy.archetype == arcane::game::EnemyArchetype::Qual
+            const bool qualKillingMagic = enemy.archetype == ui::EnemyArchetype::Qual
                 && enemy.attackActive;
-            const bool heimonAttack = enemy.archetype == arcane::game::EnemyArchetype::Heimon
+            const bool heimonAttack = enemy.archetype == ui::EnemyArchetype::Heimon
                 && enemy.attackActive && !enemy.specialAttackActive;
-            const bool auraGuillotine = enemy.archetype == arcane::game::EnemyArchetype::Aura
+            const bool auraGuillotine = enemy.archetype == ui::EnemyArchetype::Aura
                 && enemy.skillVariant == 0
                 && (enemy.specialWindingUp || enemy.specialAttackActive);
-            const bool auraDomination = enemy.archetype == arcane::game::EnemyArchetype::Aura
+            const bool auraDomination = enemy.archetype == ui::EnemyArchetype::Aura
                 && !auraGuillotine && (enemy.windingUp || enemy.attackActive);
             std::optional<sf::IntRect> dominationFrame;
             const sf::Texture* dominationTexture = nullptr;
@@ -1139,7 +1129,7 @@ else enemyColor.a = alpha;
 
     if (player.attackActive)
     {
-        const arcane::game::Aabb bounds = combat->attackBounds();
+        const arcane::common::RectF bounds = state.attackBounds;
         sf::RectangleShape attackShape({bounds.width, bounds.height});
         attackShape.setPosition({bounds.left, bounds.top});
         attackShape.setFillColor(sf::Color {255, 196, 92, 105});
@@ -1175,7 +1165,7 @@ else enemyColor.a = alpha;
         drawPixelText(target, "-" + std::to_string(number.amount),
             {number.position.x, number.position.y}, number.playerTarget ? 1.25F : 1.05F, color);
     }
-    if (const auto dialogue = combat->dialogueLine(); false && dialogue)
+    if (const auto dialogue = state.dialogue; false && dialogue)
     {
         sf::RectangleShape shade({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});
         shade.setFillColor(sf::Color {8, 8, 14, 48});
@@ -1241,10 +1231,10 @@ else enemyColor.a = alpha;
     }
 }
 
-void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSession& combat,
+void drawCombatOverlay(sf::RenderTarget& target, const ui::CombatSceneState& state,
     const DialoguePortraitTextures& portraits)
 {
-    if (const auto intro = combat.bossIntro())
+    if (const auto intro = state.bossIntro)
     {
         const float progress = 1.0F - intro->remaining / intro->duration;
         const float alphaFactor = std::min(1.0F, std::min(progress * 4.0F,
@@ -1266,7 +1256,7 @@ void drawCombatOverlay(sf::RenderTarget& target, const arcane::game::CombatSessi
                 static_cast<std::uint8_t>(230.0F * std::max(0.0F, alphaFactor))});
         return;
     }
-    const auto dialogue = combat.dialogueLine();
+    const auto dialogue = state.dialogue;
     if (!dialogue) return;
 
     sf::RectangleShape shade({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});

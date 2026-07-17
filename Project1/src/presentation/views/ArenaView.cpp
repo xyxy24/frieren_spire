@@ -15,13 +15,13 @@ namespace
 {
 constexpr std::size_t ThemeCount = 3U;
 
-[[nodiscard]] std::size_t themeIndex(const game::floors::ArenaTheme theme)
+[[nodiscard]] std::size_t themeIndex(const common::ui::ArenaTheme theme)
 {
     switch (theme)
     {
-    case game::floors::ArenaTheme::AuraOccupation: return 0U;
-    case game::floors::ArenaTheme::NorthernFrontier: return 1U;
-    case game::floors::ArenaTheme::MageExam: return 2U;
+    case common::ui::ArenaTheme::AuraOccupation: return 0U;
+    case common::ui::ArenaTheme::NorthernFrontier: return 1U;
+    case common::ui::ArenaTheme::MageExam: return 2U;
     }
     return 0U;
 }
@@ -44,7 +44,7 @@ void drawRectangle(sf::RenderTarget& target, const sf::Vector2f position,
     target.draw(shape);
 }
 
-void drawAuraOccupation(sf::RenderTarget& target, const game::run::ContentId arenaId)
+void drawAuraOccupation(sf::RenderTarget& target, const common::ui::ContentId arenaId)
 {
     drawRectangle(target, {}, {static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)},
         sf::Color {24, 19, 39});
@@ -76,7 +76,7 @@ void drawAuraOccupation(sf::RenderTarget& target, const game::run::ContentId are
     }
 }
 
-void drawNorthernFrontier(sf::RenderTarget& target, const game::run::ContentId arenaId)
+void drawNorthernFrontier(sf::RenderTarget& target, const common::ui::ContentId arenaId)
 {
     drawRectangle(target, {}, {1280.0F, 720.0F}, sf::Color {19, 35, 55});
     drawRectangle(target, {0.0F, 220.0F}, {1280.0F, 420.0F}, sf::Color {35, 57, 76});
@@ -113,7 +113,7 @@ void drawNorthernFrontier(sf::RenderTarget& target, const game::run::ContentId a
     }
 }
 
-void drawMageExam(sf::RenderTarget& target, const game::run::ContentId arenaId)
+void drawMageExam(sf::RenderTarget& target, const common::ui::ContentId arenaId)
 {
     drawRectangle(target, {}, {1280.0F, 720.0F}, sf::Color {17, 23, 38});
     drawRectangle(target, {0.0F, 120.0F}, {1280.0F, 520.0F}, sf::Color {24, 34, 50});
@@ -139,7 +139,7 @@ void drawMageExam(sf::RenderTarget& target, const game::run::ContentId arenaId)
     }
 }
 
-void drawGround(sf::RenderTarget& target, const game::floors::ArenaTheme theme,
+void drawGround(sf::RenderTarget& target, const common::ui::ArenaTheme theme,
     const float groundTop)
 {
     sf::Color body;
@@ -147,13 +147,13 @@ void drawGround(sf::RenderTarget& target, const game::floors::ArenaTheme theme,
     sf::Color seam;
     switch (theme)
     {
-    case game::floors::ArenaTheme::AuraOccupation:
+    case common::ui::ArenaTheme::AuraOccupation:
         body = sf::Color {63, 55, 67}; cap = sf::Color {126, 107, 117}; seam = sf::Color {48, 42, 52};
         break;
-    case game::floors::ArenaTheme::NorthernFrontier:
+    case common::ui::ArenaTheme::NorthernFrontier:
         body = sf::Color {55, 68, 78}; cap = sf::Color {218, 232, 235}; seam = sf::Color {41, 55, 66};
         break;
-    case game::floors::ArenaTheme::MageExam:
+    case common::ui::ArenaTheme::MageExam:
         body = sf::Color {48, 55, 69}; cap = sf::Color {109, 139, 139}; seam = sf::Color {34, 41, 55};
         break;
     }
@@ -164,21 +164,21 @@ void drawGround(sf::RenderTarget& target, const game::floors::ArenaTheme theme,
             {2.0F, 46.0F}, seam);
 }
 
-void drawPlatform(sf::RenderTarget& target, const game::Aabb& platform,
-    const game::floors::ArenaTheme theme)
+void drawPlatform(sf::RenderTarget& target, const common::RectF& platform,
+    const common::ui::ArenaTheme theme)
 {
     sf::Color body;
     sf::Color top;
     sf::Color shadow;
     switch (theme)
     {
-    case game::floors::ArenaTheme::AuraOccupation:
+    case common::ui::ArenaTheme::AuraOccupation:
         body = sf::Color {83, 68, 82}; top = sf::Color {150, 119, 125}; shadow = sf::Color {42, 34, 46};
         break;
-    case game::floors::ArenaTheme::NorthernFrontier:
+    case common::ui::ArenaTheme::NorthernFrontier:
         body = sf::Color {67, 87, 101}; top = sf::Color {224, 238, 239}; shadow = sf::Color {35, 52, 65};
         break;
-    case game::floors::ArenaTheme::MageExam:
+    case common::ui::ArenaTheme::MageExam:
         body = sf::Color {62, 72, 88}; top = sf::Color {96, 205, 180}; shadow = sf::Color {31, 39, 55};
         break;
     }
@@ -203,16 +203,16 @@ void drawTextureInRect(sf::RenderTarget& target, const sf::Texture& texture,
     target.draw(sprite);
 }
 
-[[nodiscard]] float platformVisualHeight(const game::floors::ArenaTheme theme,
+[[nodiscard]] float platformVisualHeight(const common::ui::ArenaTheme theme,
     const float width)
 {
     switch (theme)
     {
-    case game::floors::ArenaTheme::AuraOccupation:
+    case common::ui::ArenaTheme::AuraOccupation:
         return std::clamp(width * 0.15625F, 42.0F, 84.0F);
-    case game::floors::ArenaTheme::NorthernFrontier:
+    case common::ui::ArenaTheme::NorthernFrontier:
         return std::clamp(width * 0.11523F, 34.0F, 68.0F);
-    case game::floors::ArenaTheme::MageExam:
+    case common::ui::ArenaTheme::MageExam:
         return std::clamp(width * 0.14258F, 40.0F, 76.0F);
     }
     return 48.0F;
@@ -233,7 +233,7 @@ ArenaTextures loadArenaTextures(const std::string_view directory)
     return textures;
 }
 
-void drawArena(sf::RenderTarget& target, const game::floors::ArenaLayout& layout,
+void drawArena(sf::RenderTarget& target, const common::ui::ArenaState& layout,
     const float groundTop, const ArenaTextures& textures)
 {
     const std::size_t index = themeIndex(layout.theme);
@@ -246,13 +246,13 @@ void drawArena(sf::RenderTarget& target, const game::floors::ArenaLayout& layout
     {
         switch (layout.theme)
         {
-        case game::floors::ArenaTheme::AuraOccupation:
+        case common::ui::ArenaTheme::AuraOccupation:
             drawAuraOccupation(target, layout.id);
             break;
-        case game::floors::ArenaTheme::NorthernFrontier:
+        case common::ui::ArenaTheme::NorthernFrontier:
             drawNorthernFrontier(target, layout.id);
             break;
-        case game::floors::ArenaTheme::MageExam:
+        case common::ui::ArenaTheme::MageExam:
             drawMageExam(target, layout.id);
             break;
         }
@@ -262,7 +262,7 @@ void drawArena(sf::RenderTarget& target, const game::floors::ArenaLayout& layout
     {
         drawTextureInRect(target, *textures.platforms[index], {0.0F, groundTop},
             {static_cast<float>(WindowWidth), static_cast<float>(WindowHeight) - groundTop});
-        for (const game::Aabb& platform : layout.oneWayPlatforms)
+        for (const common::RectF& platform : layout.oneWayPlatforms)
         {
             drawTextureInRect(target, *textures.platforms[index],
                 {platform.left, platform.top},
@@ -272,7 +272,7 @@ void drawArena(sf::RenderTarget& target, const game::floors::ArenaLayout& layout
     else
     {
         drawGround(target, layout.theme, groundTop);
-        for (const game::Aabb& platform : layout.oneWayPlatforms)
+        for (const common::RectF& platform : layout.oneWayPlatforms)
             drawPlatform(target, platform, layout.theme);
     }
 }

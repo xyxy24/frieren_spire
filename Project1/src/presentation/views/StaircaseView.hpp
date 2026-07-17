@@ -1,7 +1,6 @@
 #pragma once
 
-#include "game/combat/Aabb.hpp"
-#include "game/floors/ArenaLayout.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -14,7 +13,7 @@ namespace arcane::presentation::views
 using StaircaseTextures = std::array<std::optional<sf::Texture>, 3>;
 
 [[nodiscard]] StaircaseTextures loadStaircaseTextures(std::string_view directory);
-void drawStaircase(sf::RenderTarget& target, game::Aabb interactionBounds,
-    bool unlocked, game::floors::ArenaTheme theme,
+void drawStaircase(sf::RenderTarget& target, common::RectF interactionBounds,
+    bool unlocked, common::ui::ArenaTheme theme,
     const StaircaseTextures& textures);
 }

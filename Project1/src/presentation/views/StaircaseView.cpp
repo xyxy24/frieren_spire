@@ -10,13 +10,13 @@ namespace arcane::presentation::views
 {
 namespace
 {
-[[nodiscard]] std::size_t themeIndex(const game::floors::ArenaTheme theme) noexcept
+[[nodiscard]] std::size_t themeIndex(const common::ui::ArenaTheme theme) noexcept
 {
     switch (theme)
     {
-    case game::floors::ArenaTheme::AuraOccupation: return 0U;
-    case game::floors::ArenaTheme::NorthernFrontier: return 1U;
-    case game::floors::ArenaTheme::MageExam: return 2U;
+    case common::ui::ArenaTheme::AuraOccupation: return 0U;
+    case common::ui::ArenaTheme::NorthernFrontier: return 1U;
+    case common::ui::ArenaTheme::MageExam: return 2U;
     }
     return 0U;
 }
@@ -37,8 +37,8 @@ StaircaseTextures loadStaircaseTextures(const std::string_view directory)
     return textures;
 }
 
-void drawStaircase(sf::RenderTarget& target, const game::Aabb interactionBounds,
-    const bool unlocked, const game::floors::ArenaTheme theme,
+void drawStaircase(sf::RenderTarget& target, const common::RectF interactionBounds,
+    const bool unlocked, const common::ui::ArenaTheme theme,
     const StaircaseTextures& textures)
 {
     const auto& texture = textures[themeIndex(theme)];

@@ -3,6 +3,7 @@
 #include "game/math/Vec2.hpp"
 #include "game/combat/Aabb.hpp"
 #include "game/player/PlayerController.hpp"
+#include "common/ui/UiStates.hpp"
 
 #include <cstdint>
 #include <array>
@@ -14,36 +15,31 @@
 
 namespace arcane::game
 {
-inline constexpr std::uint32_t BurningFlowerVisualId = 9006U;
-inline constexpr std::uint32_t PhantomBreakVisualId = 9007U;
-inline constexpr std::uint32_t StoneGolemResolveVisualId = 9008U;
-inline constexpr std::uint32_t LightningStaffDischargeVisualId = 9009U;
-inline constexpr std::uint32_t DefensiveBarrierBreakVisualId = 9010U;
-inline constexpr std::uint32_t MirrorArrayBreakVisualId = 9011U;
-inline constexpr std::uint32_t ZoltraakMuzzleVisualId = 9012U;
-inline constexpr std::uint32_t FrierenCopyBeamVisualId = 9400U;
-inline constexpr std::uint32_t FrierenCopyLightningVisualId = 9401U;
-inline constexpr std::uint32_t FrierenCopyGroundFireVisualId = 9402U;
-inline constexpr std::uint32_t CopyBeamTelegraphVisualId = 9403U;
-inline constexpr std::uint32_t FrierenCopyGroundFireTelegraphVisualId = 9404U;
-inline constexpr std::uint32_t RevolteCrossSlashFirstTelegraphVisualId = 9500U;
-inline constexpr std::uint32_t RevolteCrossSlashSecondTelegraphVisualId = 9501U;
-inline constexpr std::uint32_t RevolteCrossSlashVisualId = 9502U;
-inline constexpr std::uint32_t RevolteCrossSlashImpactVisualId = 9503U;
-inline constexpr std::uint32_t RevolteFlyingBladeTelegraphVisualId = 9504U;
-inline constexpr std::uint32_t RevolteFlyingBladeVisualId = 9505U;
+inline constexpr auto BurningFlowerVisualId = common::ui::BurningFlowerVisualId;
+inline constexpr auto PhantomBreakVisualId = common::ui::PhantomBreakVisualId;
+inline constexpr auto StoneGolemResolveVisualId = common::ui::StoneGolemResolveVisualId;
+inline constexpr auto LightningStaffDischargeVisualId = common::ui::LightningStaffDischargeVisualId;
+inline constexpr auto DefensiveBarrierBreakVisualId = common::ui::DefensiveBarrierBreakVisualId;
+inline constexpr auto MirrorArrayBreakVisualId = common::ui::MirrorArrayBreakVisualId;
+inline constexpr auto ZoltraakMuzzleVisualId = common::ui::ZoltraakMuzzleVisualId;
+inline constexpr auto FrierenCopyBeamVisualId = common::ui::FrierenCopyBeamVisualId;
+inline constexpr auto FrierenCopyLightningVisualId = common::ui::FrierenCopyLightningVisualId;
+inline constexpr auto FrierenCopyGroundFireVisualId = common::ui::FrierenCopyGroundFireVisualId;
+inline constexpr auto CopyBeamTelegraphVisualId = common::ui::CopyBeamTelegraphVisualId;
+inline constexpr auto FrierenCopyGroundFireTelegraphVisualId = common::ui::FrierenCopyGroundFireTelegraphVisualId;
+inline constexpr auto RevolteCrossSlashFirstTelegraphVisualId = common::ui::RevolteCrossSlashFirstTelegraphVisualId;
+inline constexpr auto RevolteCrossSlashSecondTelegraphVisualId = common::ui::RevolteCrossSlashSecondTelegraphVisualId;
+inline constexpr auto RevolteCrossSlashVisualId = common::ui::RevolteCrossSlashVisualId;
+inline constexpr auto RevolteCrossSlashImpactVisualId = common::ui::RevolteCrossSlashImpactVisualId;
+inline constexpr auto RevolteFlyingBladeTelegraphVisualId = common::ui::RevolteFlyingBladeTelegraphVisualId;
+inline constexpr auto RevolteFlyingBladeVisualId = common::ui::RevolteFlyingBladeVisualId;
 
 enum class CombatOutcome
 {
     Victory,
     Defeat
 };
-enum class EnemyArchetype : std::uint8_t {
-    ChestMimic, HeadlessKnight, BirdDemon, Lugner, Linie, Draht,
-    ChaosFlower, FrostWolf, Qual, Laufen, Richter, Denken,
-    Heimon, DemonWarrior, LargeBirdDemon, Gargoyle, ThreeHeadedDemon, SwordDemon,
-    Aura, Revolte, RedMirrorDragon, WaterMirrorDemon, StarkCopy, FernCopy, FrierenCopy, Boss
-};
+using EnemyArchetype = common::ui::EnemyArchetype;
 
 struct EnemySpawn
 {
@@ -89,81 +85,9 @@ struct CombatResult
     int playerHealthRemaining {0};
 };
 
-struct PlayerStateView
-{
-    Vec2 position;
-    Vec2 velocity;
-    int currentHealth {0};
-    int maximumHealth {0};
-    bool grounded {false};
-    float facingDirection {1.0F};
-    bool attackActive {false};
-    float attackCooldownRemaining {0.0F};
-    std::uint64_t attackSequence {};
-    std::uint64_t castSequence {};
-    std::array<spells::SpellSlotView, 3> spellSlots;
-    spells::SpellSlotView ultimateSpellSlot;
-    float dashRemaining {0.0F};
-    float dashCooldownRemaining {0.0F};
-    bool shadowDashing {false};
-    float shadowDashChargeRemaining {0.0F};
-    bool stunned {false};
-    float stunRemaining {0.0F};
-    float hitInvulnerabilityRemaining {0.0F};
-    std::uint64_t hurtSequence {};
-    float blessingRemaining {0.0F};
-    float vulnerableRemaining {0.0F};
-    float flowerFieldRemaining {0.0F};
-    float flightRemaining {0.0F};
-    int shield {0};
-    float sleepRemaining {0.0F};
-};
-
-struct EnemyStateView
-{
-    EnemyArchetype archetype {EnemyArchetype::HeadlessKnight};
-    Vec2 position;
-    float width {48.0F};
-    float height {64.0F};
-    int currentHealth {0};
-    int maximumHealth {0};
-    bool alive {false};
-    bool windingUp {false};
-    bool attackActive {false};
-    bool slowed {false};
-    std::optional<Aabb> skillEffectBounds;
-    float facingDirection {-1.0F};
-    bool marked {false};
-    float skillEffectProgress {};
-    float concealmentProgress {};
-    bool specialWindingUp {false};
-    bool specialAttackActive {false};
-    int skillVariant {-1};
-    bool returningToAir {false};
-    bool activated {false};
-};
-
-struct SpellEffectView
-{
-    std::uint32_t spellId {};
-    Aabb bounds;
-    float remaining {};
-    float duration {};
-    float facingDirection {1.0F};
-    float rotationDegrees {0.0F};
-};
-
-struct CombatDialogueLineView
-{
-    std::string_view speaker;
-    std::string_view text;
-    std::string_view portrait;
-};
-
-struct BossIntroView
-{
-    std::string_view name;
-    float remaining {};
-    float duration {};
-};
+using PlayerStateView = common::ui::PlayerCombatState;
+using EnemyStateView = common::ui::EnemyState;
+using SpellEffectView = common::ui::SpellEffectState;
+using CombatDialogueLineView = common::ui::CombatDialogueState;
+using BossIntroView = common::ui::BossIntroState;
 }

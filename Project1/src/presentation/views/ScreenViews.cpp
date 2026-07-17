@@ -12,7 +12,7 @@
 
 namespace arcane::presentation::views
 {
-namespace ui = viewmodel;
+namespace ui = common::ui;
 namespace
 {
 float drawWrappedBlock(sf::RenderTarget& target, const std::string_view text,
@@ -27,7 +27,7 @@ float drawWrappedBlock(sf::RenderTarget& target, const std::string_view text,
 }
 }
 
-void drawRewardScreen(sf::RenderTarget& target, const ui::RewardViewModel& model,
+void drawRewardScreen(sf::RenderTarget& target, const ui::RewardState& model,
     const arcane::presentation::SpellCardArt& spellCards)
 {
     drawPixelText(target, "CHOOSE NEW MAGIC OR MASTERY", {390.0F, 54.0F}, 2.0F,
@@ -96,7 +96,7 @@ void drawRewardScreen(sf::RenderTarget& target, const ui::RewardViewModel& model
 }
 
 void drawBreakthroughScreen(sf::RenderTarget& target,
-    const ui::BreakthroughViewModel& model)
+    const ui::BreakthroughState& model)
 {
     sf::RectangleShape backdrop({1120.0F, 610.0F});
     backdrop.setPosition({80.0F, 55.0F});
@@ -134,7 +134,7 @@ void drawBreakthroughScreen(sf::RenderTarget& target,
     }
 }
 
-void drawMerchantScreen(sf::RenderTarget& target, const ui::MerchantViewModel& model,
+void drawMerchantScreen(sf::RenderTarget& target, const ui::MerchantState& model,
     const arcane::presentation::SpellCardArt& spellCards)
 {
     sf::RectangleShape panel({1120.0F, 650.0F});
@@ -202,7 +202,7 @@ void drawMerchantScreen(sf::RenderTarget& target, const ui::MerchantViewModel& m
     }
 }
 
-void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
+void drawEventScreen(sf::RenderTarget& target, const ui::EventPanelState& event,
     const std::array<std::optional<sf::Texture>, 3>& meteorCards,
     const std::array<std::optional<sf::Texture>, 3>& ordenCards,
     const std::array<std::optional<sf::Texture>, 3>& swordVillageCards,
@@ -214,9 +214,9 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
     panel.setOutlineColor(sf::Color {148, 105, 205});
     panel.setOutlineThickness(4.0F);
     target.draw(panel);
-    const bool meteor = tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower;
-    const bool swordVillage = tower.eventKind() == arcane::app::EventKind::SwordVillage;
-    const bool southernHero = tower.eventKind() == arcane::app::EventKind::SouthernHero;
+    const bool meteor = event.kind == ui::EventKind::HalfCenturyMeteorShower;
+    const bool swordVillage = event.kind == ui::EventKind::SwordVillage;
+    const bool southernHero = event.kind == ui::EventKind::SouthernHero;
     const std::string_view title = southernHero ? "HERO OF THE SOUTH"
         : (swordVillage ? "VILLAGE OF THE SWORD"
             : (meteor ? "HALF CENTURY METEOR SHOWER" : "LORD ORDEN'S BALL"));
@@ -246,13 +246,13 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
         : (meteor
             ? std::array<std::string_view, 3> {"GAIN A RANDOM SPELLBOOK", "RESTORE HP TO MAX", "50 PERCENT CHANCE OF 99 GOLD"}
             : std::array<std::string_view, 3> {"+30 MAX HP", "GAIN A RANDOM SPELLBOOK", "+50 GOLD"}));
-    if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
+    if (event.state == ui::EventFloorState::Result)
     {
-        if (tower.eventResultChoice())
+        if (event.resultChoice)
         {
             const auto base = southernHero ? 5301U
                 : (swordVillage ? 5201U : (meteor ? 5101U : 5001U));
-            const auto choiceIndex = static_cast<std::size_t>(*tower.eventResultChoice() - base);
+            const auto choiceIndex = static_cast<std::size_t>(*event.resultChoice - base);
             const auto& eventCards = southernHero ? southernHeroCards
                 : (swordVillage ? swordVillageCards : (meteor ? meteorCards : ordenCards));
             if (choiceIndex < eventCards.size() && eventCards[choiceIndex])
@@ -266,13 +266,13 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
                 target.draw(card);
             }
             else
-                drawCard(target, *tower.eventResultChoice(),
+                drawCard(target, *event.resultChoice,
                     {535.0F, 205.0F}, {210.0F, 280.0F}, true);
             if (choiceIndex < effects.size())
             {
                 std::string resultText {effects[choiceIndex]};
                 if (meteor && choiceIndex == 2U)
-                    resultText = tower.eventChoices()[2].goldDelta == 99
+                    resultText = event.choices[2].goldDelta == 99
                         ? "WISH GRANTED +99 GOLD" : "THE WISH RECEIVED NO ANSWER";
                 drawPixelText(target, resultText, {440.0F, 515.0F}, 1.4F,
                     sf::Color {255, 231, 145});
@@ -281,7 +281,7 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
         return;
     }
     constexpr std::array<float, 3> CardX {270.0F, 535.0F, 800.0F};
-    const auto choices = tower.eventChoices();
+    const auto& choices = event.choices;
     for (std::size_t index = 0U; index < choices.size() && index < CardX.size(); ++index)
     {
         const auto& eventCards = southernHero ? southernHeroCards
@@ -304,20 +304,18 @@ void drawEventScreen(sf::RenderTarget& target, const arcane::app::TowerSession& 
         drawPixelText(target, effects[index], {CardX[index], 505.0F}, 1.25F);
 }
 
-void drawStaircase(sf::RenderTarget& target, arcane::game::Aabb bounds, bool unlocked);
-
 void drawPlayer(sf::RenderTarget& target, const arcane::presentation::PlayerAnimator& animator,
     const arcane::presentation::PlayerVisualState& player, const sf::Color fallbackColor,
     const sf::Color spriteTint)
 {
     const sf::Vector2f bottomCenter {
-        player.position.x + arcane::game::PlayerController::Width * 0.5F,
-        player.position.y + arcane::game::PlayerController::Height
+        player.position.x + ui::PlayerWidth * 0.5F,
+        player.position.y + ui::PlayerHeight
     };
     if (animator.draw(target, bottomCenter, player.facingDirection, spriteTint)) return;
 
     sf::RectangleShape shape(
-        {arcane::game::PlayerController::Width, arcane::game::PlayerController::Height});
+        {ui::PlayerWidth, ui::PlayerHeight});
     shape.setPosition({player.position.x, player.position.y});
     sf::Color tintedFallback = fallbackColor;
     tintedFallback.a = spriteTint.a;
@@ -329,7 +327,7 @@ void drawPlayer(sf::RenderTarget& target, const arcane::presentation::PlayerAnim
     target.draw(shape);
 }
 
-void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession& tower,
+void drawSpecialFloor(sf::RenderTarget& target, const ui::SpecialFloorState& state,
     const arcane::presentation::PlayerAnimator& playerAnimator,
     const arcane::presentation::ShadeChargeAnimator& shadeChargeAnimator,
     const ArenaTextures& arenaTextures, const StaircaseTextures& staircaseTextures,
@@ -339,23 +337,23 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     const std::optional<sf::Texture>& southernHeroNpcTexture,
     const std::optional<sf::Texture>& merchantNpcTexture)
 {
-    drawArena(target, tower.arenaLayout(), GroundTop, arenaTextures);
-    drawStaircase(target, tower.staircaseBounds(), tower.staircaseUnlocked(),
-        tower.arenaLayout().theme, staircaseTextures);
-    if (const auto* player = tower.explorationPlayer())
+    drawArena(target, state.arena, GroundTop, arenaTextures);
+    drawStaircase(target, state.staircase.bounds, state.staircase.unlocked,
+        state.staircase.theme, staircaseTextures);
+    if (state.player)
     {
-        const auto visual = makePlayerVisualState(*player, tower.run().player().currentHp);
+        const auto& visual = *state.player;
         const sf::Vector2f bottomCenter {
-            visual.position.x + arcane::game::PlayerController::Width * 0.5F,
-            visual.position.y + arcane::game::PlayerController::Height
+            visual.position.x + ui::PlayerWidth * 0.5F,
+            visual.position.y + ui::PlayerHeight
         };
         shadeChargeAnimator.drawBack(target, bottomCenter);
         drawPlayer(target, playerAnimator, visual,
             sf::Color {232, 232, 242});
         shadeChargeAnimator.drawFront(target, bottomCenter);
     }
-    const auto npc = tower.npcBounds();
-    if (tower.currentFloorType() == arcane::game::run::FloorType::Merchant
+    const auto npc = state.npcBounds;
+    if (state.floorKind == ui::FloorKind::Merchant
         && merchantNpcTexture)
     {
         sf::Sprite npcSprite(*merchantNpcTexture);
@@ -367,15 +365,15 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
         return;
     }
     const std::optional<sf::Texture>* eventNpcTexture = nullptr;
-    if (tower.eventKind() == arcane::app::EventKind::HalfCenturyMeteorShower)
+    if (state.event.kind == ui::EventKind::HalfCenturyMeteorShower)
         eventNpcTexture = &meteorNpcTexture;
-    else if (tower.eventKind() == arcane::app::EventKind::AldenBall)
+    else if (state.event.kind == ui::EventKind::AldenBall)
         eventNpcTexture = &ordenNpcTexture;
-    else if (tower.eventKind() == arcane::app::EventKind::SwordVillage)
+    else if (state.event.kind == ui::EventKind::SwordVillage)
         eventNpcTexture = &swordVillageNpcTexture;
-    else if (tower.eventKind() == arcane::app::EventKind::SouthernHero)
+    else if (state.event.kind == ui::EventKind::SouthernHero)
         eventNpcTexture = &southernHeroNpcTexture;
-    if (tower.currentFloorType() == arcane::game::run::FloorType::Event
+    if (state.floorKind == ui::FloorKind::Event
         && eventNpcTexture && *eventNpcTexture)
     {
         const sf::Texture& texture = **eventNpcTexture;
@@ -388,14 +386,14 @@ void drawSpecialFloor(sf::RenderTarget& target, const arcane::app::TowerSession&
     }
     sf::RectangleShape npcShape({npc.width, npc.height});
     npcShape.setPosition({npc.left, npc.top});
-    npcShape.setFillColor(tower.currentFloorType() == arcane::game::run::FloorType::Merchant
+    npcShape.setFillColor(state.floorKind == ui::FloorKind::Merchant
         ? sf::Color {205, 159, 75} : sf::Color {116, 83, 170});
     npcShape.setOutlineColor(sf::Color {235, 225, 190});
     npcShape.setOutlineThickness(3.0F);
     target.draw(npcShape);
 }
 
-void drawLoadoutOverlay(sf::RenderTarget& target, const ui::LoadoutSnapshot& model,
+void drawLoadoutOverlay(sf::RenderTarget& target, const ui::LoadoutState& model,
     const arcane::presentation::SpellCardArt& spellCards)
 {
     sf::RectangleShape overlay({static_cast<float>(WindowWidth), static_cast<float>(WindowHeight)});
@@ -530,7 +528,7 @@ void drawLoadoutOverlay(sf::RenderTarget& target, const ui::LoadoutSnapshot& mod
     }
 }
 
-void drawLootDrop(sf::RenderTarget& target, const arcane::game::Aabb bounds,
+void drawLootDrop(sf::RenderTarget& target, const arcane::common::RectF bounds,
     const arcane::presentation::LootBookAnimator& animator)
 {
     const sf::Vector2f center {

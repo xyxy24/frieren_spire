@@ -25,14 +25,17 @@
 flowchart TB
     Platform["平台与引擎适配\n窗口/输入/渲染/音频/文件"]
     View["View\nSFML 场景/HUD/动画/特效"]
+    Common["Common 绑定契约\n只读属性/命令/事件/跨层 DTO"]
     ViewModel["ViewModel\n页面状态/命令/只读快照"]
     Model["Model\nTowerSession/RunController/CombatSession"]
     Domain["领域规则\n战斗/魔法/遗物/奖励/商店"]
     Content["内容层\n魔法/遗物/敌人/楼层定义"]
     Infra["基础设施\nRNG/存档/日志/资源"]
 
+    Platform --> Common
     Platform --> View
-    View --> ViewModel
+    View --> Common
+    ViewModel --> Common
     ViewModel --> Model
     Model --> Domain
     Content --> Domain
@@ -40,13 +43,17 @@ flowchart TB
     Infra --> Domain
 ```
 
-项目采用不依赖第三方库的 C++ MVVM：View 把设备输入映射为命令并绑定只读快照；ViewModel 保存页面状态、解释 UI 命令并调用 Model；Model 持有权威玩法状态与规则。依赖方向朝向稳定的玩法规则，Model 和领域层不直接调用 SFML、音频或键盘 API。
+项目采用不依赖第三方库的 C++ MVVM。`common` 层定义 `IReadOnlyProperty<T>`、`ICommandBinding<T>`、`IEventBinding<T>`、输入命令以及完整的跨层 UI 状态；它不依赖 Model、ViewModel 或 SFML。View 只依赖 `common` DTO 和 SFML，不包含任何 `app/`、`game/` 或 `presentation/viewmodel/` 头文件。ViewModel 保存页面状态、解释命令并调用 Model，再把 Model 投影为 `common::ui::ApplicationState`。Model 持有权威玩法状态与规则，且不直接调用 SFML、音频或键盘 API。
+
+三种绑定各自只承担一种通信方向：单向属性绑定由 ViewModel 发布不可变应用快照，View 只能读取；命令绑定由平台输入层提交 `FrameCommand`，ViewModel 决定如何执行；事件通知绑定只发布页面切换、楼层切换、获得魔法和本局结束等一次性事实，View 消费后显式确认。事件不能替代持续状态，View 也不能通过绑定接口取得或修改 `TowerSession`。
 
 ## 4. 核心系统与职责
 
 | 系统 | 责任 | 不负责 |
 |---|---|---|
-| `SfmlApplication`（View） | 窗口主循环、绘制、动画和输入采样 | 保存页面选择或修改玩法规则 |
+| `common` | 定义只读属性、命令、事件和跨层值类型；保持双向稳定契约 | 玩法规则、SFML 绘制或持有运行时服务 |
+| `SfmlApplication`（组合根） | 组装 View 与 ViewModel，执行窗口主循环和输入采样 | 让具体 View 取得 Model/ViewModel 或修改玩法规则 |
+| `arcane_sfml_view` | 只根据 `common` 状态绘制场景、HUD、动画和特效 | 包含 ViewModel/Model 头文件或自行计算权威结果 |
 | `ApplicationViewModel` | 管理 Start/Playing/Pause/Result，解释顶层命令并拥有当前 Model | SFML 绘制与战斗数值计算 |
 | `LoadoutViewModel` | 管理 Tab 开关、页签、光标和装备命令，生成构筑快照 | 持有已学魔法、遗物或装备的权威数据 |
 | `CombatFeedbackViewModel` | 比较连续权威快照，生成短生命周期的闪白、伤害数字和确定性镜头偏移 | 修改 HP、判定无敌或反向影响战斗模拟 |
@@ -67,14 +74,19 @@ flowchart TB
 | `SaveService` | 设置、解锁和可选本局快照的序列化 | 决定游戏规则 |
 | `AssetService` | 资源定位、加载、缓存和卸载策略 | 内容平衡 |
 
-当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、ViewModel 更新、动画更新和统一帧渲染；View 不再调用顶层 Controller，也不保存暂停菜单或构筑页面状态。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）、`views/CombatView`（战斗场景、敌人贴图、Boss 对话）与 `views/SpellAcquisitionView`（场景内光球、工程诊断窗、注册几何网络、星爆和信息落版）；`PlayerAnimator` 和 `EnemyAnimator` 仅根据只读战斗快照推进表现帧，`SfmlApplication.cpp` 只保留资源组装、页面路由和主循环。窗口创建后先提交一帧资源准备画面，再同步建立当前课程版本的纹理缓存；运行期间窗口标题只有内容变化时才写入操作系统，不能在每帧重复调用平台 API。
+当前垂直切片由 `ApplicationViewModel` 持有可选的纯 C++ `TowerSession` Model，后者持有 `RunController` 和至多一个 `CombatSession`。`main.cpp` 只是创建并启动 `presentation::SfmlApplication` 的薄入口。SFML 消息循环固定为事件泵、输入采样、通过命令绑定更新 ViewModel、读取属性绑定、更新动画和统一帧渲染；楼层切换等瞬时行为通过事件绑定驱动表现重置。View 不保存暂停菜单或构筑页面状态，也不调用 ViewModel 的具体方法。View 实现按职责拆为 `views/UiPrimitives`（文字、卡片、血条和菜单）、`views/ScreenViews`（奖励、商店、事件、构筑和特殊楼层）、`views/CombatView`（战斗场景、敌人贴图、Boss 对话）与 `views/SpellAcquisitionView`（场景内光球、工程诊断窗、注册几何网络、星爆和信息落版）；`PlayerAnimator` 和 `EnemyAnimator` 仅根据 `common` 只读状态推进表现帧，`SfmlApplication.cpp` 作为组合根保留资源组装、绑定连接、页面路由和主循环。窗口创建后先提交一帧资源准备画面，再同步建立当前课程版本的纹理缓存；运行期间窗口标题只有内容变化时才写入操作系统，不能在每帧重复调用平台 API。
 
-`ApplicationViewModel`、`LoadoutViewModel` 与 `SpellAcquisitionViewModel` 是有状态 ViewModel；`ApplicationSnapshot`、`LoadoutSnapshot`、`RewardViewModel`、`MerchantViewModel`、`SpellAcquisitionSnapshot` 和装备槽投影是 View 的只读绑定对象。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。获取演出 ViewModel 只在检测到已学列表增长后启动，保存内容 ID 和表现时间；奖励已经由 Model 原子结算，演出不能重复发放或自动装备。演出期间 Model 不推进，`PlayerAnimator` 由表现层覆盖为一次性的 `Pickup` 姿态并停在末帧，避免复用冻结前残留速度而显示跑步。`CombatFeedbackViewModel` 是仅持有表现寿命的 ViewModel：它读取相邻两帧 `PlayerStateView/EnemyStateView` 的权威 HP 差值，产出目标闪白、飘字、命中扩散环、纯视觉击退、确定性镜头偏移和短命中停顿请求，并在楼层切换时重置。事件、战斗 HUD 和特殊楼层面板目前仍读取 Model 的只读快照，后续按同一边界迁移。
+`ApplicationViewModel`、`LoadoutViewModel` 与 `SpellAcquisitionViewModel` 是有状态 ViewModel；它们共同把页面、战斗、事件、商店、奖励、构筑和获取演出投影进 `common::ui::ApplicationState`，再由 `ObservableProperty` 单向发布。构筑 ViewModel 只拥有开关、页签、分区和光标等 UI 状态，通过 `TowerSession::equipRegularSpell/equipUltimateSpell` 命令修改 Model；已学魔法、遗物、槽位和冷却仍只有 Model 能权威持有。获取演出 ViewModel 只在检测到已学列表增长后启动，保存内容 ID 和表现时间；奖励已经由 Model 原子结算，演出不能重复发放或自动装备。演出期间 Model 不推进，`PlayerAnimator` 由表现层覆盖为一次性的 `Pickup` 姿态并停在末帧，避免复用冻结前残留速度而显示跑步。`CombatFeedbackViewModel` 是仅持有表现寿命的 ViewModel：它读取相邻两帧权威 HP 投影，产出目标闪白、飘字、命中扩散环、纯视觉击退、确定性镜头偏移和短命中停顿请求，并在 `FloorChanged` 事件后重置。View 不再直接读取 `TowerSession`。
+
+CMake 以目标边界落实依赖方向：`arcane_common` 是无实现的契约目标，`arcane_core` 只依赖 Common，`arcane_viewmodel` 依赖 Common 与 Core，`arcane_sfml_view` 只依赖 Common 与 SFML，最终 `Project1` 可执行目标作为组合根同时链接 ViewModel 与 View。CTest 的 `view_dependency_boundary` 会扫描 View 源码并拒绝具体 Model/ViewModel 头文件或类型重新渗入。
 
 ## 5. 状态所有权
 
 ```text
-SfmlApplication (View，无玩法状态所有权)
+SfmlApplication (组合根，无玩法状态所有权)
+├── IReadOnlyProperty<ApplicationState> ──> SFML Views
+├── ICommandBinding<FrameCommand> <────── SfmlInputMapper
+├── IEventBinding<UiEvent> ──────────────> 表现重置/一次性通知
 └── ApplicationViewModel
     ├── ApplicationScreen / PauseMenuItem
     ├── LoadoutViewModel
@@ -370,11 +382,12 @@ Project1/
 ├── Project1/
 │   ├── Project1.vcxproj
 │   └── src/
+│       ├── common/       # 属性、命令、事件绑定与跨层 DTO
 │       ├── app/          # GameApp、流程与状态机
 │       ├── game/         # 纯玩法领域系统
 │       ├── content/      # 内容定义与校验
-│       ├── presentation/ # 视图、HUD、表现同步
-│       │   └── viewmodel/ # 奖励、商店、构筑与槽位的只读 UI 投影
+│       ├── presentation/ # SFML 视图、HUD、动画与组合根
+│       │   └── viewmodel/ # Model 命令适配与 Common 状态投影
 │       └── platform/     # 引擎/窗口/输入/音频适配
 ├── tests/                # 独立测试项目，建立框架后创建
 ├── assets/

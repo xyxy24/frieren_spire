@@ -1,7 +1,6 @@
 #include "presentation/SfmlApplication.hpp"
 
 #include "platform/SfmlInputMapper.hpp"
-#include "game/player/PlayerController.hpp"
 #include "presentation/LootBookAnimator.hpp"
 #include "presentation/PlayerAnimator.hpp"
 #include "presentation/ShadeChargeAnimator.hpp"
@@ -33,7 +32,7 @@ namespace
 {
 constexpr float MaximumFrameTime = 0.05F;
 
-arcane::game::run::Seed makeRuntimeSeed()
+arcane::common::ui::Seed makeRuntimeSeed()
 {
     std::random_device device;
     const auto entropy = (static_cast<std::uint64_t>(device()) << 32U)
@@ -43,136 +42,41 @@ arcane::game::run::Seed makeRuntimeSeed()
     return entropy ^ clock;
 }
 
-std::string makeWindowTitle(const ui::ApplicationViewModel& app)
-{
-    const auto* towerModel = app.model();
-    if (!towerModel) return "Arcane Spire";
-    const auto& tower = *towerModel;
-    const auto& run = tower.run();
-    const auto& player = run.player();
-    std::string title = "Arcane Spire | Floor " + std::to_string(run.context().floorIndex + 1U)
-        + " | Seed " + std::to_string(run.context().runSeed)
-        + " | HP " + std::to_string(player.currentHp) + "/" + std::to_string(player.maxHp)
-        + " | Gold " + std::to_string(player.gold)
-        + " | Boss " + std::to_string(run.context().bossesDefeated) + "/3 | ";
-
-    if (const auto acquisition = app.spellAcquisition().snapshot())
-        return title + std::string {acquisition->bossSpell ? "ULTIMATE SPELL ACQUIRED - "
-            : "SPELL ACQUIRED - "} + std::string {acquisition->content.summary.name}
-            + (acquisition->canDismiss ? " | Enter Continue"
-                : acquisition->canSkip ? " | Space Skip" : " | Unlocking...");
-
-    const auto& loadout = app.loadout();
-    if (loadout.open())
-    {
-        const auto loadoutModel = loadout.snapshot(player);
-        if (loadout.page() == ui::LoadoutPage::Relics)
-        {
-            const std::string selected = loadoutModel.selectedDetail
-                ? std::string {loadoutModel.selectedDetail->summary.name} : std::string {"None"};
-            return title + "RELIC COLLECTION - Selected " + selected
-                + " | A/D Select, Q/E Spell Page, Tab Close";
-        }
-        const std::string selected = loadoutModel.selectedDetail
-            ? std::string {loadoutModel.selectedDetail->summary.name} : std::string {"None"};
-        const bool bossSection = loadout.spellSection() == ui::SpellSection::Boss;
-        return title + (bossSection ? "BOSS SPELL LOADOUT - Selected " : "REGULAR SPELL LOADOUT - Selected ")
-            + selected + (bossSection ? " | A/D Select, R Equip Ultimate" : " | A/D Select, U/I/O Equip Slot")
-            + ", W/S Switch Spell Group, Q/E Relic Page, Tab Close";
-    }
-
-    switch (run.phase())
-    {
-    case arcane::game::run::RunPhase::InEncounter:
-        if (tower.currentFloorType() == arcane::game::run::FloorType::Merchant)
-        {
-            if (!tower.specialPanelOpen()) return title + "MERCHANT ROOM - Meet NPC, E Trade | Rear Staircase Exits";
-            return title + "MERCHANT - WASD Select | Enter Buy | E Close";
-        }
-        if (tower.currentFloorType() == arcane::game::run::FloorType::Event)
-        {
-            if (!tower.specialPanelOpen())
-                return title + (tower.eventFloorState() == arcane::app::EventFloorState::Result
-                    ? "EVENT RESOLVED - E Review NPC Result | Rear Staircase Exits"
-                    : "EVENT ROOM - Meet NPC, E Interact");
-            if (tower.eventFloorState() == arcane::app::EventFloorState::Result)
-                return title + "EVENT RESULT - E Close";
-            return title + "EVENT CHOICE - U I O Select | E Close";
-        }
-        return title + "A/D Move, Space Jump, S+Space Drop, J Attack, K Dash, U/I/O Spells, R Ultimate, Tab Loadout";
-    case arcane::game::run::RunPhase::LootPending:
-        return title + "ENEMY DROP - Move To Drop, E Inspect Reward | Tab Loadout";
-    case arcane::game::run::RunPhase::Reward:
-    {
-        const auto candidates = tower.rewardCandidates();
-        if (!candidates) return title + "Reward";
-        const auto name = [](const arcane::game::run::ContentId id) {
-            const auto* definition = arcane::game::spells::findDefinition(id);
-            return definition ? std::string {definition->name} : std::to_string(id);
-        };
-        return title + "Choose U=" + name((*candidates)[0])
-            + " I=" + name((*candidates)[1])
-            + " O=" + name((*candidates)[2]) + " | Tab Loadout";
-    }
-    case arcane::game::run::RunPhase::Breakthrough:
-        return title + "Choose Mana Breakthrough: U Power, I Haste, O Defense";
-    case arcane::game::run::RunPhase::FloorComplete:
-        return title + "Move Into Staircase, E Climb (+50% Missing HP), Tab Loadout";
-    case arcane::game::run::RunPhase::Victory:
-        return title + "VICTORY - Third Boss Defeated";
-    case arcane::game::run::RunPhase::Defeat:
-        return title + "DEFEAT";
-    case arcane::game::run::RunPhase::FloorLoading:
-        return title + "Loading";
-    }
-
-    return title;
-}
-
 std::optional<arcane::presentation::PlayerVisualState> updatePresentationState(
-    const ui::ApplicationViewModel& app, arcane::presentation::PlayerAnimator& animator,
+    const arcane::common::ui::ApplicationState& appState,
+    arcane::presentation::PlayerAnimator& animator,
     const float deltaSeconds)
 {
-    std::optional<arcane::presentation::PlayerVisualState> state;
-    if (const auto* tower = app.model())
+    std::optional<arcane::presentation::PlayerVisualState> visual;
+    if (appState.combat)
     {
-        if (const auto* combat = tower->combat()) state = makePlayerVisualState(combat->playerState());
-        else if (const auto* player = tower->explorationPlayer())
-            state = makePlayerVisualState(*player, tower->run().player().currentHp);
+        const auto& player = appState.combat->player;
+        visual = arcane::presentation::PlayerVisualState {player.position, player.velocity,
+            player.currentHealth, player.grounded, player.facingDirection,
+            player.attackSequence, player.castSequence, player.hurtSequence,
+            player.dashRemaining, player.shadowDashChargeRemaining,
+            player.shadowDashing, player.stunned};
     }
-    const auto application = app.snapshot();
-    if (state && (application.screen == ui::ApplicationScreen::Playing
-        || application.screen == ui::ApplicationScreen::Result))
+    else if (appState.specialFloor && appState.specialFloor->player)
+        visual = *appState.specialFloor->player;
+    if (visual && (appState.screen == arcane::common::ui::ApplicationScreen::Playing
+        || appState.screen == arcane::common::ui::ApplicationScreen::Result))
     {
         const std::optional<arcane::presentation::PlayerAnimation> presentationOverride =
-            app.spellAcquisition().active()
+            appState.spellAcquisition
             ? std::optional {arcane::presentation::PlayerAnimation::Pickup}
             : std::nullopt;
-        animator.update(*state, deltaSeconds, presentationOverride);
+        animator.update(*visual, deltaSeconds, presentationOverride);
     }
-    return state;
-}
-
-std::string desiredWindowTitle(const ui::ApplicationViewModel& app)
-{
-    const auto model = app.snapshot();
-    if (model.screen == ui::ApplicationScreen::Start)
-        return model.canContinue
-            ? "Arcane Spire | CONTINUE - Enter | F2 Event | F3 Shop | F4 Spell | F5-F7 Boss"
-            : "Arcane Spire | START - Enter | F2 Event | F3 Shop | F4 Spell | F5-F7 Boss";
-    if (model.screen == ui::ApplicationScreen::Pause)
-        return "Arcane Spire | PAUSE - W/S Select | Enter Confirm | Esc Resume";
-    if (model.screen == ui::ApplicationScreen::Result)
-        return model.victory ? "Arcane Spire | WIN - Enter Start"
-            : "Arcane Spire | DEFEAT - Enter Start";
-    if (app.model()) return makeWindowTitle(app) + " | Esc Pause";
-    return "Arcane Spire";
+    return visual;
 }
 
 void updateWindowTitle(sf::RenderWindow& window, const ui::ApplicationViewModel& app,
     std::string& displayedTitle)
 {
-    std::string title = desiredWindowTitle(app);
+    std::string title = app.stateBinding().value().windowTitle;
+    if (app.stateBinding().value().screen == arcane::common::ui::ApplicationScreen::Playing)
+        title += " | Esc Pause";
     if (title == displayedTitle) return;
     window.setTitle(title);
     displayedTitle = std::move(title);
@@ -239,18 +143,17 @@ struct RenderResources
     const arcane::presentation::SpellEffectAnimator& spellAnimator;
 };
 
-void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewModel& app,
+void renderApplicationFrame(sf::RenderWindow& window,
+    const arcane::common::ui::ApplicationState& application,
     const std::optional<arcane::presentation::PlayerVisualState>& playerVisualState,
-    const RenderResources& resources, const ui::CombatFeedbackSnapshot& feedback,
-    const std::span<const arcane::game::EnemyStateView> enemyStates,
-    const std::span<const arcane::game::SpellEffectView> spellEffects)
+    const RenderResources& resources,
+    const arcane::common::ui::CombatFeedbackState& feedback)
 {
     sf::Color background {18, 20, 28};
-    const auto application = app.snapshot();
-    if (application.screen == ui::ApplicationScreen::Result)
+    if (application.screen == arcane::common::ui::ApplicationScreen::Result)
         background = application.victory ? sf::Color {20, 67, 49} : sf::Color {68, 24, 31};
     window.clear(background);
-    if (application.screen == ui::ApplicationScreen::Start)
+    if (application.screen == arcane::common::ui::ApplicationScreen::Start)
     {
         if (resources.startMenuBackground)
         {
@@ -266,8 +169,9 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
         }
         drawStartMenu(window, application.canContinue);
     }
-    else if (application.screen == ui::ApplicationScreen::Pause) drawPauseMenu(window, application.pauseMenuItem);
-    else if (application.screen == ui::ApplicationScreen::Result)
+    else if (application.screen == arcane::common::ui::ApplicationScreen::Pause)
+        drawPauseMenu(window, application.pauseMenuItem);
+    else if (application.screen == arcane::common::ui::ApplicationScreen::Result)
     {
         drawResultMenu(window, application.victory);
         if (!application.victory && playerVisualState)
@@ -275,19 +179,16 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 {static_cast<float>(WindowWidth) * 0.5F, GroundTop},
                 playerVisualState->facingDirection));
     }
-    else if (const auto* tower = app.model())
+    else if (application.run)
     {
-        const auto phase = tower->run().phase();
-        if ((phase == arcane::game::run::RunPhase::InEncounter
-            || phase == arcane::game::run::RunPhase::LootPending
-            || phase == arcane::game::run::RunPhase::Breakthrough
-            || phase == arcane::game::run::RunPhase::FloorComplete) && tower->combat())
+        const auto& run = *application.run;
+        if (application.combat)
         {
             const sf::View interfaceView = window.getView();
             sf::View worldView = interfaceView;
             worldView.move({feedback.cameraOffset.x, feedback.cameraOffset.y});
             window.setView(worldView);
-            drawCombat(window, *tower, enemyStates, spellEffects,
+            drawCombat(window, *application.combat,
                 resources.headless, resources.mimic, resources.bird,
                 resources.frostWolf, resources.chaosFlower, resources.qual, resources.qualSkill,
                 resources.heimon, resources.heimonSkill, resources.heimonFog,
@@ -309,61 +210,47 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
                 resources.staircases,
                 resources.enemyAnimator, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.spellAnimator, feedback);
-            if (const auto loot = tower->lootDropBounds())
-                drawLootDrop(window, *loot, resources.lootBookAnimator);
+            if (application.combat->lootDrop)
+                drawLootDrop(window, *application.combat->lootDrop,
+                    resources.lootBookAnimator);
             window.setView(interfaceView);
         }
-        if (phase == arcane::game::run::RunPhase::Reward)
+        if (application.reward)
+            drawRewardScreen(window, *application.reward, resources.spellCards);
+        if (application.breakthrough)
+            drawBreakthroughScreen(window, *application.breakthrough);
+        if (application.specialFloor)
         {
-            if (const auto model = app.reward())
-                drawRewardScreen(window, *model, resources.spellCards);
-        }
-        if (phase == arcane::game::run::RunPhase::Breakthrough)
-        {
-            if (const auto model = app.breakthrough())
-                drawBreakthroughScreen(window, *model);
-        }
-        if (phase == arcane::game::run::RunPhase::InEncounter
-            && (tower->currentFloorType() == arcane::game::run::FloorType::Merchant
-                || tower->currentFloorType() == arcane::game::run::FloorType::Event))
-        {
-            drawSpecialFloor(window, *tower, resources.playerAnimator,
+            drawSpecialFloor(window, *application.specialFloor, resources.playerAnimator,
                 resources.shadeChargeAnimator, resources.arena, resources.staircases,
                 resources.meteorNpc, resources.ordenNpc, resources.swordVillageNpc,
                 resources.southernHeroNpc, resources.merchantNpc);
-            if (tower->specialPanelOpen()
-                && tower->currentFloorType() == arcane::game::run::FloorType::Merchant)
-            {
-                if (const auto model = app.merchant())
-                    drawMerchantScreen(window, *model, resources.spellCards);
-            }
-            if (tower->specialPanelOpen()
-                && tower->currentFloorType() == arcane::game::run::FloorType::Event)
-                drawEventScreen(window, *tower, resources.meteorCards, resources.ordenCards,
+            if (application.merchant)
+                drawMerchantScreen(window, *application.merchant, resources.spellCards);
+            if (application.specialFloor->event.open
+                && application.specialFloor->floorKind == arcane::common::ui::FloorKind::Event)
+                drawEventScreen(window, application.specialFloor->event,
+                    resources.meteorCards, resources.ordenCards,
                     resources.swordVillageCards, resources.southernHeroCards);
         }
-        int health = tower->run().player().currentHp;
-        std::optional<arcane::game::PlayerStateView> combatView;
-        if (tower->combat()) { combatView = tower->combat()->playerState(); health = combatView->currentHealth; }
-        drawHealthBar(window, {32.0F, 28.0F}, {300.0F, 22.0F}, health,
-            tower->run().player().maxHp, sf::Color {108, 206, 126});
+        const auto* combatView = application.combat ? &application.combat->player : nullptr;
+        drawHealthBar(window, {32.0F, 28.0F}, {300.0F, 22.0F}, run.currentHp,
+            run.maximumHp, sf::Color {108, 206, 126});
         if (combatView && combatView->shield > 0)
             drawPixelText(window, "SHIELD " + std::to_string(combatView->shield),
                 {345.0F, 32.0F}, 1.0F, sf::Color {140, 190, 255});
-        drawGold(window, tower->run().player().gold);
-        if (!app.loadout().open())
+        drawGold(window, run.gold);
+        if (!application.loadout)
         {
-            if (const auto model = app.equippedSlots())
-                drawEquippedSlots(window, *model, resources.spellCards,
-                    combatView ? &*combatView : nullptr);
+            if (application.equippedSlots)
+                drawEquippedSlots(window, *application.equippedSlots,
+                    resources.spellCards, combatView);
         }
         else
-        {
-            const auto model = app.loadout().snapshot(tower->run().player());
-            drawLoadoutOverlay(window, model, resources.spellCards);
-        }
-        if (tower->combat()) drawCombatOverlay(window, *tower->combat(), resources.portraits);
-        if (const auto acquisition = app.spellAcquisition().snapshot())
+            drawLoadoutOverlay(window, *application.loadout, resources.spellCards);
+        if (application.combat)
+            drawCombatOverlay(window, *application.combat, resources.portraits);
+        if (application.spellAcquisition)
         {
             sf::Vector2f focusPosition {
                 static_cast<float>(WindowWidth) * 0.5F, GroundTop - 145.0F};
@@ -371,10 +258,11 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
             {
                 focusPosition = {
                     playerVisualState->position.x
-                        + arcane::game::PlayerController::Width * 0.5F,
+                        + arcane::common::ui::PlayerWidth * 0.5F,
                     playerVisualState->position.y - 60.0F};
             }
-            drawSpellAcquisition(window, *acquisition, resources.spellCards,
+            drawSpellAcquisition(window, *application.spellAcquisition,
+                resources.spellCards,
                 focusPosition);
         }
     }
@@ -629,11 +517,8 @@ int arcane::presentation::SfmlApplication::run()
         spellEffectAnimator};
     sf::Clock frameClock;
     ui::CombatFeedbackViewModel combatFeedback;
-    std::optional<std::uint32_t> feedbackFloor;
-    std::vector<arcane::game::EnemyStateView> frameEnemyStates;
-    std::vector<arcane::game::SpellEffectView> frameSpellEffects;
-    frameEnemyStates.reserve(8U);
-    frameSpellEffects.reserve(16U);
+    arcane::common::binding::ICommandBinding<arcane::common::FrameCommand>& commands = app;
+    auto& events = app.eventBinding();
 
     while (window.isOpen())
     {
@@ -646,55 +531,55 @@ int arcane::presentation::SfmlApplication::run()
         const float deltaSeconds = std::min(frameClock.restart().asSeconds(), MaximumFrameTime);
         lootBookAnimator.update(deltaSeconds);
         float simulationDeltaSeconds = deltaSeconds;
-        if (const auto* tower = app.model(); app.snapshot().screen == ui::ApplicationScreen::Playing
-            && tower && tower->combat()
-            && tower->run().phase() == arcane::game::run::RunPhase::InEncounter)
+        const auto& beforeUpdate = app.stateBinding().value();
+        if (beforeUpdate.screen == arcane::common::ui::ApplicationScreen::Playing
+            && beforeUpdate.combat && beforeUpdate.run
+            && beforeUpdate.run->phase == arcane::common::ui::GameplayPhase::InEncounter)
             simulationDeltaSeconds = combatFeedback.combatDeltaSeconds(deltaSeconds);
-        app.update(inputMapper.sample(), simulationDeltaSeconds);
-        const auto application = app.snapshot();
-        frameEnemyStates.clear();
-        frameSpellEffects.clear();
-        if (const auto* tower = app.model(); application.screen == ui::ApplicationScreen::Playing
-            && tower && tower->combat())
+        commands.execute({inputMapper.sample(), simulationDeltaSeconds});
+        const auto& application = app.stateBinding().value();
+        for (const auto& event : events.pending())
         {
-            const std::uint32_t floor = tower->run().context().floorIndex;
-            if (!feedbackFloor || *feedbackFloor != floor)
+            if (event.kind == arcane::common::UiEventKind::FloorChanged)
             {
                 combatFeedback.reset();
-                feedbackFloor = floor;
+                enemyAnimator.reset();
             }
-            tower->combat()->populateEnemyStates(frameEnemyStates);
-            tower->combat()->populateSpellEffects(frameSpellEffects);
-            const float feedbackDelta = !app.loadout().open() ? deltaSeconds : 0.0F;
-            combatFeedback.update(
-                tower->combat()->playerState(), frameEnemyStates, feedbackDelta);
-            const bool enemyAnimationAdvances = !app.loadout().open()
-                && !app.spellAcquisition().active()
-                && !tower->combat()->dialogueLine().has_value()
-                && !tower->combat()->bossIntro().has_value();
-            enemyAnimator.update(frameEnemyStates,
+        }
+        if (application.screen == arcane::common::ui::ApplicationScreen::Playing
+            && application.combat)
+        {
+            const float feedbackDelta = !application.loadout ? deltaSeconds : 0.0F;
+            combatFeedback.update(application.combat->player,
+                application.combat->enemies, feedbackDelta);
+            const bool enemyAnimationAdvances = !application.loadout
+                && !application.spellAcquisition
+                && !application.combat->dialogue
+                && !application.combat->bossIntro;
+            enemyAnimator.update(application.combat->enemies,
                 enemyAnimationAdvances ? simulationDeltaSeconds : 0.0F);
         }
         else
         {
             combatFeedback.reset();
             enemyAnimator.reset();
-            feedbackFloor.reset();
         }
         const auto presentationState = updatePresentationState(
-            app, playerAnimator, simulationDeltaSeconds);
+            application, playerAnimator, simulationDeltaSeconds);
         if (presentationState)
         {
-            const bool shadeTimeAdvances = application.screen == ui::ApplicationScreen::Playing
-                && !app.loadout().open() && !app.spellAcquisition().active();
+            const bool shadeTimeAdvances = application.screen
+                    == arcane::common::ui::ApplicationScreen::Playing
+                && !application.loadout && !application.spellAcquisition;
             shadeChargeAnimator.update(*presentationState,
                 shadeTimeAdvances ? deltaSeconds : 0.0F);
         }
         else
             shadeChargeAnimator.reset();
         updateWindowTitle(window, app, displayedWindowTitle);
-        renderApplicationFrame(window, app, presentationState, renderResources,
-            combatFeedback.snapshot(), frameEnemyStates, frameSpellEffects);
+        renderApplicationFrame(window, application, presentationState, renderResources,
+            combatFeedback.snapshot());
+        events.acknowledge();
     }
 
     return 0;
