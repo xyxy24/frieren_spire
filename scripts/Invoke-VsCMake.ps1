@@ -93,8 +93,8 @@ $arguments = switch ($Action) {
     "configure" { @("--preset", $configurePreset) }
     "build-debug" { @("--build", "--preset", $debugBuildPreset) }
     "build-release" { @("--build", "--preset", $releaseBuildPreset) }
-    "test-debug" { @("--build", "--preset", $debugBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests") }
-    "test-release" { @("--build", "--preset", $releaseBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests") }
+    "test-debug" { @("--build", "--preset", $debugBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests", "binding_contract_tests", "ui_viewmodel_tests") }
+    "test-release" { @("--build", "--preset", $releaseBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests", "binding_contract_tests", "ui_viewmodel_tests") }
 }
 
 & $cmake @arguments

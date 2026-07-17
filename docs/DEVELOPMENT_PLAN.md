@@ -293,6 +293,8 @@
 - 固定种子能重现本次测试场景。
 - 没有把用户本地文件、构建产物、未知许可资产加入交付。
 - 游戏规则变化已同步到 `GAME_DESIGN.md`，系统边界变化已同步到 `ARCHITECTURE.md`。
+- UI 状态流转通过无窗口的 ViewModel 快照测试验证，避免自动化环境依赖图形桌面。
+- GitHub Actions 在每次 push 与 pull request 时使用 Windows/Visual Studio 2022 完成 Debug 构建和完整 CTest；CI 通过后方可视为分支可集成。
 
 ## 13. 紧接着要做的事情
 

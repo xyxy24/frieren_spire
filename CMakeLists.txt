@@ -179,6 +179,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(binding_contract_tests PRIVATE arcane_viewmodel)
 
+    add_executable(ui_viewmodel_tests
+        tests/ui_viewmodel_tests.cpp
+    )
+    target_link_libraries(ui_viewmodel_tests PRIVATE arcane_viewmodel)
+
     arcane_enable_warnings(arcane_core_tests)
     arcane_enable_warnings(combat_session_tests)
     arcane_enable_warnings(run_flow_tests)
@@ -186,6 +191,7 @@ if(BUILD_TESTING)
     arcane_enable_warnings(arena_layout_tests)
     arcane_enable_warnings(sfml_input_mapper_tests)
     arcane_enable_warnings(binding_contract_tests)
+    arcane_enable_warnings(ui_viewmodel_tests)
 
     add_test(NAME player_controller COMMAND arcane_core_tests)
     add_test(NAME combat_session COMMAND combat_session_tests)
@@ -194,6 +200,7 @@ if(BUILD_TESTING)
     add_test(NAME arena_layout COMMAND arena_layout_tests)
     add_test(NAME sfml_input_mapper COMMAND sfml_input_mapper_tests)
     add_test(NAME binding_contract COMMAND binding_contract_tests)
+    add_test(NAME ui_viewmodel COMMAND ui_viewmodel_tests)
     add_test(NAME view_dependency_boundary
         COMMAND ${CMAKE_COMMAND}
             -DPROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
