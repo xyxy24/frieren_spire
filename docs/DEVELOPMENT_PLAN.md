@@ -295,6 +295,7 @@
 - 游戏规则变化已同步到 `GAME_DESIGN.md`，系统边界变化已同步到 `ARCHITECTURE.md`。
 - UI 状态流转通过无窗口的 ViewModel 快照测试验证，避免自动化环境依赖图形桌面。
 - GitHub Actions 在每次 push 与 pull request 时使用 Windows/Visual Studio 2022 完成 Debug 构建和完整 CTest；CI 通过后方可视为分支可集成。
+- 提供独立的 `ui_window_smoke_test` 可视化冒烟测试供现场验收；该目标打开真实 SFML 窗口并自动演示关键 UI 流转，但不加入默认 CTest/CI。
 
 ## 13. 紧接着要做的事情
 

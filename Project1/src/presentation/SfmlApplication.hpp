@@ -6,5 +6,9 @@ class SfmlApplication
 {
 public:
     int run();
+    int runVisualSmokeTest();
+
+private:
+    int runImpl(bool visualSmokeTest);
 };
 }

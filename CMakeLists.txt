@@ -184,6 +184,21 @@ if(BUILD_TESTING)
     )
     target_link_libraries(ui_viewmodel_tests PRIVATE arcane_viewmodel)
 
+    # This manual visual smoke test opens a real SFML window. Keep it outside
+    # the default build/CTest run so headless CI remains deterministic.
+    add_executable(ui_window_smoke_test EXCLUDE_FROM_ALL
+        tests/ui_window_smoke_test.cpp
+        Project1/src/platform/SfmlInputMapper.cpp
+        Project1/src/presentation/SfmlApplication.cpp
+    )
+    target_link_libraries(ui_window_smoke_test PRIVATE
+        arcane_viewmodel
+        arcane_sfml_view
+        SFML::Graphics
+        SFML::Window
+        SFML::System
+    )
+
     arcane_enable_warnings(arcane_core_tests)
     arcane_enable_warnings(combat_session_tests)
     arcane_enable_warnings(run_flow_tests)
@@ -192,6 +207,23 @@ if(BUILD_TESTING)
     arcane_enable_warnings(sfml_input_mapper_tests)
     arcane_enable_warnings(binding_contract_tests)
     arcane_enable_warnings(ui_viewmodel_tests)
+    arcane_enable_warnings(ui_window_smoke_test)
+
+    add_custom_command(TARGET ui_window_smoke_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:ui_window_smoke_test>/assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/player/processed
+            $<TARGET_FILE_DIR:ui_window_smoke_test>/assets/player
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/spells/processed
+            $<TARGET_FILE_DIR:ui_window_smoke_test>/assets/spells
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/Project1/assets/spell_cards
+            $<TARGET_FILE_DIR:ui_window_smoke_test>/assets/spell_cards
+        COMMENT "Copying runtime assets for visual UI smoke test"
+    )
 
     add_test(NAME player_controller COMMAND arcane_core_tests)
     add_test(NAME combat_session COMMAND combat_session_tests)

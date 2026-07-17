@@ -19,6 +19,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <optional>
 #include <random>
 #include <span>
@@ -266,11 +267,68 @@ void renderApplicationFrame(sf::RenderWindow& window,
                 focusPosition);
         }
     }
-    window.display();
+}
+
+bool visualSmokeStateMatches(const std::size_t step,
+    const arcane::common::ui::ApplicationState& state,
+    const std::optional<float> initialPlayerX)
+{
+    using arcane::common::ui::ApplicationScreen;
+    using arcane::common::ui::PauseMenuItem;
+    switch (step)
+    {
+    case 0U: return state.screen == ApplicationScreen::Start && !state.canContinue;
+    case 1U: return state.screen == ApplicationScreen::Playing && state.combat.has_value();
+    case 2U: return state.combat && initialPlayerX
+            && state.combat->player.position.x > *initialPlayerX + 30.0F;
+    case 3U: return state.combat && (!state.combat->player.grounded
+            || state.combat->player.velocity.y < 0.0F);
+    case 4U: return state.combat && state.combat->player.attackSequence > 0U;
+    case 5U: return state.combat && (state.combat->player.dashRemaining > 0.0F
+            || state.combat->player.shadowDashing);
+    case 6U: return state.screen == ApplicationScreen::Pause
+            && state.pauseMenuItem == PauseMenuItem::ReplayCurrentFloor;
+    case 7U: return state.screen == ApplicationScreen::Pause
+            && state.pauseMenuItem == PauseMenuItem::SaveAndExit;
+    case 8U: return state.screen == ApplicationScreen::Start && state.canContinue;
+    case 9U: return state.screen == ApplicationScreen::Playing && state.combat.has_value();
+    case 10U: return state.screen == ApplicationScreen::Playing && state.loadout.has_value();
+    case 11U: return state.screen == ApplicationScreen::Playing && !state.loadout.has_value();
+    default: return false;
+    }
+}
+
+void drawVisualSmokeStatus(sf::RenderTarget& target, const std::size_t step,
+    const bool finished, const bool passed)
+{
+    constexpr std::array<std::string_view, 12> Names {"START SCREEN", "START TO PLAYING",
+        "MOVE RIGHT", "JUMP", "BASIC ATTACK", "DASH", "PLAYING TO PAUSE",
+        "SELECT SAVE AND EXIT", "EXIT TO CONTINUE SCREEN", "CONTINUE TO PLAYING",
+        "OPEN LOADOUT OVERLAY", "CLOSE LOADOUT OVERLAY"};
+    sf::RectangleShape status({static_cast<float>(WindowWidth), 76.0F});
+    status.setFillColor(sf::Color {7, 9, 18, 225});
+    target.draw(status);
+    drawPixelText(target, "REAL VIEW UI SMOKE TEST", {22.0F, 12.0F}, 1.35F,
+        sf::Color {145, 218, 255});
+    const std::string message = finished
+        ? (passed ? "PASS - REAL GAME UI VERIFIED" : "FAIL - UI STATE MISMATCH")
+        : "STEP " + std::to_string(step + 1U) + "/12 - " + std::string {Names[step]};
+    drawPixelText(target, message, {22.0F, 43.0F}, 1.05F,
+        passed ? sf::Color {125, 232, 155} : sf::Color {240, 100, 110});
 }
 }
 
 int arcane::presentation::SfmlApplication::run()
+{
+    return runImpl(false);
+}
+
+int arcane::presentation::SfmlApplication::runVisualSmokeTest()
+{
+    return runImpl(true);
+}
+
+int arcane::presentation::SfmlApplication::runImpl(const bool visualSmokeTest)
 {
     sf::RenderWindow window(sf::VideoMode({WindowWidth, WindowHeight}), "Arcane Spire");
     window.setVerticalSyncEnabled(true);
@@ -291,7 +349,7 @@ int arcane::presentation::SfmlApplication::run()
     arcane::platform::SfmlInputMapper inputMapper;
     arcane::app::TowerSessionConfig config;
     config.worldBounds = {0.0F, static_cast<float>(WindowWidth), GroundTop};
-    ui::ApplicationViewModel app(makeRuntimeSeed(), config);
+    ui::ApplicationViewModel app(visualSmokeTest ? 0x51A7E123U : makeRuntimeSeed(), config);
     const EnemyStateTextures headlessKnightTextures = loadEnemyStateTextures(
         "assets/enemies/headless_knight/", false, false, true, false, true);
     const EnemyStateTextures chestMimicTextures = loadEnemyStateTextures(
@@ -519,6 +577,16 @@ int arcane::presentation::SfmlApplication::run()
     ui::CombatFeedbackViewModel combatFeedback;
     arcane::common::binding::ICommandBinding<arcane::common::FrameCommand>& commands = app;
     auto& events = app.eventBinding();
+    constexpr std::size_t SmokeStepCount = 12U;
+    std::size_t smokeStep = 0U;
+    bool smokePassed = !visualSmokeTest || visualSmokeStateMatches(0U,
+        app.stateBinding().value(), std::nullopt);
+    bool smokeStepObserved = smokePassed;
+    bool smokeFirstFrame = false;
+    bool smokeFinished = false;
+    std::optional<float> smokeInitialPlayerX;
+    sf::Clock smokeClock;
+    sf::Clock smokeFinishedClock;
 
     while (window.isOpen())
     {
@@ -536,7 +604,53 @@ int arcane::presentation::SfmlApplication::run()
             && beforeUpdate.combat && beforeUpdate.run
             && beforeUpdate.run->phase == arcane::common::ui::GameplayPhase::InEncounter)
             simulationDeltaSeconds = combatFeedback.combatDeltaSeconds(deltaSeconds);
-        commands.execute({inputMapper.sample(), simulationDeltaSeconds});
+        arcane::common::InputState frameInput = inputMapper.sample();
+        if (visualSmokeTest)
+        {
+            frameInput = {};
+            if (!smokeFinished && smokeClock.getElapsedTime().asSeconds() >= 1.25F)
+            {
+                if (!smokeStepObserved)
+                    std::cerr << "Visual UI smoke test failed at step "
+                        << (smokeStep + 1U) << '.\n';
+                smokePassed = smokePassed && smokeStepObserved;
+                if (smokeStep + 1U < SmokeStepCount)
+                {
+                    ++smokeStep;
+                    smokeStepObserved = false;
+                    smokeFirstFrame = true;
+                    smokeClock.restart();
+                }
+                else
+                {
+                    smokeFinished = true;
+                    smokeFinishedClock.restart();
+                }
+            }
+            if (smokeStep == 2U) frameInput.moveAxis = 1.0F;
+            if (smokeStep == 3U) frameInput.jumpPressed = true;
+            if (smokeStep == 4U) frameInput.attackPressed = true;
+            if (smokeStep == 5U) frameInput.dashPressed = true;
+            if (smokeFirstFrame)
+            {
+                if (smokeStep == 1U || smokeStep == 8U || smokeStep == 9U)
+                    frameInput.menuConfirmPressed = true;
+                else if (smokeStep == 6U) frameInput.pausePressed = true;
+                else if (smokeStep == 7U) frameInput.menuDownPressed = true;
+                else if (smokeStep == 10U || smokeStep == 11U)
+                    frameInput.toggleLoadoutPressed = true;
+                smokeFirstFrame = false;
+            }
+        }
+        commands.execute({frameInput, simulationDeltaSeconds});
+        if (visualSmokeTest && !smokeFinished)
+        {
+            if (smokeStep == 1U && !smokeInitialPlayerX
+                && app.stateBinding().value().combat)
+                smokeInitialPlayerX = app.stateBinding().value().combat->player.position.x;
+            smokeStepObserved = smokeStepObserved || visualSmokeStateMatches(smokeStep,
+                app.stateBinding().value(), smokeInitialPlayerX);
+        }
         const auto& application = app.stateBinding().value();
         for (const auto& event : events.pending())
         {
@@ -579,8 +693,14 @@ int arcane::presentation::SfmlApplication::run()
         updateWindowTitle(window, app, displayedWindowTitle);
         renderApplicationFrame(window, application, presentationState, renderResources,
             combatFeedback.snapshot());
+        if (visualSmokeTest)
+            drawVisualSmokeStatus(window, smokeStep, smokeFinished, smokePassed);
+        window.display();
         events.acknowledge();
+        if (visualSmokeTest && smokeFinished
+            && smokeFinishedClock.getElapsedTime().asSeconds() >= 3.0F)
+            window.close();
     }
 
-    return 0;
+    return !visualSmokeTest || (smokePassed && smokeFinished) ? 0 : 1;
 }
