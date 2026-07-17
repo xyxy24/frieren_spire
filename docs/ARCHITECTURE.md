@@ -196,6 +196,8 @@ stateDiagram-v2
 
 `CombatSession` 是 `CombatWorld` 的最小垂直切片，不是最终敌人或伤害框架。它只依赖纯 C++ 类型，SFML 主循环负责把键盘映射为意图并绘制只读状态。
 
+为控制战斗模块的单文件复杂度，`CombatSession` 的实现按职责分布在四个编译单元：`CombatSession.cpp` 保留生命周期、通用时间推进、伤害入口和快照投影；`CombatSessionSpellEffects.cpp` 处理玩家施法结果、范围伤害与遗物联动；`CombatSessionEnemySkills.cpp` 推进敌人及 Boss 主动技能；`CombatSessionBossRules.cpp` 处理 Boss 阶段切换、战前/战后对话和结束路由。这是同一个 Model 类型的内部实现拆分，所有权威状态仍由唯一的 `CombatSession` 实例持有，不新增全局状态、服务定位器或第二套伤害规则。
+
 - `SfmlInputMapper` 将跳跃、攻击、施法、交互和菜单等一次性动作从 SFML `KeyPressed` 事件缓冲到下一次模拟更新，防止低帧率下短按发生在两次实时轮询之间而丢失；窗口关闭系统按键重复。水平与垂直移动轴仍读取实时键盘状态，以保留持续按住的控制语义。
 - 内置像素字体把一次文本调用中的所有亮点合并为一个三角形顶点数组提交，UI 不得为每个字体像素单独产生一次绘制调用。该优化只影响表现性能，不改变奖励选择或其他领域状态转换。
 - `SpellCardArt` 独立加载 `assets/spell_cards/<spell-id>.png` 中的 33 张方形卡面，并以同一内容 ID 在奖励、商店、Tab 配装页和 HUD 槽位中绘制；它不读取或复用 `SpellEffectAnimator` 的战斗图集。卡面插画和 Boss 金色边框只属于表现层；魔法类别、可装备性、伤害、范围与冷却仍只读取领域定义和运行时快照。

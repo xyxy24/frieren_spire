@@ -34,9 +34,11 @@ out/
 *.lib
 *.exp
 
+# Local packaged releases
+dist/
+
 # Editor and OS files
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
-

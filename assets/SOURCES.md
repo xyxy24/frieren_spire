@@ -339,3 +339,10 @@
 - Added by: project team, 2026-07-16.
 - Original source/license: team-provided classroom prototype artwork.
 - Purpose: replace the geometric merchant placeholder in spatial merchant rooms.
+
+## Start-menu background
+
+- File: `ui/start-menu-background.png`.
+- Added by: project team with OpenAI image generation, 2026-07-17.
+- Original source/license: project-generated classroom prototype artwork.
+- Purpose: provide the pixel-art tower establishing shot behind the start-menu UI.

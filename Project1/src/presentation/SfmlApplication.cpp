@@ -230,6 +230,7 @@ struct RenderResources
     const std::array<std::optional<sf::Texture>, 3>& southernHeroCards;
     const std::optional<sf::Texture>& southernHeroNpc;
     const std::optional<sf::Texture>& merchantNpc;
+    const std::optional<sf::Texture>& startMenuBackground;
     const arcane::presentation::EnemyAnimator& enemyAnimator;
     const arcane::presentation::LootBookAnimator& lootBookAnimator;
     const arcane::presentation::PlayerAnimator& playerAnimator;
@@ -249,7 +250,22 @@ void renderApplicationFrame(sf::RenderWindow& window, const ui::ApplicationViewM
     if (application.screen == ui::ApplicationScreen::Result)
         background = application.victory ? sf::Color {20, 67, 49} : sf::Color {68, 24, 31};
     window.clear(background);
-    if (application.screen == ui::ApplicationScreen::Start) drawStartMenu(window, application.canContinue);
+    if (application.screen == ui::ApplicationScreen::Start)
+    {
+        if (resources.startMenuBackground)
+        {
+            const sf::Vector2u textureSize = resources.startMenuBackground->getSize();
+            sf::Sprite backdrop(*resources.startMenuBackground);
+            backdrop.setScale({static_cast<float>(WindowWidth) / static_cast<float>(textureSize.x),
+                static_cast<float>(WindowHeight) / static_cast<float>(textureSize.y)});
+            window.draw(backdrop);
+            sf::RectangleShape readabilityVeil({static_cast<float>(WindowWidth),
+                static_cast<float>(WindowHeight)});
+            readabilityVeil.setFillColor(sf::Color {5, 8, 18, 38});
+            window.draw(readabilityVeil);
+        }
+        drawStartMenu(window, application.canContinue);
+    }
     else if (application.screen == ui::ApplicationScreen::Pause) drawPauseMenu(window, application.pauseMenuItem);
     else if (application.screen == ui::ApplicationScreen::Result)
     {
@@ -574,6 +590,8 @@ int arcane::presentation::SfmlApplication::run()
         loadTexture("assets/npcs/hero_of_the_south.png");
     const std::optional<sf::Texture> merchantNpcTexture =
         loadTexture("assets/npcs/merchant.png");
+    const std::optional<sf::Texture> startMenuBackgroundTexture =
+        loadTexture("assets/ui/start-menu-background.png");
     arcane::presentation::EnemyAnimator enemyAnimator;
     arcane::presentation::PlayerAnimator playerAnimator;
     static_cast<void>(playerAnimator.loadFromDirectory("assets/player"));
@@ -605,6 +623,7 @@ int arcane::presentation::SfmlApplication::run()
         swordVillageCardTextures, swordVillageNpcTexture,
         southernHeroCardTextures, southernHeroNpcTexture,
         merchantNpcTexture,
+        startMenuBackgroundTexture,
         enemyAnimator, lootBookAnimator, playerAnimator,
         shadeChargeAnimator, spellCards,
         spellEffectAnimator};

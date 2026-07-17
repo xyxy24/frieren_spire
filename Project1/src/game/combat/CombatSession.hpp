@@ -148,10 +148,15 @@ private:
     };
     struct ActiveSpellEffect
     {
+        enum class Anchor : std::uint8_t { World, Player, Enemy };
+
         std::uint32_t spellId {};
         Aabb bounds;
         float remaining {};
         float duration {};
+        float facingDirection {1.0F};
+        Anchor anchor {Anchor::World};
+        std::size_t enemyIndex {};
     };
     struct PendingSpellImpact
     {
@@ -162,6 +167,8 @@ private:
         std::uint64_t sequence {};
         DamageSource source {DamageSource::PlayerUltimateSpell};
         float multiplier {1.0F};
+        int frozenBonusDamage {};
+        std::vector<std::size_t> frozenEnemyIndices;
     };
     struct ActivePillar { Aabb bounds; float remaining {}; };
     struct ActiveTornado
@@ -236,6 +243,15 @@ private:
     static constexpr int AuraGuillotineDamage = 22;
     [[nodiscard]] WorldBounds movementBoundsFor(const EnemyRuntime& enemy) const noexcept;
     [[nodiscard]] bool updateEnemySkills(float deltaSeconds, float playerCenter);
+    [[nodiscard]] static std::optional<std::size_t> regularSlotForSource(DamageSource source) noexcept;
+    void onActiveHit(EnemyRuntime& enemy, DamageSource source, std::uint64_t sequence);
+    void damageEnemies(DamageSource source, std::uint64_t sequence, int damage,
+        float multiplier, const Aabb& area);
+    void onInterrupt(EnemyRuntime& enemy);
+    void applyCast(const spells::SpellCastResult& cast, DamageSource source,
+        const spells::SpellDefinition* definition);
+    [[nodiscard]] bool updateBossPhaseRules();
+    void resolveCombatEnd();
     void clearCombatTransientEffects() noexcept;
     [[nodiscard]] Aabb firstLivingEnemyBounds() const noexcept;
     void finish(CombatOutcome outcome) noexcept;

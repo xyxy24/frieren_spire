@@ -25,7 +25,9 @@ add_library(arcane_core STATIC
     Project1/src/app/run/TowerSession.cpp
     Project1/src/game/combat/AttackState.cpp
     Project1/src/game/combat/CombatSession.cpp
+    Project1/src/game/combat/CombatSessionBossRules.cpp
     Project1/src/game/combat/CombatSessionEnemySkills.cpp
+    Project1/src/game/combat/CombatSessionSpellEffects.cpp
     Project1/src/game/combat/DamageResolver.cpp
     Project1/src/game/combat/Health.cpp
     Project1/src/game/player/PlayerController.cpp

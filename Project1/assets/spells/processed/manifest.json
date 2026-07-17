@@ -268,7 +268,7 @@
     "frameHeight": 192,
     "anchorX": 96,
     "anchorY": 176,
-    "framesPerSecond": 14,
+    "framesPerSecond": 8,
     "loops": false,
     "alignBottom": true
   },
@@ -294,7 +294,7 @@
     "frameHeight": 192,
     "anchorX": 96,
     "anchorY": 176,
-    "framesPerSecond": 16,
+    "framesPerSecond": 12.5,
     "loops": false,
     "alignBottom": true
   },

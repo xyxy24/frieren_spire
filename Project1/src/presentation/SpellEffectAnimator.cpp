@@ -75,9 +75,9 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     {"magic-thread.png", 8U, 96, 96, 48.0F, 48.0F, 16.0F, false},
     {"golden-binding.png", 8U, 96, 96, 48.0F, 48.0F, 14.0F, false},
     {"sealing-magic.png", 8U, 96, 96, 48.0F, 48.0F, 14.0F, false},
-    {"float-slam.png", 8U, 192, 192, 96.0F, 176.0F, 14.0F, true},
+    {"float-slam.png", 8U, 192, 192, 96.0F, 176.0F, 8.0F, true},
     {"goddess-spears.png", 10U, 192, 192, 96.0F, 176.0F, 14.0F, true},
-    {"destruction-lightning.png", 10U, 192, 192, 96.0F, 176.0F, 16.0F, true},
+    {"destruction-lightning.png", 10U, 192, 192, 96.0F, 176.0F, 12.5F, true},
     {"earth-domination.png", 10U, 192, 192, 96.0F, 176.0F, 12.0F, true},
     {"phantom.png", 10U, 128, 96, 64.0F, 92.0F, 12.0F, true},
     {"stone-golem.png", 10U, 128, 96, 64.0F, 92.0F, 10.0F, true},
@@ -148,6 +148,8 @@ constexpr std::array<ClipDefinition, SpellEffectAnimator::ClipCount> ClipDefinit
     case game::MirrorArrayBreakVisualId:
         return SpellBinding {26U, VisualLayout::CasterBottom, 1.2F, false,
             NoLoop, NoLoop, 6U, 8U};
+    case game::ZoltraakMuzzleVisualId:
+        return SpellBinding {5U, VisualLayout::Endpoint, 1.0F, true};
     default: return std::nullopt;
     }
 }
@@ -201,7 +203,7 @@ bool SpellEffectAnimator::loadFromDirectory(const std::filesystem::path& directo
 }
 
 bool SpellEffectAnimator::draw(sf::RenderTarget& target, const game::SpellEffectView& effect,
-    const float playerFacingDirection, const float groundTop) const
+    const float groundTop) const
 {
     const std::optional<SpellBinding> binding = bindingFor(effect.spellId);
     if (!binding) return false;
@@ -211,7 +213,7 @@ bool SpellEffectAnimator::draw(sf::RenderTarget& target, const game::SpellEffect
     const ClipDefinition& definition = ClipDefinitions[binding->clipIndex];
 
     const std::uint32_t frame = frameFor(definition, *binding, effect);
-    const float horizontalDirection = binding->directional && playerFacingDirection < 0.0F
+    const float horizontalDirection = binding->directional && effect.facingDirection < 0.0F
         ? -1.0F : 1.0F;
 
     const auto drawFrame = [&](const sf::Vector2f position, const float scale,
@@ -235,7 +237,7 @@ bool SpellEffectAnimator::draw(sf::RenderTarget& target, const game::SpellEffect
 
     const float centerX = effect.bounds.left + effect.bounds.width * 0.5F;
     const float centerY = effect.bounds.top + effect.bounds.height * 0.5F;
-    const float endpointX = playerFacingDirection < 0.0F
+    const float endpointX = effect.facingDirection < 0.0F
         ? effect.bounds.left : effect.bounds.left + effect.bounds.width;
 
     if (binding->layout == VisualLayout::Hellfire)
@@ -330,7 +332,7 @@ bool SpellEffectAnimator::draw(sf::RenderTarget& target, const game::SpellEffect
     sf::Vector2f position {centerX, centerY};
     if (binding->layout == VisualLayout::CasterBottom
         || binding->layout == VisualLayout::GroundCenter)
-        position.y = groundTop;
+        position.y = effect.bounds.top + effect.bounds.height;
     else if (binding->layout == VisualLayout::Endpoint)
         position.x = endpointX;
     drawFrame(position, binding->scale, 0U);

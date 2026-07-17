@@ -424,8 +424,11 @@ bool collectibleSpellsEmitEffectPlaceholders()
         cast.spellPressed[0] = true;
         combat.update(cast, 0.01F);
         const auto effects = combat.spellEffects();
-        if (!expect(effects.size() == 1U && effects.front().spellId == id
-                && effects.front().bounds.width > 0.0F && effects.front().bounds.height > 0.0F,
+        const auto primary = std::find_if(effects.begin(), effects.end(), [id](const auto& effect) {
+            return effect.spellId == id;
+        });
+        if (!expect(primary != effects.end()
+                && primary->bounds.width > 0.0F && primary->bounds.height > 0.0F,
             "every collectible spell must emit a non-empty effect placeholder")) return false;
     }
     return true;
@@ -510,6 +513,171 @@ bool everySpellEffectKeepsItsCompleteVisualTimeline()
                 "a spell visual timeline must be long enough to reach its final frame")) return false;
     }
     return true;
+}
+
+bool spellVisualsSnapshotDirectionTrackOwnersAndAvoidDuplicates()
+{
+    auto directionRequest = adjacentEnemyRequest();
+    directionRequest.enemyMaximumHealth = 100000;
+    directionRequest.enemyContactDamage = 0;
+    directionRequest.enemyAttackDamage = 0;
+    directionRequest.equippedSpellIds[0] = 1006U;
+    arcane::game::CombatSession directionCombat(directionRequest);
+    arcane::game::PlayerIntent castFlame;
+    castFlame.spellPressed[0] = true;
+    directionCombat.update(castFlame, 0.01F);
+    arcane::game::PlayerIntent turnLeft;
+    turnLeft.moveAxis = -1.0F;
+    directionCombat.update(turnLeft, 0.01F);
+    const auto flameEffects = directionCombat.spellEffects();
+    const auto flame = std::find_if(flameEffects.begin(), flameEffects.end(), [](const auto& effect) {
+        return effect.spellId == 1006U;
+    });
+    if (!expect(directionCombat.playerState().facingDirection < 0.0F,
+            "the player must be able to turn after casting")
+        || !expect(flame != flameEffects.end() && flame->facingDirection > 0.0F,
+            "directional spell visuals must retain their cast-time direction")) return false;
+
+    auto barrierRequest = adjacentEnemyRequest();
+    barrierRequest.enemySpawn = {1000.0F, 576.0F};
+    barrierRequest.enemyMaximumHealth = 100000;
+    barrierRequest.enemyContactDamage = 0;
+    barrierRequest.enemyAttackDamage = 0;
+    barrierRequest.equippedSpellIds[0] = 1028U;
+    arcane::game::CombatSession barrierCombat(barrierRequest);
+    arcane::game::PlayerIntent castBarrier;
+    castBarrier.spellPressed[0] = true;
+    barrierCombat.update(castBarrier, 0.01F);
+    const float initialLeft = barrierCombat.spellEffects().front().bounds.left;
+    arcane::game::PlayerIntent moveRight;
+    moveRight.moveAxis = 1.0F;
+    barrierCombat.update(moveRight, 0.20F);
+    const auto barrierEffects = barrierCombat.spellEffects();
+    const auto barrier = std::find_if(barrierEffects.begin(), barrierEffects.end(), [](const auto& effect) {
+        return effect.spellId == 1028U;
+    });
+    if (!expect(barrier != barrierEffects.end() && barrier->bounds.left > initialLeft,
+            "player-owned persistent visuals must follow the moving player")) return false;
+
+    auto masteredRequest = adjacentEnemyRequest();
+    masteredRequest.enemyMaximumHealth = 100000;
+    masteredRequest.enemyContactDamage = 0;
+    masteredRequest.enemyAttackDamage = 0;
+    masteredRequest.equippedSpellIds[0] = 1001U;
+    masteredRequest.equippedSpellRanks[0] = 3U;
+    arcane::game::CombatSession masteredCombat(masteredRequest);
+    arcane::game::PlayerIntent castFlowerField;
+    castFlowerField.spellPressed[0] = true;
+    masteredCombat.update(castFlowerField, 0.01F);
+    const auto masteredEffects = masteredCombat.spellEffects();
+    const auto flower = std::find_if(masteredEffects.begin(), masteredEffects.end(), [](const auto& effect) {
+        return effect.spellId == 1001U;
+    });
+    if (!expect(flower != masteredEffects.end() && std::abs(flower->duration - 5.2F) < 0.001F,
+            "mastery duration must extend both persistent gameplay and its visual")) return false;
+
+    auto earthRequest = adjacentEnemyRequest();
+    earthRequest.enemyMaximumHealth = 100000;
+    earthRequest.enemyContactDamage = 0;
+    earthRequest.enemyAttackDamage = 0;
+    earthRequest.equippedUltimateSpellId = 2011U;
+    arcane::game::CombatSession earthCombat(earthRequest);
+    arcane::game::PlayerIntent castEarth;
+    castEarth.ultimateSpellPressed = true;
+    earthCombat.update(castEarth, 0.01F);
+    const auto earthEffects = earthCombat.spellEffects();
+    if (!expect(std::count_if(earthEffects.begin(), earthEffects.end(), [](const auto& effect) {
+            return effect.spellId == 2011U;
+        }) == 1,
+        "Earth Dominion must render its three-pillar sheet once instead of four copies"))
+        return false;
+
+    arcane::game::CombatRequest elevatedRequest;
+    elevatedRequest.playerSpawn = {120.0F, 576.0F};
+    elevatedRequest.enemyContactDamage = 0;
+    elevatedRequest.enemyAttackDamage = 0;
+    elevatedRequest.equippedUltimateSpellId = 2007U;
+    elevatedRequest.enemies = {{arcane::game::EnemyArchetype::Richter, {620.0F, 480.0F},
+        arcane::game::WorldBounds {500.0F, 800.0F, 480.0F}, false}};
+    arcane::game::CombatSession elevatedCombat(elevatedRequest);
+    arcane::game::PlayerIntent castLightning;
+    castLightning.ultimateSpellPressed = true;
+    elevatedCombat.update(castLightning, 0.01F);
+    const auto elevatedEnemy = elevatedCombat.enemyState();
+    const auto elevatedEffects = elevatedCombat.spellEffects();
+    const auto lightning = std::find_if(elevatedEffects.begin(), elevatedEffects.end(),
+        [](const auto& effect) { return effect.spellId == 2007U; });
+    if (!expect(lightning != elevatedEffects.end()
+            && std::abs(lightning->bounds.top + lightning->bounds.height
+                - (elevatedEnemy.position.y + elevatedEnemy.height)) < 0.001F,
+            "grounded target effects must anchor to an elevated enemy's platform surface"))
+        return false;
+
+    auto muzzleRequest = adjacentEnemyRequest();
+    muzzleRequest.enemyMaximumHealth = 100000;
+    muzzleRequest.enemyContactDamage = 0;
+    muzzleRequest.enemyAttackDamage = 0;
+    muzzleRequest.equippedSpellIds[0] = 1004U;
+    arcane::game::CombatSession muzzleCombat(muzzleRequest);
+    arcane::game::PlayerIntent castZoltraak;
+    castZoltraak.spellPressed[0] = true;
+    muzzleCombat.update(castZoltraak, 0.01F);
+    const auto muzzleEffects = muzzleCombat.spellEffects();
+    return expect(std::any_of(muzzleEffects.begin(), muzzleEffects.end(), [](const auto& effect) {
+            return effect.spellId == arcane::game::ZoltraakMuzzleVisualId
+                && std::abs(effect.duration - 0.4F) < 0.001F;
+        }), "Zoltraak-family spells must play their dedicated muzzle sheet");
+}
+
+bool targetingAndDamageModifiersAreConsistentAcrossSpellResolvers()
+{
+    auto markedRequest = adjacentEnemyRequest();
+    markedRequest.enemyMaximumHealth = 1000;
+    markedRequest.enemyContactDamage = 0;
+    markedRequest.enemyAttackDamage = 0;
+    markedRequest.equippedSpellIds[0] = 1016U;
+    markedRequest.equippedUltimateSpellId = 2001U;
+    arcane::game::CombatSession markedCombat(markedRequest);
+    arcane::game::PlayerIntent trace;
+    trace.spellPressed[0] = true;
+    markedCombat.update(trace, 0.01F);
+    arcane::game::PlayerIntent zoltraak;
+    zoltraak.ultimateSpellPressed = true;
+    markedCombat.update(zoltraak, 0.01F);
+    if (!expect(markedCombat.enemyState().currentHealth == 922,
+            "marked damage must apply to direct Boss-spell resolution through the central resolver"))
+        return false;
+
+    auto demonRequest = adjacentEnemyRequest();
+    demonRequest.enemyMaximumHealth = 1000;
+    demonRequest.enemyContactDamage = 0;
+    demonRequest.enemyAttackDamage = 0;
+    demonRequest.enemyArchetype = arcane::game::EnemyArchetype::Qual;
+    demonRequest.equippedUltimateSpellId = 2001U;
+    arcane::game::CombatSession demonCombat(demonRequest);
+    demonCombat.update(zoltraak, 0.01F);
+    if (!expect(demonCombat.enemyState().currentHealth == 909,
+            "Demon Killing Zoltraak must recognize every configured demon archetype")) return false;
+
+    arcane::game::CombatRequest targetRequest;
+    targetRequest.playerSpawn = {160.0F, 576.0F};
+    targetRequest.enemyMaximumHealth = 1000;
+    targetRequest.enemyContactDamage = 0;
+    targetRequest.enemyAttackDamage = 0;
+    targetRequest.equippedSpellIds[0] = 1027U;
+    targetRequest.enemies = {
+        {arcane::game::EnemyArchetype::HeadlessKnight, {460.0F, 576.0F}},
+        {arcane::game::EnemyArchetype::HeadlessKnight, {250.0F, 576.0F}}
+    };
+    arcane::game::CombatSession targetCombat(targetRequest);
+    arcane::game::PlayerIntent volley;
+    volley.spellPressed[0] = true;
+    targetCombat.update(volley, 0.01F);
+    const auto targets = targetCombat.enemyStates();
+    return expect(targets[0].currentHealth == targets[0].maximumHealth,
+            "target-area spells must not select the first configured enemy when it is farther away")
+        && expect(targets[1].currentHealth == targets[1].maximumHealth - 21,
+            "Homing Volley must strike the nearest valid living enemy");
 }
 
 bool secondarySpellEffectsKeepTheirCompleteVisualTimelines()
@@ -2560,6 +2728,8 @@ int main()
         && innateActionsExposeSpellEffectPlaceholders()
         && collectibleSpellsEmitEffectPlaceholders()
         && everySpellEffectKeepsItsCompleteVisualTimeline()
+        && spellVisualsSnapshotDirectionTrackOwnersAndAvoidDuplicates()
+        && targetingAndDamageModifiersAreConsistentAcrossSpellResolvers()
         && secondarySpellEffectsKeepTheirCompleteVisualTimelines()
         && statefulSpellVisualsUseTheirMatchingTransitionPhases()
         && flameBurstUsesOneShotVisualAndSeparateBurningField()

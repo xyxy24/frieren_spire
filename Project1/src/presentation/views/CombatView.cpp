@@ -625,7 +625,7 @@ void drawCombat(sf::RenderTarget& target, const arcane::app::TowerSession& tower
         color.a = static_cast<std::uint8_t>(130.0F + 125.0F * life);
         rangeShape.setOutlineColor(color);
         rangeShape.setOutlineThickness(2.0F);
-        if (!spellEffectAnimator.draw(target, effect, player.facingDirection, GroundTop))
+        if (!spellEffectAnimator.draw(target, effect, GroundTop))
             target.draw(rangeShape);
     }
 
