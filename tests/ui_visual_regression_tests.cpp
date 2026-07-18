@@ -23,13 +23,16 @@ constexpr sf::Color BackgroundColor {18, 20, 28};
 constexpr int ChannelTolerance = 8;
 constexpr unsigned int TileWidth = WindowWidth / 2U;
 constexpr unsigned int TileHeight = WindowHeight / 2U;
+constexpr unsigned int TileGuard = 16U;
+constexpr unsigned int RenderTileWidth = TileWidth + TileGuard * 2U;
+constexpr unsigned int RenderTileHeight = TileHeight + TileGuard * 2U;
 // Channel tolerance absorbs tiny driver blending differences. More than nine
 // changed pixels at 1280x720 still fails, so even a single glyph regression is visible.
 constexpr double AllowedDifferentPixelRatio = 0.00001;
 
 static_assert(WindowWidth % TileWidth == 0U);
 static_assert(WindowHeight % TileHeight == 0U);
-static_assert(TileWidth <= 1024U && TileHeight <= 1024U);
+static_assert(RenderTileWidth <= 1024U && RenderTileHeight <= 1024U);
 
 enum class Scene
 {
@@ -84,26 +87,29 @@ void drawScene(sf::RenderTarget& target, Scene scene)
         for (unsigned int column = 0U; column < ColumnCount; ++column)
         {
             sf::RenderTexture target;
-            if (!target.resize({TileWidth, TileHeight}))
+            if (!target.resize({RenderTileWidth, RenderTileHeight}))
                 throw std::runtime_error("failed to create a UI render tile");
 
             const unsigned int logicalLeft = column * TileWidth;
             const unsigned int logicalTop = row * TileHeight;
             target.setView(sf::View {sf::FloatRect {
-                {static_cast<float>(logicalLeft), static_cast<float>(logicalTop)},
-                {static_cast<float>(TileWidth), static_cast<float>(TileHeight)}}});
+                {static_cast<float>(logicalLeft) - static_cast<float>(TileGuard),
+                    static_cast<float>(logicalTop) - static_cast<float>(TileGuard)},
+                {static_cast<float>(RenderTileWidth),
+                    static_cast<float>(RenderTileHeight)}}});
             target.clear(BackgroundColor);
             drawScene(target, scene);
             target.display();
 
             const sf::Image tile = target.getTexture().copyToImage();
-            if (tile.getSize() != sf::Vector2u {TileWidth, TileHeight})
+            if (tile.getSize() != sf::Vector2u {RenderTileWidth, RenderTileHeight})
                 throw std::runtime_error("UI render tile returned an unexpected image size");
             for (unsigned int y = 0U; y < TileHeight; ++y)
             {
                 for (unsigned int x = 0U; x < TileWidth; ++x)
                     result.setPixel(
-                        {logicalLeft + x, logicalTop + y}, tile.getPixel({x, y}));
+                        {logicalLeft + x, logicalTop + y},
+                        tile.getPixel({TileGuard + x, TileGuard + y}));
             }
         }
     }
