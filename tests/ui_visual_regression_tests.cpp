@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -20,9 +21,13 @@ using arcane::presentation::views::WindowWidth;
 
 constexpr sf::Color BackgroundColor {18, 20, 28};
 constexpr int ChannelTolerance = 8;
+constexpr unsigned int TileWidth = WindowWidth / 2U;
 // Channel tolerance absorbs tiny driver blending differences. More than nine
 // changed pixels at 1280x720 still fails, so even a single glyph regression is visible.
 constexpr double AllowedDifferentPixelRatio = 0.00001;
+
+static_assert(WindowWidth % TileWidth == 0U);
+static_assert(TileWidth <= 1024U && WindowHeight <= 1024U);
 
 enum class Scene
 {
@@ -69,11 +74,32 @@ void drawScene(sf::RenderTarget& target, Scene scene)
 
 [[nodiscard]] sf::Image render(Scene scene)
 {
-    sf::RenderTexture target({WindowWidth, WindowHeight});
-    target.clear(BackgroundColor);
-    drawScene(target, scene);
-    target.display();
-    return target.getTexture().copyToImage();
+    sf::Image result({WindowWidth, WindowHeight}, BackgroundColor);
+    constexpr unsigned int TileCount = WindowWidth / TileWidth;
+    for (unsigned int tileIndex = 0U; tileIndex < TileCount; ++tileIndex)
+    {
+        sf::RenderTexture target;
+        if (!target.resize({TileWidth, WindowHeight}))
+            throw std::runtime_error("failed to create a 640x720 UI render tile");
+
+        const unsigned int logicalLeft = tileIndex * TileWidth;
+        target.setView(sf::View {sf::FloatRect {
+            {static_cast<float>(logicalLeft), 0.0F},
+            {static_cast<float>(TileWidth), static_cast<float>(WindowHeight)}}});
+        target.clear(BackgroundColor);
+        drawScene(target, scene);
+        target.display();
+
+        const sf::Image tile = target.getTexture().copyToImage();
+        if (tile.getSize() != sf::Vector2u {TileWidth, WindowHeight})
+            throw std::runtime_error("UI render tile returned an unexpected image size");
+        for (unsigned int y = 0U; y < WindowHeight; ++y)
+        {
+            for (unsigned int x = 0U; x < TileWidth; ++x)
+                result.setPixel({logicalLeft + x, y}, tile.getPixel({x, y}));
+        }
+    }
+    return result;
 }
 
 [[nodiscard]] int channelDelta(sf::Color left, sf::Color right)
@@ -150,59 +176,69 @@ int main(int argc, char** argv)
         updateBaselines ? baselineDirectory : artifactDirectory);
 
     bool allPassed = true;
-    for (const Scenario& scenario : Scenarios)
+    try
     {
-        const sf::Image actual = render(scenario.scene);
-        const std::filesystem::path baselinePath =
-            baselineDirectory / (std::string {scenario.name} + ".png");
+        for (const Scenario& scenario : Scenarios)
+        {
+            const sf::Image actual = render(scenario.scene);
+            const std::filesystem::path baselinePath =
+                baselineDirectory / (std::string {scenario.name} + ".png");
 
-        if (updateBaselines)
-        {
-            allPassed = saveImage(actual, baselinePath) && allPassed;
-            std::cout << "Updated baseline: " << baselinePath << '\n';
-            continue;
-        }
+            if (updateBaselines)
+            {
+                allPassed = saveImage(actual, baselinePath) && allPassed;
+                std::cout << "Updated baseline: " << baselinePath << '\n';
+                continue;
+            }
 
-        sf::Image expected;
-        if (!expected.loadFromFile(baselinePath))
-        {
-            std::cerr << "Missing UI baseline: " << baselinePath
-                      << "\nRegenerate it with the --update-baselines option.\n";
-            allPassed = false;
-            continue;
-        }
-        if (expected.getSize() != actual.getSize())
-        {
-            std::cerr << scenario.name << ": image size changed from "
-                      << expected.getSize().x << 'x' << expected.getSize().y << " to "
-                      << actual.getSize().x << 'x' << actual.getSize().y << '\n';
-            static_cast<void>(saveImage(
-                actual, artifactDirectory / (std::string {scenario.name} + "_actual.png")));
-            allPassed = false;
-            continue;
-        }
+            sf::Image expected;
+            if (!expected.loadFromFile(baselinePath))
+            {
+                std::cerr << "Missing UI baseline: " << baselinePath
+                          << "\nRegenerate it with the --update-baselines option.\n";
+                allPassed = false;
+                continue;
+            }
+            if (expected.getSize() != actual.getSize())
+            {
+                std::cerr << scenario.name << ": image size changed from "
+                          << expected.getSize().x << 'x' << expected.getSize().y << " to "
+                          << actual.getSize().x << 'x' << actual.getSize().y << '\n';
+                static_cast<void>(saveImage(
+                    actual, artifactDirectory / (std::string {scenario.name} + "_actual.png")));
+                allPassed = false;
+                continue;
+            }
 
-        sf::Image difference;
-        const Comparison comparison = compareImages(expected, actual, difference);
-        const double ratio = static_cast<double>(comparison.differentPixels)
-            / static_cast<double>(comparison.totalPixels);
-        if (ratio > AllowedDifferentPixelRatio)
-        {
-            const std::string prefix {scenario.name};
-            static_cast<void>(saveImage(actual, artifactDirectory / (prefix + "_actual.png")));
-            static_cast<void>(saveImage(difference, artifactDirectory / (prefix + "_diff.png")));
-            std::cerr << scenario.name << ": " << comparison.differentPixels << " / "
-                      << comparison.totalPixels << " pixels differ ("
-                      << ratio * 100.0 << "%, allowed "
-                      << AllowedDifferentPixelRatio * 100.0 << "%), max channel delta "
-                      << comparison.maximumChannelDelta << '\n';
-            allPassed = false;
+            sf::Image difference;
+            const Comparison comparison = compareImages(expected, actual, difference);
+            const double ratio = static_cast<double>(comparison.differentPixels)
+                / static_cast<double>(comparison.totalPixels);
+            if (ratio > AllowedDifferentPixelRatio)
+            {
+                const std::string prefix {scenario.name};
+                static_cast<void>(saveImage(actual,
+                    artifactDirectory / (prefix + "_actual.png")));
+                static_cast<void>(saveImage(difference,
+                    artifactDirectory / (prefix + "_diff.png")));
+                std::cerr << scenario.name << ": " << comparison.differentPixels << " / "
+                          << comparison.totalPixels << " pixels differ ("
+                          << ratio * 100.0 << "%, allowed "
+                          << AllowedDifferentPixelRatio * 100.0 << "%), max channel delta "
+                          << comparison.maximumChannelDelta << '\n';
+                allPassed = false;
+            }
+            else
+            {
+                std::cout << scenario.name << ": passed (" << comparison.differentPixels
+                          << " tolerant pixel differences)\n";
+            }
         }
-        else
-        {
-            std::cout << scenario.name << ": passed (" << comparison.differentPixels
-                      << " tolerant pixel differences)\n";
-        }
+    }
+    catch (const std::exception& exception)
+    {
+        std::cerr << "UI visual regression rendering failed: " << exception.what() << '\n';
+        return 1;
     }
 
     return allPassed ? 0 : 1;
