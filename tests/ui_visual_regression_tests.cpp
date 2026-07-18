@@ -26,6 +26,7 @@ constexpr unsigned int TileHeight = WindowHeight / 2U;
 constexpr unsigned int TileGuard = 16U;
 constexpr unsigned int RenderTileWidth = TileWidth + TileGuard * 2U;
 constexpr unsigned int RenderTileHeight = TileHeight + TileGuard * 2U;
+constexpr unsigned int RasterNeighborhoodRadius = 1U;
 // Channel tolerance absorbs tiny driver blending differences. More than nine
 // changed pixels at 1280x720 still fails, so even a single glyph regression is visible.
 constexpr double AllowedDifferentPixelRatio = 0.00001;
@@ -50,6 +51,7 @@ struct Scenario
 struct Comparison
 {
     std::size_t differentPixels {0};
+    std::size_t neighborhoodToleratedPixels {0};
     std::size_t totalPixels {0};
     int maximumChannelDelta {0};
 };
@@ -125,6 +127,29 @@ void drawScene(sf::RenderTarget& target, Scene scene)
         delta(left.b, right.b), delta(left.a, right.a)});
 }
 
+[[nodiscard]] bool hasMatchingNeighbor(const sf::Image& image,
+    const sf::Vector2u position, const sf::Color color)
+{
+    const sf::Vector2u size = image.getSize();
+    const unsigned int left = position.x > RasterNeighborhoodRadius
+        ? position.x - RasterNeighborhoodRadius : 0U;
+    const unsigned int top = position.y > RasterNeighborhoodRadius
+        ? position.y - RasterNeighborhoodRadius : 0U;
+    const unsigned int right = std::min(
+        position.x + RasterNeighborhoodRadius, size.x - 1U);
+    const unsigned int bottom = std::min(
+        position.y + RasterNeighborhoodRadius, size.y - 1U);
+    for (unsigned int y = top; y <= bottom; ++y)
+    {
+        for (unsigned int x = left; x <= right; ++x)
+        {
+            if (channelDelta(image.getPixel({x, y}), color) <= ChannelTolerance)
+                return true;
+        }
+    }
+    return false;
+}
+
 [[nodiscard]] Comparison compareImages(
     const sf::Image& expected, const sf::Image& actual, sf::Image& difference)
 {
@@ -138,13 +163,25 @@ void drawScene(sf::RenderTarget& target, Scene scene)
         for (unsigned int x = 0; x < size.x; ++x)
         {
             const sf::Vector2u position {x, y};
+            const sf::Color expectedPixel = expected.getPixel(position);
             const sf::Color actualPixel = actual.getPixel(position);
-            const int delta = channelDelta(expected.getPixel(position), actualPixel);
+            const int delta = channelDelta(expectedPixel, actualPixel);
             result.maximumChannelDelta = std::max(result.maximumChannelDelta, delta);
             if (delta > ChannelTolerance)
             {
-                ++result.differentPixels;
-                difference.setPixel(position, sf::Color {255, 30, 80});
+                const bool rasterEquivalent = hasMatchingNeighbor(
+                    expected, position, actualPixel)
+                    && hasMatchingNeighbor(actual, position, expectedPixel);
+                if (rasterEquivalent)
+                {
+                    ++result.neighborhoodToleratedPixels;
+                    difference.setPixel(position, sf::Color {40, 70, 90});
+                }
+                else
+                {
+                    ++result.differentPixels;
+                    difference.setPixel(position, sf::Color {255, 30, 80});
+                }
             }
             else
             {
@@ -157,6 +194,26 @@ void drawScene(sf::RenderTarget& target, Scene scene)
         }
     }
     return result;
+}
+
+[[nodiscard]] bool comparisonPolicyIsSound()
+{
+    constexpr sf::Vector2u Size {5U, 5U};
+    constexpr sf::Color Foreground {220, 210, 250};
+    sf::Image expected(Size, BackgroundColor);
+    expected.setPixel({2U, 2U}, Foreground);
+
+    sf::Image shifted(Size, BackgroundColor);
+    shifted.setPixel({3U, 2U}, Foreground);
+    sf::Image difference;
+    const Comparison shiftedComparison = compareImages(expected, shifted, difference);
+    if (shiftedComparison.differentPixels != 0U
+        || shiftedComparison.neighborhoodToleratedPixels != 2U) return false;
+
+    const sf::Image missing(Size, BackgroundColor);
+    const Comparison missingComparison = compareImages(expected, missing, difference);
+    return missingComparison.differentPixels == 1U
+        && missingComparison.neighborhoodToleratedPixels == 0U;
 }
 
 [[nodiscard]] bool saveImage(const sf::Image& image, const std::filesystem::path& path)
@@ -184,6 +241,11 @@ int main(int argc, char** argv)
     {
         std::cerr << "Unknown option: " << argv[3] << '\n';
         return 2;
+    }
+    if (!comparisonPolicyIsSound())
+    {
+        std::cerr << "UI visual comparison policy self-check failed\n";
+        return 3;
     }
 
     std::filesystem::create_directories(
@@ -245,7 +307,9 @@ int main(int argc, char** argv)
             else
             {
                 std::cout << scenario.name << ": passed (" << comparison.differentPixels
-                          << " tolerant pixel differences)\n";
+                          << " significant differences, "
+                          << comparison.neighborhoodToleratedPixels
+                          << " one-pixel raster differences tolerated)\n";
             }
         }
     }
