@@ -215,7 +215,68 @@ bool ApplicationViewModel::canExecute(const common::FrameCommand&) const noexcep
 
 void ApplicationViewModel::execute(const common::FrameCommand& command)
 {
-    update(command.input, command.deltaSeconds);
+    common::InputState combined = command.input;
+    combined.toggleLoadoutPressed = combined.toggleLoadoutPressed
+        || pendingUiInput_.toggleLoadoutPressed;
+    combined.menuPreviousPressed = combined.menuPreviousPressed
+        || pendingUiInput_.menuPreviousPressed;
+    combined.menuNextPressed = combined.menuNextPressed
+        || pendingUiInput_.menuNextPressed;
+    combined.menuPagePreviousPressed = combined.menuPagePreviousPressed
+        || pendingUiInput_.menuPagePreviousPressed;
+    combined.menuPageNextPressed = combined.menuPageNextPressed
+        || pendingUiInput_.menuPageNextPressed;
+    combined.menuUpPressed = combined.menuUpPressed || pendingUiInput_.menuUpPressed;
+    combined.menuDownPressed = combined.menuDownPressed || pendingUiInput_.menuDownPressed;
+    combined.pausePressed = combined.pausePressed || pendingUiInput_.pausePressed;
+    combined.menuConfirmPressed = combined.menuConfirmPressed
+        || pendingUiInput_.menuConfirmPressed;
+    combined.menuSecondaryPressed = combined.menuSecondaryPressed
+        || pendingUiInput_.menuSecondaryPressed;
+    combined.debugEventPreviewPressed = combined.debugEventPreviewPressed
+        || pendingUiInput_.debugEventPreviewPressed;
+    combined.debugMerchantPreviewPressed = combined.debugMerchantPreviewPressed
+        || pendingUiInput_.debugMerchantPreviewPressed;
+    combined.debugSpellAcquisitionPreviewPressed = combined.debugSpellAcquisitionPreviewPressed
+        || pendingUiInput_.debugSpellAcquisitionPreviewPressed;
+    for (std::size_t index = 0; index < combined.debugBossPreviewPressed.size(); ++index)
+    {
+        combined.debugBossPreviewPressed[index] = combined.debugBossPreviewPressed[index]
+            || pendingUiInput_.debugBossPreviewPressed[index];
+    }
+    pendingUiInput_ = {};
+    update(combined, command.deltaSeconds);
+}
+
+bool ApplicationViewModel::canExecute(const common::UiCommand&) const noexcept
+{
+    return true;
+}
+
+void ApplicationViewModel::execute(const common::UiCommand& command)
+{
+    using common::UiAction;
+    switch (command.action)
+    {
+    case UiAction::ToggleLoadout: pendingUiInput_.toggleLoadoutPressed = true; break;
+    case UiAction::SelectPrevious: pendingUiInput_.menuPreviousPressed = true; break;
+    case UiAction::SelectNext: pendingUiInput_.menuNextPressed = true; break;
+    case UiAction::PreviousPage: pendingUiInput_.menuPagePreviousPressed = true; break;
+    case UiAction::NextPage: pendingUiInput_.menuPageNextPressed = true; break;
+    case UiAction::SelectUp: pendingUiInput_.menuUpPressed = true; break;
+    case UiAction::SelectDown: pendingUiInput_.menuDownPressed = true; break;
+    case UiAction::TogglePause: pendingUiInput_.pausePressed = true; break;
+    case UiAction::Confirm: pendingUiInput_.menuConfirmPressed = true; break;
+    case UiAction::Secondary: pendingUiInput_.menuSecondaryPressed = true; break;
+    case UiAction::PreviewEvent: pendingUiInput_.debugEventPreviewPressed = true; break;
+    case UiAction::PreviewMerchant: pendingUiInput_.debugMerchantPreviewPressed = true; break;
+    case UiAction::PreviewSpellAcquisition:
+        pendingUiInput_.debugSpellAcquisitionPreviewPressed = true;
+        break;
+    case UiAction::PreviewBossOne: pendingUiInput_.debugBossPreviewPressed[0] = true; break;
+    case UiAction::PreviewBossTwo: pendingUiInput_.debugBossPreviewPressed[1] = true; break;
+    case UiAction::PreviewBossThree: pendingUiInput_.debugBossPreviewPressed[2] = true; break;
+    }
 }
 
 const common::binding::IReadOnlyProperty<ApplicationSnapshot>&

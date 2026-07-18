@@ -18,13 +18,17 @@ using ApplicationScreen = common::ui::ApplicationScreen;
 using PauseMenuItem = common::ui::PauseMenuItem;
 using ApplicationSnapshot = common::ui::ApplicationState;
 
-class ApplicationViewModel final : public common::binding::ICommandBinding<common::FrameCommand>
+class ApplicationViewModel final
+    : public common::binding::ICommandBinding<common::FrameCommand>,
+      public common::binding::ICommandBinding<common::UiCommand>
 {
 public:
     explicit ApplicationViewModel(game::run::Seed seed, app::TowerSessionConfig config = {});
 
     [[nodiscard]] bool canExecute(const common::FrameCommand& command) const noexcept override;
     void execute(const common::FrameCommand& command) override;
+    [[nodiscard]] bool canExecute(const common::UiCommand& command) const noexcept override;
+    void execute(const common::UiCommand& command) override;
 
     [[nodiscard]] const common::binding::IReadOnlyProperty<ApplicationSnapshot>&
         stateBinding() const noexcept;
@@ -58,5 +62,6 @@ private:
     bool victory_ {};
     common::binding::ObservableProperty<ApplicationSnapshot> state_;
     common::binding::EventChannel<common::UiEvent> events_;
+    common::InputState pendingUiInput_;
 };
 }

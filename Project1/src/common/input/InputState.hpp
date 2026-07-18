@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 
 namespace arcane::common
 {
@@ -34,5 +35,30 @@ struct FrameCommand
 {
     InputState input;
     float deltaSeconds {};
+};
+
+enum class UiAction : std::uint8_t
+{
+    ToggleLoadout,
+    SelectPrevious,
+    SelectNext,
+    PreviousPage,
+    NextPage,
+    SelectUp,
+    SelectDown,
+    TogglePause,
+    Confirm,
+    Secondary,
+    PreviewEvent,
+    PreviewMerchant,
+    PreviewSpellAcquisition,
+    PreviewBossOne,
+    PreviewBossTwo,
+    PreviewBossThree,
+};
+
+struct UiCommand
+{
+    UiAction action {UiAction::Confirm};
 };
 }

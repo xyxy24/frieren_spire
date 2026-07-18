@@ -184,6 +184,16 @@ if(BUILD_TESTING)
     )
     target_link_libraries(ui_viewmodel_tests PRIVATE arcane_viewmodel)
 
+    add_executable(ui_visual_regression_tests
+        tests/ui_visual_regression_tests.cpp
+    )
+    target_link_libraries(ui_visual_regression_tests PRIVATE
+        arcane_sfml_view
+        SFML::Graphics
+        SFML::Window
+        SFML::System
+    )
+
     # This manual visual smoke test opens a real SFML window. Keep it outside
     # the default build/CTest run so headless CI remains deterministic.
     add_executable(ui_window_smoke_test EXCLUDE_FROM_ALL
@@ -207,6 +217,7 @@ if(BUILD_TESTING)
     arcane_enable_warnings(sfml_input_mapper_tests)
     arcane_enable_warnings(binding_contract_tests)
     arcane_enable_warnings(ui_viewmodel_tests)
+    arcane_enable_warnings(ui_visual_regression_tests)
     arcane_enable_warnings(ui_window_smoke_test)
 
     add_custom_command(TARGET ui_window_smoke_test POST_BUILD
@@ -233,6 +244,10 @@ if(BUILD_TESTING)
     add_test(NAME sfml_input_mapper COMMAND sfml_input_mapper_tests)
     add_test(NAME binding_contract COMMAND binding_contract_tests)
     add_test(NAME ui_viewmodel COMMAND ui_viewmodel_tests)
+    add_test(NAME ui_visual_regression
+        COMMAND ui_visual_regression_tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/baselines/ui/windows
+            ${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/ui)
     add_test(NAME view_dependency_boundary
         COMMAND ${CMAKE_COMMAND}
             -DPROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}

@@ -8,6 +8,8 @@
 namespace
 {
 using arcane::common::FrameCommand;
+using arcane::common::UiAction;
+using arcane::common::UiCommand;
 using arcane::common::ui::ApplicationScreen;
 using arcane::common::ui::FloorKind;
 using arcane::common::ui::PauseMenuItem;
@@ -19,10 +21,11 @@ bool expect(const bool condition, const std::string_view message)
     return condition;
 }
 
-void send(ApplicationViewModel& application, arcane::common::InputState input,
+void sendUi(ApplicationViewModel& application, const UiAction action,
     const float deltaSeconds = 0.01F)
 {
-    application.execute(FrameCommand {input, deltaSeconds});
+    application.execute(UiCommand {action});
+    application.execute(FrameCommand {{}, deltaSeconds});
 }
 
 bool startPauseExitAndContinueFlowIsProjected()
@@ -34,36 +37,28 @@ bool startPauseExitAndContinueFlowIsProjected()
             && !state.value().canContinue && !state.value().run,
             "a fresh application must show START without a resumable run")) return false;
 
-    arcane::common::InputState input;
-    input.menuConfirmPressed = true;
-    send(application, input);
+    sendUi(application, UiAction::Confirm);
     const auto startedFloor = state.value().run ? state.value().run->floorIndex : 999U;
     const auto startedSeed = state.value().run ? state.value().run->runSeed : 0U;
     if (!expect(state.value().screen == ApplicationScreen::Playing
             && state.value().run && state.value().combat,
             "confirming START must publish a playable combat scene")) return false;
 
-    input = {};
-    input.pausePressed = true;
-    send(application, input);
+    sendUi(application, UiAction::TogglePause);
     if (!expect(state.value().screen == ApplicationScreen::Pause
             && state.value().pauseMenuItem == PauseMenuItem::ReplayCurrentFloor,
             "pause must open with replay-current-floor selected")) return false;
 
-    input = {};
-    input.menuDownPressed = true;
-    send(application, input);
+    sendUi(application, UiAction::SelectDown);
     if (!expect(state.value().pauseMenuItem == PauseMenuItem::SaveAndExit,
             "pause navigation must select save-and-exit")) return false;
 
-    input = {};
-    input.menuConfirmPressed = true;
-    send(application, input);
+    sendUi(application, UiAction::Confirm);
     if (!expect(state.value().screen == ApplicationScreen::Start
             && state.value().canContinue && state.value().run,
             "save-and-exit must return to a CONTINUE-capable start screen")) return false;
 
-    send(application, input);
+    sendUi(application, UiAction::Confirm);
     return expect(state.value().screen == ApplicationScreen::Playing
             && state.value().run && state.value().run->floorIndex == startedFloor
             && state.value().run->runSeed == startedSeed,
@@ -73,9 +68,7 @@ bool startPauseExitAndContinueFlowIsProjected()
 bool specialFloorPreviewsExposeTheCorrectUiModel()
 {
     ApplicationViewModel eventApplication {0xE7E17U};
-    arcane::common::InputState input;
-    input.debugEventPreviewPressed = true;
-    send(eventApplication, input);
+    sendUi(eventApplication, UiAction::PreviewEvent);
     const auto& eventState = eventApplication.stateBinding().value();
     if (!expect(eventState.screen == ApplicationScreen::Playing && eventState.run
             && eventState.run->floorKind == FloorKind::Event && eventState.specialFloor
@@ -83,9 +76,7 @@ bool specialFloorPreviewsExposeTheCorrectUiModel()
             "event preview must expose event-room UI state without a combat scene")) return false;
 
     ApplicationViewModel merchantApplication {0x5A0FU};
-    input = {};
-    input.debugMerchantPreviewPressed = true;
-    send(merchantApplication, input);
+    sendUi(merchantApplication, UiAction::PreviewMerchant);
     const auto& merchantState = merchantApplication.stateBinding().value();
     return expect(merchantState.screen == ApplicationScreen::Playing && merchantState.run
             && merchantState.run->floorKind == FloorKind::Merchant
@@ -98,19 +89,15 @@ bool specialFloorPreviewsExposeTheCorrectUiModel()
 bool loadoutOverlayTogglesWithoutReplacingGameplayState()
 {
     ApplicationViewModel application {0x10AD0U};
-    arcane::common::InputState input;
-    input.menuConfirmPressed = true;
-    send(application, input);
+    sendUi(application, UiAction::Confirm);
 
-    input = {};
-    input.toggleLoadoutPressed = true;
-    send(application, input);
+    sendUi(application, UiAction::ToggleLoadout);
     const auto& openState = application.stateBinding().value();
     if (!expect(openState.screen == ApplicationScreen::Playing && openState.combat
             && openState.loadout && openState.equippedSlots,
             "opening loadout must layer its UI model over the active gameplay scene")) return false;
 
-    send(application, input);
+    sendUi(application, UiAction::ToggleLoadout);
     const auto& closedState = application.stateBinding().value();
     return expect(closedState.screen == ApplicationScreen::Playing && closedState.combat
             && !closedState.loadout && closedState.equippedSlots,

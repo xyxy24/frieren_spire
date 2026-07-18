@@ -59,7 +59,7 @@
 - `CombatSession` 已按职责拆为四个编译单元：主文件保留生命周期、通用推进、伤害入口和快照投影；`CombatSessionSpellEffects.cpp` 负责玩家魔法及遗物命中联动；`CombatSessionEnemySkills.cpp` 负责敌人和 Boss 主动技能；`CombatSessionBossRules.cpp` 负责 Boss 阶段、对话与战斗结束路由。拆分不改变状态所有权和公共接口，主实现由约 2450 行降至约 1490 行，现有战斗回归测试保持通过。
 - 阿乌拉支配已从全场必中改为身前 `420×180 px`、0.8 秒可视预警和单次控制结算；紫色天平锁链图集直接缩放到权威 `skillEffectBounds`，背后、范围外、跳出区域及黑冲/法术无敌均可规避。
 - 阿乌拉新增“灵魂断头台”：首次支配后以 9 秒独立 CD 锁定玩家当时位置，显示 `192×420 px`、0.9 秒的紫红锁链和落刃预警，随后单次造成 22 点伤害；区域生成后不追踪，需要明确横移，也可用黑冲/法术无敌规避。领域层输出范围与阶段，SFML 视图分别加载只占边缘的固定断头台框架与宽度约为判定区 58% 的独立薄刃，并由程序驱动刀刃在 0.18 秒有效阶段从顶部贯穿至底部；素材缺失时仍使用程序化横梁、导轨与窄刃回退。
-- 已按课程要求建立严格的纯 C++ MVVM/Common 边界：`common` 提供单向只读属性绑定、命令绑定、事件通知绑定与跨层 DTO；`ApplicationViewModel` 把完整页面/玩法投影发布为 `ApplicationState`，`SfmlInputMapper` 只生成 `FrameCommand`，所有具体 View 只消费 Common 状态，不再包含 Model 或 ViewModel 头文件。奖励、商店、事件、构筑、战斗、获取演出和装备槽均已迁移到同一绑定路径。
+- 已按课程要求建立严格的纯 C++ MVVM/Common 边界：`common` 提供带修订号和 RAII 变化订阅的单向只读属性绑定、命令绑定、事件通知绑定与跨层 DTO；`ApplicationViewModel` 把完整页面/玩法投影发布为 `ApplicationState`。`SfmlInputMapper` 的持续移动/战斗输入通过 `FrameCommand` 提交，暂停、确认、页签、选择和预览入口通过语义化 `UiCommand` 绑定后在同一模拟帧统一执行。所有具体 View 只消费 Common 状态，不再包含 Model 或 ViewModel 头文件。奖励、商店、事件、构筑、战斗、获取演出和装备槽均已迁移到同一绑定路径。
 - CMake 已把依赖拆为 `arcane_common`、`arcane_core`、`arcane_viewmodel`、`arcane_sfml_view` 与最终组合根 `Project1`；其中 SFML View 目标无法链接 Core/ViewModel。新增绑定契约测试覆盖属性发布、命令执行、事件确认，源码边界 CTest 自动阻止 View 重新引用 `app/`、`game/` 或具体 ViewModel。原约 1500 行的 `SfmlApplication.cpp` 已拆为应用壳与 `UiPrimitives`、`ScreenViews`、`CombatView`、`SpellAcquisitionView`、`StaircaseView` 等独立模块。
 - 战斗命中反馈已补齐：玩家实际损失 HP 后由集中伤害入口启动 `0.60 秒`受击无敌和权威受击序列，现有 4 帧 Hit 动画按序列重播；`CombatFeedbackViewModel` 根据只读 HP 快照生成玩家/敌人闪白、飘字与确定性镜头震动。护盾完全吸收和既有无敌不会误触发，连续与重叠伤害的窗口行为已有回归测试。
 - 命中手感第二阶段已接入：普通敌人按单次实际伤害分为 `0.06/0.09/0.13 秒`轻中重停顿，Boss 与最终战复制体缩放到 `45%`且最多 `0.055 秒`，玩家受击使用 `0.075 秒`；同帧只取最长值。停顿仅冻结活动战斗和角色动画，反馈与 UI 继续推进，同时补充命中扩散环、敌人 7 px 纯视觉冲击位移和更大的致死扩散环；全部参数集中在 `CombatFeedbackTuning`，不触碰敌人 AI 与碰撞规则。
@@ -296,6 +296,8 @@
 - UI 状态流转通过无窗口的 ViewModel 快照测试验证，避免自动化环境依赖图形桌面。
 - GitHub Actions 在每次 push 与 pull request 时使用 Windows/Visual Studio 2022 完成 Debug 构建和完整 CTest；CI 通过后方可视为分支可集成。
 - 提供独立的 `ui_window_smoke_test` 可视化冒烟测试供现场验收；该目标打开真实 SFML 窗口并自动演示关键 UI 流转，但不加入默认 CTest/CI。
+- `ui_visual_regression_tests` 使用 `sf::RenderTexture` 离屏绘制开始页和暂停页，与仓库内 Windows 基准 PNG 做容差比较；发生回归时输出实际图和红色差异图，CI 会上传失败产物。
+- 只有确认 UI 改动正确后才运行 `.\scripts\Invoke-VsCMake.ps1 update-ui-baselines` 更新基准图，并将代码与对应 PNG 放在同一次提交中审查。
 
 ## 13. 紧接着要做的事情
 

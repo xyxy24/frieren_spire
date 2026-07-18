@@ -23,14 +23,34 @@ bool propertyBindingPublishesReadOnlyState()
     if (!expect(binding.value() == 7 && binding.revision() == 0U,
             "property binding must expose its initial value without a write API")) return false;
 
-    source.publish(11);
-    return expect(binding.value() == 11 && binding.revision() == 1U,
-        "property binding must publish a new immutable snapshot and revision");
+    std::size_t notificationCount = 0U;
+    std::uint64_t notifiedRevision = 0U;
+    {
+        auto connection = binding.subscribe([&](const std::uint64_t revision) {
+            ++notificationCount;
+            notifiedRevision = revision;
+        });
+        if (!expect(connection.connected(), "property subscription must return a live connection"))
+            return false;
+        source.publish(11);
+        if (!expect(binding.value() == 11 && binding.revision() == 1U,
+                "property binding must publish a new immutable snapshot and revision"))
+            return false;
+        if (!expect(notificationCount == 1U && notifiedRevision == 1U,
+                "property subscribers must be notified with the published revision"))
+            return false;
+    }
+
+    source.publish(13);
+    return expect(notificationCount == 1U && binding.value() == 13,
+        "destroying a binding connection must automatically unsubscribe");
 }
 
 bool applicationUsesCommandAndEventBindings()
 {
     using arcane::common::FrameCommand;
+    using arcane::common::UiAction;
+    using arcane::common::UiCommand;
     using arcane::common::UiEventKind;
     using arcane::common::ui::ApplicationScreen;
     arcane::presentation::viewmodel::ApplicationViewModel application {0xB1D1A6U};
@@ -41,11 +61,11 @@ bool applicationUsesCommandAndEventBindings()
     const auto initialRevision = property.revision();
 
     arcane::common::binding::ICommandBinding<FrameCommand>& commands = application;
-    FrameCommand start;
-    start.input.menuConfirmPressed = true;
-    start.deltaSeconds = 0.01F;
-    if (!expect(commands.canExecute(start), "start command must be executable")) return false;
-    commands.execute(start);
+    arcane::common::binding::ICommandBinding<UiCommand>& uiCommands = application;
+    const UiCommand start {UiAction::Confirm};
+    if (!expect(uiCommands.canExecute(start), "start UI command must be executable")) return false;
+    uiCommands.execute(start);
+    commands.execute(FrameCommand {{}, 0.01F});
 
     if (!expect(property.revision() == initialRevision + 1U
             && property.value().screen == ApplicationScreen::Playing

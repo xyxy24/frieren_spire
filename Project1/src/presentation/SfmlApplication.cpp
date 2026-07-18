@@ -33,6 +33,35 @@ namespace
 {
 constexpr float MaximumFrameTime = 0.05F;
 
+void dispatchUiCommands(arcane::common::InputState& input,
+    arcane::common::binding::ICommandBinding<arcane::common::UiCommand>& commands)
+{
+    const auto dispatch = [&](bool& active, const arcane::common::UiAction action) {
+        if (!active) return;
+        commands.execute({action});
+        active = false;
+    };
+
+    using arcane::common::UiAction;
+    dispatch(input.toggleLoadoutPressed, UiAction::ToggleLoadout);
+    dispatch(input.menuPreviousPressed, UiAction::SelectPrevious);
+    dispatch(input.menuNextPressed, UiAction::SelectNext);
+    dispatch(input.menuPagePreviousPressed, UiAction::PreviousPage);
+    dispatch(input.menuPageNextPressed, UiAction::NextPage);
+    dispatch(input.menuUpPressed, UiAction::SelectUp);
+    dispatch(input.menuDownPressed, UiAction::SelectDown);
+    dispatch(input.pausePressed, UiAction::TogglePause);
+    dispatch(input.menuConfirmPressed, UiAction::Confirm);
+    dispatch(input.menuSecondaryPressed, UiAction::Secondary);
+    dispatch(input.debugEventPreviewPressed, UiAction::PreviewEvent);
+    dispatch(input.debugMerchantPreviewPressed, UiAction::PreviewMerchant);
+    dispatch(input.debugSpellAcquisitionPreviewPressed, UiAction::PreviewSpellAcquisition);
+    constexpr std::array bossActions {
+        UiAction::PreviewBossOne, UiAction::PreviewBossTwo, UiAction::PreviewBossThree};
+    for (std::size_t index = 0; index < bossActions.size(); ++index)
+        dispatch(input.debugBossPreviewPressed[index], bossActions[index]);
+}
+
 arcane::common::ui::Seed makeRuntimeSeed()
 {
     std::random_device device;
@@ -575,8 +604,13 @@ int arcane::presentation::SfmlApplication::runImpl(const bool visualSmokeTest)
         spellEffectAnimator};
     sf::Clock frameClock;
     ui::CombatFeedbackViewModel combatFeedback;
-    arcane::common::binding::ICommandBinding<arcane::common::FrameCommand>& commands = app;
+    arcane::common::binding::ICommandBinding<arcane::common::FrameCommand>& frameCommands = app;
+    arcane::common::binding::ICommandBinding<arcane::common::UiCommand>& uiCommands = app;
     auto& events = app.eventBinding();
+    bool applicationStateChanged = true;
+    auto applicationStateConnection = app.stateBinding().subscribe(
+        [&](const std::uint64_t) { applicationStateChanged = true; });
+    static_cast<void>(applicationStateConnection);
     constexpr std::size_t SmokeStepCount = 12U;
     std::size_t smokeStep = 0U;
     bool smokePassed = !visualSmokeTest || visualSmokeStateMatches(0U,
@@ -642,7 +676,8 @@ int arcane::presentation::SfmlApplication::runImpl(const bool visualSmokeTest)
                 smokeFirstFrame = false;
             }
         }
-        commands.execute({frameInput, simulationDeltaSeconds});
+        dispatchUiCommands(frameInput, uiCommands);
+        frameCommands.execute({frameInput, simulationDeltaSeconds});
         if (visualSmokeTest && !smokeFinished)
         {
             if (smokeStep == 1U && !smokeInitialPlayerX
@@ -690,7 +725,11 @@ int arcane::presentation::SfmlApplication::runImpl(const bool visualSmokeTest)
         }
         else
             shadeChargeAnimator.reset();
-        updateWindowTitle(window, app, displayedWindowTitle);
+        if (applicationStateChanged)
+        {
+            updateWindowTitle(window, app, displayedWindowTitle);
+            applicationStateChanged = false;
+        }
         renderApplicationFrame(window, application, presentationState, renderResources,
             combatFeedback.snapshot());
         if (visualSmokeTest)

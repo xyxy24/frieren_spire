@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("doctor", "configure", "build-debug", "build-release", "test-debug", "test-release")]
+    [ValidateSet("doctor", "configure", "build-debug", "build-release", "test-debug", "test-release", "update-ui-baselines")]
     [string]$Action
 )
 
@@ -93,13 +93,25 @@ $arguments = switch ($Action) {
     "configure" { @("--preset", $configurePreset) }
     "build-debug" { @("--build", "--preset", $debugBuildPreset) }
     "build-release" { @("--build", "--preset", $releaseBuildPreset) }
-    "test-debug" { @("--build", "--preset", $debugBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests", "binding_contract_tests", "ui_viewmodel_tests") }
-    "test-release" { @("--build", "--preset", $releaseBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests", "binding_contract_tests", "ui_viewmodel_tests") }
+    "test-debug" { @("--build", "--preset", $debugBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests", "binding_contract_tests", "ui_viewmodel_tests", "ui_visual_regression_tests") }
+    "test-release" { @("--build", "--preset", $releaseBuildPreset, "--target", "arcane_core_tests", "combat_session_tests", "run_flow_tests", "tower_session_tests", "arena_layout_tests", "sfml_input_mapper_tests", "binding_contract_tests", "ui_viewmodel_tests", "ui_visual_regression_tests") }
+    "update-ui-baselines" { @("--build", "--preset", $debugBuildPreset, "--target", "ui_visual_regression_tests") }
 }
 
 & $cmake @arguments
 if ($LASTEXITCODE -ne 0) {
     throw "CMake action '$Action' failed with exit code $LASTEXITCODE."
+}
+
+if ($Action -eq "update-ui-baselines") {
+    $testExecutable = Join-Path $buildDirectory "Debug\ui_visual_regression_tests.exe"
+    $baselineDirectory = Join-Path $PSScriptRoot "..\tests\baselines\ui\windows"
+    $artifactDirectory = Join-Path $buildDirectory "test-artifacts\ui"
+    & $testExecutable $baselineDirectory $artifactDirectory --update-baselines
+    if ($LASTEXITCODE -ne 0) {
+        throw "Updating UI baselines failed with exit code $LASTEXITCODE."
+    }
+    return
 }
 
 if ($Action -eq "test-debug" -or $Action -eq "test-release") {
